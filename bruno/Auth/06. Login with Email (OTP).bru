@@ -1,0 +1,27 @@
+meta {
+  name: 06. Login with Email (OTP)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/login/email
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{testEmail}}"
+  }
+}
+
+vars:post-response {
+  token: res.body.data.access_token
+  refreshToken: res.body.data.refresh_token
+  userId: res.body.data.user.id
+}
