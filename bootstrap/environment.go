@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -10,6 +11,19 @@ type Environment struct {
 	DataBase   DataBase   `mapstructure:",squash"`
 	Redis      Redis      `mapstructure:",squash"`
 	HttpServer HttpServer `mapstructure:",squash"`
+	JWT        JWTConfig  `mapstructure:",squash"`
+	OTP        OTPConfig  `mapstructure:",squash"`
+}
+
+type JWTConfig struct {
+	SecretKey      string        `mapstructure:"JWT_SECRET_KEY"`
+	AccessTokenTTL time.Duration `mapstructure:"ACCESS_TOKEN_TTL"`
+}
+
+type OTPConfig struct {
+	TTL         time.Duration `mapstructure:"OTP_TTL"`
+	VerifiedTTL time.Duration `mapstructure:"OTP_VERIFIED_TTL"`
+	Digits      int           `mapstructure:"OTP_DIGITS"`
 }
 
 type DataBase struct {
@@ -37,11 +51,8 @@ func NewEnvironment() (*Environment, error) {
 	v := viper.New()
 	v.SetConfigFile(".env")
 	v.SetConfigType("env")
-	for _, key := range []string{
-		"HTTP_DOMAIN", "HTTP_PORT",
-		"PDB_HOST", "PDB_PORT", "PDB_USER", "PDB_PASSWORD", "PDB_DB_NAME", "PDB_SSL_MODE",
-		"RDB_HOST", "RDB_PORT", "RDB_PASSWORD", "RDB_DB_NUMBER",
-	} {
+
+	for _, key := range EnvKeys {
 		if err := v.BindEnv(key); err != nil {
 			return nil, err
 		}
@@ -53,5 +64,6 @@ func NewEnvironment() (*Environment, error) {
 	if err := v.Unmarshal(&environment); err != nil {
 		return nil, fmt.Errorf("read environment settings: %w", err)
 	}
+
 	return &environment, nil
 }

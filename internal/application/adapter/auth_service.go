@@ -1,0 +1,13 @@
+package adapter
+
+import (
+	"context"
+
+	"github.com/Doratou/Backend/internal/application/dto"
+)
+
+type AuthService interface {
+	Register(ctx context.Context, req dto.RegisterRequest) (*dto.AuthResponse, error)
+	SendOTP(ctx context.Context, req dto.SendOTPRequest) (*dto.SendOTPResponse, error)
+	VerifyOTP(ctx context.Context, req dto.VerifyOTPRequest) (*dto.VerifyOTPResponse, error)
+}
