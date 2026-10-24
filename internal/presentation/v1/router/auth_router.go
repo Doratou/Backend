@@ -6,11 +6,20 @@ import (
 )
 
 // RegisterAuthRoutes wires the authentication and OTP verification endpoints onto the router group.
-func RegisterAuthRoutes(rg *gin.RouterGroup, authHandler *handler.AuthHandler, authMiddleware gin.HandlerFunc) {
+func RegisterAuthRoutes(
+	rg *gin.RouterGroup,
+	authHandler *handler.AuthHandler,
+	authMiddleware gin.HandlerFunc,
+	captchaMiddleware gin.HandlerFunc,
+) {
 	auth := rg.Group("/auth")
 	{
-		// Public OTP endpoints
-		auth.POST("/otp/send", authHandler.SendOTP)
+		// Public OTP endpoints (protected by CaptchaGuard if configured)
+		if captchaMiddleware != nil {
+			auth.POST("/otp/send", captchaMiddleware, authHandler.SendOTP)
+		} else {
+			auth.POST("/otp/send", authHandler.SendOTP)
+		}
 		auth.POST("/otp/verify", authHandler.VerifyOTP)
 
 		// Public registration & login endpoints
@@ -18,7 +27,13 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authHandler *handler.AuthHandler, a
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/login/email", authHandler.LoginWithEmail)
 		auth.POST("/login/phone", authHandler.LoginWithPhone)
-		auth.POST("/password/reset", authHandler.ResetPassword)
+
+		// Password reset (protected by CaptchaGuard if configured)
+		if captchaMiddleware != nil {
+			auth.POST("/password/reset", captchaMiddleware, authHandler.ResetPassword)
+		} else {
+			auth.POST("/password/reset", authHandler.ResetPassword)
+		}
 
 		// Token refresh
 		auth.POST("/refresh", authHandler.Refresh)
@@ -26,6 +41,5 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authHandler *handler.AuthHandler, a
 		// Protected endpoints (require valid access token)
 		auth.POST("/logout", authMiddleware, authHandler.Logout)
 		auth.POST("/password/change", authMiddleware, authHandler.ChangePassword)
-
 	}
 }

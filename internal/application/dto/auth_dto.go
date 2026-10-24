@@ -29,7 +29,7 @@ type VerifyOTPResponse struct {
 }
 
 type RegisterRequest struct {
-	Name     string  `json:"name" binding:"required,min=2,max=100"`
+	Name     string  `json:"name" binding:"omitempty,min=2,max=100"`
 	Password string  `json:"password" binding:"required,min=6,max=100"`
 	Email    *string `json:"email,omitempty"`
 	Phone    *string `json:"phone,omitempty"`

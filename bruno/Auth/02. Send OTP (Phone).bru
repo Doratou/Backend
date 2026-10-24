@@ -12,11 +12,13 @@ post {
 
 headers {
   Content-Type: application/json
+  ~X-Captcha-ID: {{captchaId}}
+  ~X-Captcha-Code: 
 }
 
 body:json {
   {
-    "identifier": "{{testPhone}}",
+    "identifier": "{{seedUserPhone}}",
     "type": "phone"
   }
 }

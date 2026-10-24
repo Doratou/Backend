@@ -90,7 +90,7 @@ func main() {
 
 	// 5. Crypto & Security Utilities
 	passwordHasher := hasher.NewBcryptHasher()
-	captchaMan := captcha.NewStringCaptcha(nil)
+	captchaMan := captcha.NewDigitCaptcha(nil)
 	jwtMaker, err := jwt.NewJWTMaker(cfg.Environment.JWT.SecretKey)
 	if err != nil {
 		log.Fatalf("failed to initialize JWT maker: %v", err)
@@ -145,6 +145,8 @@ func main() {
 	engine := router.New(router.Dependencies{
 		AuthHandler:    authHandler,
 		CaptchaHandler: captchaHandler,
+		CaptchaService: captchaService,
+		CaptchaEnabled: cfg.Environment.Captcha.Enabled,
 		TokenMaker:     jwtMaker,
 		TokenRepo:      tokenRepo,
 	})

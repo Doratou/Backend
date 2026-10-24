@@ -18,7 +18,8 @@ type Environment struct {
 }
 
 type CaptchaConfig struct {
-	TTL time.Duration `mapstructure:"CAPTCHA_TTL"`
+	Enabled bool          `mapstructure:"CAPTCHA_ENABLED"`
+	TTL     time.Duration `mapstructure:"CAPTCHA_TTL"`
 }
 
 type SeedConfig struct {
@@ -49,7 +50,7 @@ type DataBase struct {
 	Host     string `mapstructure:"PDB_HOST"`
 	Port     string `mapstructure:"PDB_PORT"`
 	User     string `mapstructure:"PDB_USER"`
-	Password string `mapstructure:"PDB_PASSWORD" json:"-"`
+	Password string `mapstructure:"PDB_PASSWORD"`
 	Name     string `mapstructure:"PDB_DB_NAME"`
 	SSLMode  string `mapstructure:"PDB_SSL_MODE"`
 }
@@ -57,7 +58,7 @@ type DataBase struct {
 type Redis struct {
 	Host      string `mapstructure:"RDB_HOST"`
 	Port      string `mapstructure:"RDB_PORT"`
-	Password  string `mapstructure:"RDB_PASSWORD" json:"-"`
+	Password  string `mapstructure:"RDB_PASSWORD"`
 	RDBNumber string `mapstructure:"RDB_DB_NUMBER"`
 }
 

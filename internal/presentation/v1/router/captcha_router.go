@@ -10,7 +10,6 @@ func RegisterCaptchaRoutes(rg *gin.RouterGroup, handler *handler.CaptchaHandler)
 	captchaGroup := rg.Group("/captcha")
 	{
 		captchaGroup.POST("/generate", handler.Generate)
-		captchaGroup.GET("/generate", handler.Generate)
 		captchaGroup.POST("/verify", handler.Verify)
 	}
 }
