@@ -54,6 +54,7 @@ var (
 	ErrDomainTokenInvalid         = errors.New("token is invalid")
 	ErrDomainTokenExpired         = errors.New("token has expired")
 	ErrDomainTokenRevoked         = errors.New("token has been revoked")
+	ErrDomainTokenNotFound        = errors.New("token session not found or revoked")
 	ErrDomainMissingToken         = errors.New("missing authorization token")
 	ErrDomainRefreshTokenInvalid  = errors.New("invalid or expired refresh token")
 
@@ -85,6 +86,7 @@ var (
 	ErrTokenInvalid              = &AppError{Code: "TOKEN_INVALID", Message: "authorization token is invalid", HTTPStatus: http.StatusUnauthorized, Err: ErrDomainTokenInvalid}
 	ErrTokenExpired              = &AppError{Code: "TOKEN_EXPIRED", Message: "authorization token has expired", HTTPStatus: http.StatusUnauthorized, Err: ErrDomainTokenExpired}
 	ErrTokenRevoked              = &AppError{Code: "TOKEN_REVOKED", Message: "authorization token has been revoked", HTTPStatus: http.StatusUnauthorized, Err: ErrDomainTokenRevoked}
+	ErrTokenNotFound             = &AppError{Code: "TOKEN_NOT_FOUND", Message: "token session not found or revoked", HTTPStatus: http.StatusUnauthorized, Err: ErrDomainTokenNotFound}
 	ErrMissingToken              = &AppError{Code: "MISSING_TOKEN", Message: "authorization token is missing", HTTPStatus: http.StatusUnauthorized, Err: ErrDomainMissingToken}
 	ErrRefreshTokenInvalid       = &AppError{Code: "REFRESH_TOKEN_INVALID", Message: "refresh token is invalid or expired", HTTPStatus: http.StatusUnauthorized, Err: ErrDomainRefreshTokenInvalid}
 

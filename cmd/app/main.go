@@ -78,7 +78,7 @@ func main() {
 	defer stop()
 	server := &http.Server{
 		Addr:              net.JoinHostPort(cfg.Environment.HttpServer.Domain, cfg.Environment.HttpServer.Port),
-		Handler:           router.New(pool),
+		Handler:           router.New(router.Dependencies{}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {

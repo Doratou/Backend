@@ -15,14 +15,22 @@ var (
 	ErrInvalidSecretKey = errors.New("jwt secret key must be at least 32 bytes")
 )
 
+type TokenType string
+
+const (
+	TokenTypeAccess  TokenType = "access"
+	TokenTypeRefresh TokenType = "refresh"
+)
+
 type TokenMaker interface {
-	CreateToken(userID int64, role enum.UserRole, duration time.Duration) (string, *Claims, error)
+	CreateToken(userID int64, role enum.UserRole, tokenType TokenType, duration time.Duration) (string, *Claims, error)
 	VerifyToken(tokenString string) (*Claims, error)
 }
 
 type Claims struct {
-	UserID int64         `json:"user_id"`
-	Role   enum.UserRole `json:"role"`
+	UserID    int64         `json:"user_id"`
+	Role      enum.UserRole `json:"role"`
+	TokenType TokenType     `json:"token_type"`
 	jwt.RegisteredClaims
 }
 
@@ -39,7 +47,7 @@ func NewJWTMaker(secretKey string) (TokenMaker, error) {
 	}, nil
 }
 
-func (maker *JWTMaker) CreateToken(userID int64, role enum.UserRole, duration time.Duration) (string, *Claims, error) {
+func (maker *JWTMaker) CreateToken(userID int64, role enum.UserRole, tokenType TokenType, duration time.Duration) (string, *Claims, error) {
 	tokenID, err := uuid.NewRandom()
 	if err != nil {
 		return "", nil, exception.Wrap(exception.ErrInternal, err)
@@ -47,8 +55,9 @@ func (maker *JWTMaker) CreateToken(userID int64, role enum.UserRole, duration ti
 
 	now := time.Now()
 	claims := &Claims{
-		UserID: userID,
-		Role:   role,
+		UserID:    userID,
+		Role:      role,
+		TokenType: tokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        tokenID.String(),
 			Subject:   fmt.Sprintf("%d", userID),

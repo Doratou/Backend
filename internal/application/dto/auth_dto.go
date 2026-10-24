@@ -35,6 +35,22 @@ type RegisterRequest struct {
 	Phone    *string `json:"phone,omitempty"`
 }
 
+type LoginRequest struct {
+	Identifier string `json:"identifier" binding:"required"`
+	Password   string `json:"password" binding:"required"`
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type TokenPairResponse struct {
+	AccessToken           string    `json:"access_token"`
+	AccessTokenExpiresAt  time.Time `json:"access_token_expires_at"`
+	RefreshToken          string    `json:"refresh_token"`
+	RefreshTokenExpiresAt time.Time `json:"refresh_token_expires_at"`
+}
+
 type UserResponse struct {
 	ID                 int64           `json:"id"`
 	Name               string          `json:"name"`
@@ -52,9 +68,12 @@ type UserResponse struct {
 }
 
 type AuthResponse struct {
-	User        UserResponse `json:"user"`
-	AccessToken string       `json:"access_token"`
-	ExpiresAt   time.Time    `json:"expires_at"`
+	User                  UserResponse `json:"user"`
+	AccessToken           string       `json:"access_token"`
+	AccessTokenExpiresAt  time.Time    `json:"access_token_expires_at"`
+	RefreshToken          string       `json:"refresh_token"`
+	RefreshTokenExpiresAt time.Time    `json:"refresh_token_expires_at"`
+	ExpiresAt             time.Time    `json:"expires_at"`
 }
 
 // ToUserResponse converts a domain User entity into a UserResponse DTO.
