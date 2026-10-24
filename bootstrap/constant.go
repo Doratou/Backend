@@ -6,6 +6,7 @@ type Constant struct {
 	Database DBConst
 	Auth     AuthConst
 	OTP      OTPConst
+	Captcha  CaptchaConst
 }
 
 type DBConst struct {
@@ -25,6 +26,10 @@ type OTPConst struct {
 	DefaultDigits      int
 }
 
+type CaptchaConst struct {
+	DefaultTTL time.Duration
+}
+
 func NewConstant() *Constant {
 	return &Constant{
 		Database: DBConst{
@@ -40,6 +45,9 @@ func NewConstant() *Constant {
 			DefaultTTL:         3 * time.Minute,
 			DefaultVerifiedTTL: 15 * time.Minute,
 			DefaultDigits:      5,
+		},
+		Captcha: CaptchaConst{
+			DefaultTTL: 2 * time.Minute,
 		},
 	}
 }
