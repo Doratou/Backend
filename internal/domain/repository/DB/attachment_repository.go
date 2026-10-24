@@ -30,9 +30,6 @@ type AttachmentRepository interface {
 	// FindByType lists attachments filtered by type (e.g. PROFILE_IMAGE, GALLERY_IMAGE).
 	FindByType(ctx context.Context, attachmentType enum.AttachmentType, limit, offset int) ([]*entity.Attachment, error)
 
-	// GetDefaultAvatar retrieves the system's seeded default avatar profile image.
-	GetDefaultAvatar(ctx context.Context) (*entity.Attachment, error)
-
 	// Update updates an existing attachment's metadata.
 	Update(ctx context.Context, attachment *entity.Attachment) error
 

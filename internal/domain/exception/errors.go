@@ -64,7 +64,6 @@ var (
 	ErrDomainRateLimitExceeded    = errors.New("rate limit exceeded, please try again later")
 
 	ErrDomainAttachmentNotFound   = errors.New("attachment not found")
-	ErrDomainDefaultAvatarMissing = errors.New("default avatar attachment missing")
 
 	ErrDomainBadRequest           = errors.New("bad request")
 	ErrDomainInternal             = errors.New("internal server error")
@@ -98,7 +97,6 @@ var (
 
 	// Attachment
 	ErrAttachmentNotFound        = &AppError{Code: "ATTACHMENT_NOT_FOUND", Message: "attachment not found", HTTPStatus: http.StatusNotFound, Err: ErrDomainAttachmentNotFound}
-	ErrDefaultAvatarMissing      = &AppError{Code: "DEFAULT_AVATAR_MISSING", Message: "default avatar attachment is missing", HTTPStatus: http.StatusInternalServerError, Err: ErrDomainDefaultAvatarMissing}
 
 	// General
 	ErrBadRequest                = &AppError{Code: "BAD_REQUEST", Message: "bad request payload or parameters", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
