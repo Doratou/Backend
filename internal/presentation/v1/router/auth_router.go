@@ -24,12 +24,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authHandler *handler.AuthHandler, a
 		auth.POST("/refresh", authHandler.Refresh)
 
 		// Protected endpoints (require valid access token)
-		if authMiddleware != nil {
-			auth.POST("/logout", authMiddleware, authHandler.Logout)
-			auth.POST("/password/change", authMiddleware, authHandler.ChangePassword)
-		} else {
-			auth.POST("/logout", authHandler.Logout)
-			auth.POST("/password/change", authHandler.ChangePassword)
-		}
+		auth.POST("/logout", authMiddleware, authHandler.Logout)
+		auth.POST("/password/change", authMiddleware, authHandler.ChangePassword)
+
 	}
 }

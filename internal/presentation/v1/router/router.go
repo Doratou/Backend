@@ -12,9 +12,10 @@ import (
 
 // Dependencies bundles all handlers and presentation dependencies needed to wire routes.
 type Dependencies struct {
-	AuthHandler *handler.AuthHandler
-	TokenMaker  jwt.TokenMaker
-	TokenRepo   cache.AuthnTokenRepository
+	AuthHandler    *handler.AuthHandler
+	CaptchaHandler *handler.CaptchaHandler
+	TokenMaker     jwt.TokenMaker
+	TokenRepo      cache.AuthnTokenRepository
 }
 
 // New builds the fully configured Gin engine with global middlewares and versioned routes.
@@ -34,9 +35,8 @@ func New(deps Dependencies) *gin.Engine {
 	}
 
 	v1 := engine.Group("/api/v1")
-	if deps.AuthHandler != nil {
-		RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware)
-	}
+	RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware)
+	RegisterCaptchaRoutes(v1, deps.CaptchaHandler)
 
 	return engine
 }
