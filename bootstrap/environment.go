@@ -13,6 +13,19 @@ type Environment struct {
 	HttpServer HttpServer `mapstructure:",squash"`
 	JWT        JWTConfig  `mapstructure:",squash"`
 	OTP        OTPConfig  `mapstructure:",squash"`
+	Seed       SeedConfig `mapstructure:",squash"`
+}
+
+type SeedConfig struct {
+	UserName     string `mapstructure:"SEED_USER_NAME"`
+	UserEmail    string `mapstructure:"SEED_USER_EMAIL"`
+	UserPhone    string `mapstructure:"SEED_USER_PHONE"`
+	UserPassword string `mapstructure:"SEED_USER_PASSWORD"`
+
+	AdminName     string `mapstructure:"SEED_ADMIN_NAME"`
+	AdminEmail    string `mapstructure:"SEED_ADMIN_EMAIL"`
+	AdminPhone    string `mapstructure:"SEED_ADMIN_PHONE"`
+	AdminPassword string `mapstructure:"SEED_ADMIN_PASSWORD"`
 }
 
 type JWTConfig struct {
