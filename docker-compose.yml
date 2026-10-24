@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:15-alpine
+    pull_policy: missing
+    environment:
+      POSTGRES_USER: ${PDB_USER:?PDB_USER is required}
+      POSTGRES_PASSWORD: ${PDB_PASSWORD:?PDB_PASSWORD is required}
+      POSTGRES_DB: ${PDB_DB_NAME:?PDB_DB_NAME is required}
+    ports:
+      - "127.0.0.1:${PDB_PORT:?PDB_PORT is required}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    pull_policy: missing
+    environment:
+      REDISCLI_AUTH: ${RDB_PASSWORD:?RDB_PASSWORD is required}
+    command: ["/bin/sh", "-c", 'exec redis-server --requirepass "$$REDISCLI_AUTH"']
+    ports:
+      - "127.0.0.1:${RDB_PORT:?RDB_PORT is required}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -qx PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
