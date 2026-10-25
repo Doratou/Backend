@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Doratou/Backend/bootstrap"
@@ -12,6 +15,7 @@ import (
 	"github.com/Doratou/Backend/internal/domain/enum"
 	"github.com/Doratou/Backend/internal/domain/exception"
 	domain_db "github.com/Doratou/Backend/internal/domain/repository/DB"
+	"github.com/Doratou/Backend/internal/domain/repository/cache"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
@@ -19,12 +23,14 @@ import (
 )
 
 type AuthServiceConfig struct {
-	AccessTokenTTL time.Duration
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
 }
 
 type authService struct {
 	userRepo   domain_db.UserRepository
 	otpService adapter.OTPService
+	tokenRepo  cache.AuthnTokenRepository
 	dbTrx      database.TrxManager
 	redisTrx   redisInfra.TrxManager
 	jwtMaker   jwt.TokenMaker
@@ -35,6 +41,7 @@ type authService struct {
 func NewAuthService(
 	userRepo domain_db.UserRepository,
 	otpService adapter.OTPService,
+	tokenRepo cache.AuthnTokenRepository,
 	dbTrx database.TrxManager,
 	redisTrx redisInfra.TrxManager,
 	jwtMaker jwt.TokenMaker,
@@ -47,15 +54,40 @@ func NewAuthService(
 		log.Printf("[CONFIG NOTICE] AccessTokenTTL is not configured or non-positive (%v), applying default: %v", cfg.AccessTokenTTL, defaultTTL)
 		cfg.AccessTokenTTL = defaultTTL
 	}
+	if cfg.RefreshTokenTTL <= 0 {
+		defaultTTL := consts.Auth.DefaultRefreshTokenTTL
+		log.Printf("[CONFIG NOTICE] RefreshTokenTTL is not configured or non-positive (%v), applying default: %v", cfg.RefreshTokenTTL, defaultTTL)
+		cfg.RefreshTokenTTL = defaultTTL
+	}
 	return &authService{
 		userRepo:   userRepo,
 		otpService: otpService,
+		tokenRepo:  tokenRepo,
 		dbTrx:      dbTrx,
 		redisTrx:   redisTrx,
 		jwtMaker:   jwtMaker,
 		hasher:     hasher,
 		cfg:        cfg,
 	}
+}
+
+func (s *authService) issueTokenPair(ctx context.Context, userID int64, role enum.UserRole) (accessToken string, accessClaims *jwt.Claims, refreshToken string, refreshClaims *jwt.Claims, err error) {
+	accessToken, accessClaims, err = s.jwtMaker.CreateToken(userID, role, jwt.TokenTypeAccess, s.cfg.AccessTokenTTL)
+	if err != nil {
+		return "", nil, "", nil, err
+	}
+
+	refreshToken, refreshClaims, err = s.jwtMaker.CreateToken(userID, role, jwt.TokenTypeRefresh, s.cfg.RefreshTokenTTL)
+	if err != nil {
+		return "", nil, "", nil, err
+	}
+
+	userIDStr := strconv.FormatInt(userID, 10)
+	if err := s.tokenRepo.SaveRefreshSession(ctx, userIDStr, refreshClaims.ID, refreshToken, s.cfg.RefreshTokenTTL); err != nil {
+		return "", nil, "", nil, err
+	}
+
+	return accessToken, accessClaims, refreshToken, refreshClaims, nil
 }
 
 func (s *authService) SendOTP(ctx context.Context, req dto.SendOTPRequest) (*dto.SendOTPResponse, error) {
@@ -157,16 +189,126 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 		return nil
 	})
 
-	// Issue JWT token
-	token, claims, err := s.jwtMaker.CreateToken(user.ID, user.SystemRole, s.cfg.AccessTokenTTL)
+	// Issue token pair (access token + refresh token)
+	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
 	if err != nil {
 		return nil, err
 	}
 
 	userResponse := dto.ToUserResponse(user)
 	return &dto.AuthResponse{
-		User:        userResponse,
-		AccessToken: token,
-		ExpiresAt:   claims.ExpiresAt.Time,
+		User:                  userResponse,
+		AccessToken:           accessToken,
+		AccessTokenExpiresAt:  accessClaims.ExpiresAt.Time,
+		RefreshToken:          refreshToken,
+		RefreshTokenExpiresAt: refreshClaims.ExpiresAt.Time,
+		ExpiresAt:             accessClaims.ExpiresAt.Time,
 	}, nil
+}
+
+func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.AuthResponse, error) {
+	var user *entity.User
+	var err error
+
+	// If identifier contains '@', lookup by email; otherwise by phone
+	if strings.Contains(req.Identifier, "@") {
+		user, err = s.userRepo.FindByEmail(ctx, req.Identifier)
+	} else {
+		user, err = s.userRepo.FindByPhone(ctx, req.Identifier)
+	}
+
+	if err != nil {
+		if errors.Is(err, exception.ErrUserNotFound) {
+			return nil, exception.ErrInvalidCredentials
+		}
+		return nil, err
+	}
+
+	if user.Status != enum.UserStatusActive {
+		return nil, exception.ErrUserInactive
+	}
+
+	if err := s.hasher.Compare(req.Password, user.PasswordHash); err != nil {
+		return nil, exception.ErrInvalidCredentials
+	}
+
+	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
+	if err != nil {
+		return nil, err
+	}
+
+	userResponse := dto.ToUserResponse(user)
+	return &dto.AuthResponse{
+		User:                  userResponse,
+		AccessToken:           accessToken,
+		AccessTokenExpiresAt:  accessClaims.ExpiresAt.Time,
+		RefreshToken:          refreshToken,
+		RefreshTokenExpiresAt: refreshClaims.ExpiresAt.Time,
+		ExpiresAt:             accessClaims.ExpiresAt.Time,
+	}, nil
+}
+
+func (s *authService) Refresh(ctx context.Context, req dto.RefreshRequest) (*dto.TokenPairResponse, error) {
+	claims, err := s.jwtMaker.VerifyToken(req.RefreshToken)
+	if err != nil {
+		return nil, exception.Wrap(exception.ErrRefreshTokenInvalid, err)
+	}
+
+	if claims.TokenType != jwt.TokenTypeRefresh {
+		return nil, exception.ErrRefreshTokenInvalid
+	}
+
+	userIDStr := strconv.FormatInt(claims.UserID, 10)
+	storedToken, err := s.tokenRepo.GetRefreshSession(ctx, userIDStr, claims.ID)
+	if err != nil || storedToken != req.RefreshToken {
+		return nil, exception.ErrRefreshTokenInvalid
+	}
+
+	// Rotate refresh token: purge used session before issuing new tokens
+	_, _ = s.tokenRepo.DeleteRefreshSession(ctx, userIDStr, claims.ID)
+
+	user, err := s.userRepo.FindByID(ctx, claims.UserID)
+	if err != nil {
+		if errors.Is(err, exception.ErrUserNotFound) {
+			return nil, exception.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	if user.Status != enum.UserStatusActive {
+		return nil, exception.ErrUserInactive
+	}
+
+	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.TokenPairResponse{
+		AccessToken:           accessToken,
+		AccessTokenExpiresAt:  accessClaims.ExpiresAt.Time,
+		RefreshToken:          refreshToken,
+		RefreshTokenExpiresAt: refreshClaims.ExpiresAt.Time,
+	}, nil
+}
+
+func (s *authService) Logout(ctx context.Context, accessToken string) error {
+	claims, err := s.jwtMaker.VerifyToken(accessToken)
+	if err != nil {
+		return exception.Wrap(exception.ErrTokenInvalid, err)
+	}
+
+	// Blacklist the access token's jti for however long it would otherwise remain valid
+	remaining := time.Until(claims.ExpiresAt.Time)
+	if remaining > 0 {
+		if err := s.tokenRepo.BlacklistAccessToken(ctx, claims.ID, remaining); err != nil {
+			return err
+		}
+	}
+
+	// Purge all refresh sessions for this user so logout terminates full session
+	userIDStr := strconv.FormatInt(claims.UserID, 10)
+	_ = s.tokenRepo.DeleteUserRefreshSessions(ctx, userIDStr)
+
+	return nil
 }

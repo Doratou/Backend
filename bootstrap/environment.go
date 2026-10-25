@@ -16,8 +16,9 @@ type Environment struct {
 }
 
 type JWTConfig struct {
-	SecretKey      string        `mapstructure:"JWT_SECRET_KEY"`
-	AccessTokenTTL time.Duration `mapstructure:"ACCESS_TOKEN_TTL"`
+	SecretKey       string        `mapstructure:"JWT_SECRET_KEY"`
+	AccessTokenTTL  time.Duration `mapstructure:"ACCESS_TOKEN_TTL"`
+	RefreshTokenTTL time.Duration `mapstructure:"REFRESH_TOKEN_TTL"`
 }
 
 type OTPConfig struct {

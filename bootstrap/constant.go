@@ -15,7 +15,8 @@ type DBConst struct {
 }
 
 type AuthConst struct {
-	DefaultAccessTokenTTL time.Duration
+	DefaultAccessTokenTTL  time.Duration
+	DefaultRefreshTokenTTL time.Duration
 }
 
 type OTPConst struct {
@@ -32,7 +33,8 @@ func NewConstant() *Constant {
 			MaxDbLifeTime: 5 * time.Minute,
 		},
 		Auth: AuthConst{
-			DefaultAccessTokenTTL: 24 * time.Hour,
+			DefaultAccessTokenTTL:  24 * time.Hour,
+			DefaultRefreshTokenTTL: 7 * 24 * time.Hour,
 		},
 		OTP: OTPConst{
 			DefaultTTL:         3 * time.Minute,

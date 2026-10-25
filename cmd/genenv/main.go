@@ -11,6 +11,7 @@ import (
 func main() {
 	envFile := ".env"
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
+		log.Printf("[ENV NOTICE] .env file not found")
 		envFile = ".env.example"
 	}
 
