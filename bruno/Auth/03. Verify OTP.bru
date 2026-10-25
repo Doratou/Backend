@@ -1,0 +1,23 @@
+meta {
+  name: 03. Verify OTP
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/otp/verify
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "identifier": "{{testEmail}}",
+    "type": "email",
+    "code": "{{testOtpCode}}"
+  }
+}
