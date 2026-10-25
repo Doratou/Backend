@@ -312,3 +312,171 @@ func (s *authService) Logout(ctx context.Context, accessToken string) error {
 
 	return nil
 }
+
+func (s *authService) LoginWithEmail(ctx context.Context, req dto.LoginWithEmailRequest) (*dto.AuthResponse, error) {
+	verified, err := s.otpService.IsVerified(ctx, req.Email, enum.OTPTypeEmail)
+	if err != nil {
+		return nil, err
+	}
+	if !verified {
+		return nil, exception.ErrUnverifiedCredentials
+	}
+
+	user, err := s.userRepo.FindByEmail(ctx, req.Email)
+	if err != nil {
+		if errors.Is(err, exception.ErrUserNotFound) {
+			return nil, exception.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	if user.Status != enum.UserStatusActive {
+		return nil, exception.ErrUserInactive
+	}
+
+	if !user.IsEmailVerified {
+		user.IsEmailVerified = true
+		_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, true, user.IsPhoneVerified)
+	}
+
+	// Clear verified flag atomically from Redis
+	_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
+		return s.otpService.ClearVerified(trxCtx, req.Email, enum.OTPTypeEmail)
+	})
+
+	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
+	if err != nil {
+		return nil, err
+	}
+
+	userResponse := dto.ToUserResponse(user)
+	return &dto.AuthResponse{
+		User:                  userResponse,
+		AccessToken:           accessToken,
+		AccessTokenExpiresAt:  accessClaims.ExpiresAt.Time,
+		RefreshToken:          refreshToken,
+		RefreshTokenExpiresAt: refreshClaims.ExpiresAt.Time,
+		ExpiresAt:             accessClaims.ExpiresAt.Time,
+	}, nil
+}
+
+func (s *authService) LoginWithPhone(ctx context.Context, req dto.LoginWithPhoneRequest) (*dto.AuthResponse, error) {
+	verified, err := s.otpService.IsVerified(ctx, req.Phone, enum.OTPTypePhone)
+	if err != nil {
+		return nil, err
+	}
+	if !verified {
+		return nil, exception.ErrUnverifiedCredentials
+	}
+
+	user, err := s.userRepo.FindByPhone(ctx, req.Phone)
+	if err != nil {
+		if errors.Is(err, exception.ErrUserNotFound) {
+			return nil, exception.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	if user.Status != enum.UserStatusActive {
+		return nil, exception.ErrUserInactive
+	}
+
+	if !user.IsPhoneVerified {
+		user.IsPhoneVerified = true
+		_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, user.IsEmailVerified, true)
+	}
+
+	// Clear verified flag atomically from Redis
+	_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
+		return s.otpService.ClearVerified(trxCtx, req.Phone, enum.OTPTypePhone)
+	})
+
+	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
+	if err != nil {
+		return nil, err
+	}
+
+	userResponse := dto.ToUserResponse(user)
+	return &dto.AuthResponse{
+		User:                  userResponse,
+		AccessToken:           accessToken,
+		AccessTokenExpiresAt:  accessClaims.ExpiresAt.Time,
+		RefreshToken:          refreshToken,
+		RefreshTokenExpiresAt: refreshClaims.ExpiresAt.Time,
+		ExpiresAt:             accessClaims.ExpiresAt.Time,
+	}, nil
+}
+
+func (s *authService) ChangePassword(ctx context.Context, userID int64, req dto.ChangePasswordRequest) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.Status != enum.UserStatusActive {
+		return exception.ErrUserInactive
+	}
+
+	if err := s.hasher.Compare(req.OldPassword, user.PasswordHash); err != nil {
+		return exception.ErrInvalidCredentials
+	}
+
+	newHash, err := s.hasher.Hash(req.NewPassword)
+	if err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+
+	if err := s.userRepo.UpdatePassword(ctx, userID, newHash); err != nil {
+		return err
+	}
+
+	// Purge existing refresh sessions for security
+	_ = s.tokenRepo.DeleteUserRefreshSessions(ctx, strconv.FormatInt(userID, 10))
+
+	return nil
+}
+
+func (s *authService) ResetPassword(ctx context.Context, req dto.ResetPasswordRequest) error {
+	verified, err := s.otpService.IsVerified(ctx, req.Identifier, req.Type)
+	if err != nil {
+		return err
+	}
+	if !verified {
+		return exception.ErrUnverifiedCredentials
+	}
+
+	var user *entity.User
+	if req.Type == enum.OTPTypeEmail {
+		user, err = s.userRepo.FindByEmail(ctx, req.Identifier)
+	} else {
+		user, err = s.userRepo.FindByPhone(ctx, req.Identifier)
+	}
+	if err != nil {
+		if errors.Is(err, exception.ErrUserNotFound) {
+			return exception.ErrUserNotFound
+		}
+		return err
+	}
+
+	if user.Status != enum.UserStatusActive {
+		return exception.ErrUserInactive
+	}
+
+	newHash, err := s.hasher.Hash(req.NewPassword)
+	if err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+
+	if err := s.userRepo.UpdatePassword(ctx, user.ID, newHash); err != nil {
+		return err
+	}
+
+	// Clear verified flag atomically from Redis
+	_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
+		return s.otpService.ClearVerified(trxCtx, req.Identifier, req.Type)
+	})
+
+	// Purge existing refresh sessions for security
+	_ = s.tokenRepo.DeleteUserRefreshSessions(ctx, strconv.FormatInt(user.ID, 10))
+
+	return nil
+}

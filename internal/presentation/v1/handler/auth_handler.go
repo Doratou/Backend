@@ -7,6 +7,7 @@ import (
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
 	"github.com/Doratou/Backend/internal/domain/exception"
+	"github.com/Doratou/Backend/internal/domain/tokencontext"
 	"github.com/gin-gonic/gin"
 )
 
@@ -86,6 +87,82 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	success(c, http.StatusOK, res)
+}
+
+// LoginWithEmail handles POST /api/v1/auth/login/email
+func (h *AuthHandler) LoginWithEmail(c *gin.Context) {
+	var req dto.LoginWithEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	res, err := h.authService.LoginWithEmail(c.Request.Context(), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}
+
+// LoginWithPhone handles POST /api/v1/auth/login/phone
+func (h *AuthHandler) LoginWithPhone(c *gin.Context) {
+	var req dto.LoginWithPhoneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	res, err := h.authService.LoginWithPhone(c.Request.Context(), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}
+
+// ChangePassword handles POST /api/v1/auth/password/change (protected)
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
+	var req dto.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	if err := h.authService.ChangePassword(c.Request.Context(), userID, req); err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, gin.H{
+		"message": "password changed successfully",
+	})
+}
+
+// ResetPassword handles POST /api/v1/auth/password/reset (public, requires prior OTP verification)
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req dto.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	if err := h.authService.ResetPassword(c.Request.Context(), req); err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, gin.H{
+		"message": "password reset successfully",
+	})
 }
 
 // Refresh handles POST /api/v1/auth/refresh
