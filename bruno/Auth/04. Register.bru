@@ -16,10 +16,9 @@ headers {
 
 body:json {
   {
-  //   "name": "New Registered User",
-    "email": "{{seedUserEmail}}X",
-  //   "phone" : "0919123456789"
-    "password": "123123"
+    "name": "New Registered User",
+    "email": "newuser@doratou.local",
+    "password": "UserPass@123"
   }
 }
 
@@ -27,4 +26,58 @@ vars:post-response {
   token: res.body.data.access_token
   refreshToken: res.body.data.refresh_token
   userId: res.body.data.user.id
+}
+
+docs {
+  # Register
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/auth/register`
+  **Auth:** None
+
+  ## Description
+
+  Creates a new user account. Requires at least one credential (email or phone) to have been previously verified via OTP.
+
+  ## Request
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `name` | `string` | No | Optional display name for the user |
+  | `email` | `string` | Conditional | Email address (at least one of `email` or `phone` required) |
+  | `phone` | `string` | Conditional | Mobile phone number (at least one of `email` or `phone` required) |
+  | `password` | `string` | Yes | Account password (minimum 6 characters) |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "user": {
+        "id": 1,
+        "name": "New Registered User",
+        "email": "newuser@doratou.local",
+        "phone": null,
+        "is_email_verified": true,
+        "is_phone_verified": false,
+        "avatar_attachment_id": null,
+        "system_role": "user",
+        "status": "active",
+        "wallet": 0
+      },
+      "access_token": "eyJhbGciOiJIUzI1NiIs...",
+      "access_token_expires_at": "2026-10-26T21:45:00Z",
+      "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+      "refresh_token_expires_at": "2026-11-01T21:45:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing password or neither email nor phone provided
+  * `403 Forbidden` — Credentials not verified with OTP
+  * `409 Conflict` — Email or phone number is already registered
 }

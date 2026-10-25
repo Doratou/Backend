@@ -16,8 +16,46 @@ headers {
 
 body:json {
   {
-    "identifier": "{{seedUserEmail}}X",
+    "identifier": "{{seedUserEmail}}",
     "type": "email",
-    "code": "50128"
+    "code": "12345"
   }
+}
+
+docs {
+  # Verify OTP
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/auth/otp/verify`
+  **Auth:** None
+
+  ## Description
+
+  Validates the OTP code received by the user. Upon success, marks the identifier as verified in Redis for a 15-minute registration/login window.
+
+  ## Request
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `identifier` | `string` | Yes | Verified email address or mobile phone number |
+  | `type` | `string` | Yes | Verification channel, must be `email` or `phone` |
+  | `code` | `string` | Yes | One-time password verification code |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "verified": true
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing or malformed parameters
+  * `401 Unauthorized` — Verification code is invalid or has expired
+  * `404 Not Found` — Verification code session not found
 }

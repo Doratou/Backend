@@ -25,3 +25,54 @@ vars:post-response {
   refreshToken: res.body.data.refresh_token
   userId: res.body.data.user.id
 }
+
+docs {
+  # Login with OTP
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/auth/login/otp`
+  **Auth:** None
+
+  ## Description
+
+  Passwordless login using a pre-verified email or mobile phone number. The backend automatically determines whether the identifier is an email or phone number at runtime.
+
+  ## Request
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `identifier` | `string` | Yes | Verified email address or mobile phone number |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "user": {
+        "id": 1,
+        "name": "Default User",
+        "email": "user@doratou.local",
+        "phone": "09120000001",
+        "is_email_verified": true,
+        "is_phone_verified": true,
+        "avatar_attachment_id": null,
+        "system_role": "user",
+        "status": "active",
+        "wallet": 0
+      },
+      "access_token": "eyJhbGciOiJIUzI1NiIs...",
+      "access_token_expires_at": "2026-10-26T21:45:00Z",
+      "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+      "refresh_token_expires_at": "2026-11-01T21:45:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing identifier in request body
+  * `403 Forbidden` — Identifier has not been verified with OTP, or account is deactivated
+  * `404 Not Found` — User account not found
+}

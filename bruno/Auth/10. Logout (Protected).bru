@@ -17,3 +17,39 @@ auth:bearer {
 headers {
   Content-Type: application/json
 }
+
+docs {
+  # Logout (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/auth/logout`
+  **Auth:** Required
+
+  ## Description
+
+  Terminates the user's active session by blacklisting the provided access token for its remaining TTL and purging all refresh token sessions from Redis.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "logged out successfully"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `401 Unauthorized` — Missing, invalid, expired, or already revoked access token
+}

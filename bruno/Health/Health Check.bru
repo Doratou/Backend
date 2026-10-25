@@ -9,3 +9,28 @@ get {
   body: none
   auth: none
 }
+
+docs {
+  # Health Check
+
+  **Method:** `GET`
+  **Endpoint:** `/health`
+  **Auth:** None
+
+  ## Description
+
+  Checks the operational availability and health status of the API server.
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "status": "ok"
+  }
+  ```
+
+  ## Errors
+
+  * `500 Internal Server Error` — Server unavailable
+}
