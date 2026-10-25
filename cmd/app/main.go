@@ -19,6 +19,7 @@ import (
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	postgresRepo "github.com/Doratou/Backend/internal/infrastructure/repository/postgres"
 	redisRepo "github.com/Doratou/Backend/internal/infrastructure/repository/redis"
+	"github.com/Doratou/Backend/internal/infrastructure/seed"
 	"github.com/Doratou/Backend/internal/presentation/v1/handler"
 	"github.com/Doratou/Backend/internal/presentation/v1/router"
 	"github.com/Doratou/Backend/pkg/hasher"
@@ -91,6 +92,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize JWT maker: %v", err)
 	}
+
+	// 5.1 Database Seeder (idempotent: seeds regular user & admin user if not present)
+	seedCtx, cancelSeed := context.WithTimeout(context.Background(), 15*time.Second)
+	if err := seed.Run(seedCtx, userRepo, passwordHasher, cfg.Environment.Seed); err != nil {
+		log.Printf("[SEED WARNING] database seeder finished with notice/error: %v", err)
+	}
+	cancelSeed()
 
 	// 6. Application Services
 	otpService := service.NewOTPService(
