@@ -1,11 +1,11 @@
 meta {
-  name: 07. Login with Phone (OTP)
+  name: 06. Login with OTP
   type: http
-  seq: 7
+  seq: 6
 }
 
 post {
-  url: {{baseUrl}}/api/v1/auth/login/phone
+  url: {{baseUrl}}/api/v1/auth/login/otp
   body: json
   auth: none
 }
@@ -16,7 +16,7 @@ headers {
 
 body:json {
   {
-    "phone": "{{seedUserPhone}}"
+    "identifier": "{{seedUserEmail}}"
   }
 }
 

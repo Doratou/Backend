@@ -75,6 +75,7 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 	}
 
 	// In development, log the OTP code to stdout for immediate testing
+	//TODO : real otp email/phone sender
 	log.Printf("[OTP DEV LOG] Type: %s | Identifier: %s | Code: %s (Expires in %v)", otpType, identifier, code, s.cfg.TTL)
 
 	return &dto.SendOTPResponse{

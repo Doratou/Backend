@@ -89,6 +89,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	success(c, http.StatusOK, res)
 }
 
+// LoginWithOTP handles POST /api/v1/auth/login/otp
+func (h *AuthHandler) LoginWithOTP(c *gin.Context) {
+	var req dto.LoginWithOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	res, err := h.authService.LoginWithOTP(c.Request.Context(), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}
+
 // LoginWithEmail handles POST /api/v1/auth/login/email
 func (h *AuthHandler) LoginWithEmail(c *gin.Context) {
 	var req dto.LoginWithEmailRequest
