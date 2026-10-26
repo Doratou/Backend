@@ -69,6 +69,24 @@ func NewAudioCaptcha(cfg *DriverAudio) CaptchaMan {
 	}
 }
 
+func NewDigitCaptcha(cfg *DriverDigit) CaptchaMan {
+	if cfg == nil {
+		cfg = DefaultDriverDigit()
+	}
+
+	driver := base64Captcha.NewDriverDigit(
+		cfg.Height,
+		cfg.Width,
+		cfg.Length,
+		cfg.MaxSkew,
+		cfg.DotCount,
+	)
+
+	return &captchaMan{
+		captcha: base64Captcha.NewCaptcha(driver, &dummyStore{}),
+	}
+}
+
 func (cm *captchaMan) Generate() (cid string, b64 string, answer string, err error) {
 	return cm.captcha.Generate()
 }

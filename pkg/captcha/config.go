@@ -33,6 +33,24 @@ type DriverAudio struct {
 	Language string
 }
 
+type DriverDigit struct {
+	Height   int
+	Width    int
+	Length   int
+	MaxSkew  float64
+	DotCount int
+}
+
+func DefaultDriverDigit() *DriverDigit {
+	return &DriverDigit{
+		Height:   80,
+		Width:    175,
+		Length:   5,
+		MaxSkew:  0.85,
+		DotCount: 5,
+	}
+}
+
 func DefaultDriverString() *DriverString {
 	return &DriverString{
 		Height:          60,

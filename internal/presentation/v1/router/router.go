@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 
+	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/domain/repository/cache"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
 	"github.com/Doratou/Backend/internal/presentation/middleware"
@@ -14,6 +15,8 @@ import (
 type Dependencies struct {
 	AuthHandler    *handler.AuthHandler
 	CaptchaHandler *handler.CaptchaHandler
+	CaptchaService adapter.CaptchaService
+	CaptchaEnabled bool
 	TokenMaker     jwt.TokenMaker
 	TokenRepo      cache.AuthnTokenRepository
 }
@@ -34,8 +37,13 @@ func New(deps Dependencies) *gin.Engine {
 		authMiddleware = middleware.Auth(deps.TokenMaker, deps.TokenRepo)
 	}
 
+	var captchaMiddleware gin.HandlerFunc
+	if deps.CaptchaService != nil {
+		captchaMiddleware = middleware.CaptchaGuard(deps.CaptchaService, deps.CaptchaEnabled)
+	}
+
 	v1 := engine.Group("/api/v1")
-	RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware)
+	RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware, captchaMiddleware)
 	RegisterCaptchaRoutes(v1, deps.CaptchaHandler)
 
 	return engine

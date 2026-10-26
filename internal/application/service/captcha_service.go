@@ -63,6 +63,8 @@ func (s *captchaService) Generate(ctx context.Context) (*dto.CaptchaResponse, er
 		return nil, err
 	}
 
+	log.Printf("[CAPTCHA DEV LOG] Type: %s | Identifier: %s | answer: %s (Expires in %v)", "string", cid, answer, s.cfg.TTL)
+
 	return &dto.CaptchaResponse{
 		CaptchaID: cid,
 		ImageB64:  b64,

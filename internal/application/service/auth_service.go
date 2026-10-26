@@ -20,6 +20,7 @@ import (
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	"github.com/Doratou/Backend/pkg/hasher"
+	"github.com/Doratou/Backend/pkg/random"
 )
 
 type AuthServiceConfig struct {
@@ -35,6 +36,7 @@ type authService struct {
 	redisTrx   redisInfra.TrxManager
 	jwtMaker   jwt.TokenMaker
 	hasher     hasher.Hasher
+	randomEng  *random.RandomGeneratorEngine
 	cfg        AuthServiceConfig
 }
 
@@ -67,6 +69,7 @@ func NewAuthService(
 		redisTrx:   redisTrx,
 		jwtMaker:   jwtMaker,
 		hasher:     hasher,
+		randomEng:  random.NewRandomGeneratorEngine(),
 		cfg:        cfg,
 	}
 }
@@ -155,8 +158,17 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 
+	name := req.Name
+	if name == "" {
+		rand_name, err := s.randomEng.GenerateRandomBase58String(8)
+		if err != nil {
+			rand_name = "<|O__O|>"
+		}
+		name = rand_name
+	}
+
 	user := &entity.User{
-		Name:               req.Name,
+		Name:               name,
 		PasswordHash:       hashedPassword,
 		Email:              req.Email,
 		Phone:              req.Phone,

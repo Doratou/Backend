@@ -27,7 +27,8 @@ type OTPConst struct {
 }
 
 type CaptchaConst struct {
-	DefaultTTL time.Duration
+	DefaultTTL     time.Duration
+	DefaultEnabled bool
 }
 
 func NewConstant() *Constant {
@@ -47,7 +48,8 @@ func NewConstant() *Constant {
 			DefaultDigits:      5,
 		},
 		Captcha: CaptchaConst{
-			DefaultTTL: 2 * time.Minute,
+			DefaultTTL:     2 * time.Minute,
+			DefaultEnabled: true,
 		},
 	}
 }
