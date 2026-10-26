@@ -66,6 +66,10 @@ var (
 
 	ErrDomainAttachmentNotFound   = errors.New("attachment not found")
 
+	ErrDomainCaptchaNotFound      = errors.New("captcha not found or expired")
+	ErrDomainCaptchaInvalid       = errors.New("captcha code is invalid")
+	ErrDomainCaptchaRequired      = errors.New("captcha verification is required")
+
 	ErrDomainBadRequest           = errors.New("bad request")
 	ErrDomainInternal             = errors.New("internal server error")
 )
@@ -99,6 +103,11 @@ var (
 
 	// Attachment
 	ErrAttachmentNotFound        = &AppError{Code: "ATTACHMENT_NOT_FOUND", Message: "attachment not found", HTTPStatus: http.StatusNotFound, Err: ErrDomainAttachmentNotFound}
+
+	// Captcha
+	ErrCaptchaNotFound           = &AppError{Code: "CAPTCHA_NOT_FOUND", Message: "captcha not found or expired", HTTPStatus: http.StatusNotFound, Err: ErrDomainCaptchaNotFound}
+	ErrCaptchaInvalid            = &AppError{Code: "CAPTCHA_INVALID", Message: "captcha verification failed", HTTPStatus: http.StatusBadRequest, Err: ErrDomainCaptchaInvalid}
+	ErrCaptchaRequired           = &AppError{Code: "CAPTCHA_REQUIRED", Message: "captcha headers X-Captcha-ID and X-Captcha-Code are required", HTTPStatus: http.StatusBadRequest, Err: ErrDomainCaptchaRequired}
 
 	// General
 	ErrBadRequest                = &AppError{Code: "BAD_REQUEST", Message: "bad request payload or parameters", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}

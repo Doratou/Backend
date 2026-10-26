@@ -30,4 +30,5 @@ var EnvKeys = []string{
 	"SEED_ADMIN_EMAIL",
 	"SEED_ADMIN_PHONE",
 	"SEED_ADMIN_PASSWORD",
+	"CAPTCHA_TTL",
 }
