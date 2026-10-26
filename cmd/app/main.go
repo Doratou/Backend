@@ -22,6 +22,7 @@ import (
 	"github.com/Doratou/Backend/internal/infrastructure/seed"
 	"github.com/Doratou/Backend/internal/presentation/v1/handler"
 	"github.com/Doratou/Backend/internal/presentation/v1/router"
+	"github.com/Doratou/Backend/pkg/captcha"
 	"github.com/Doratou/Backend/pkg/hasher"
 )
 
@@ -85,9 +86,11 @@ func main() {
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
+	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
 
 	// 5. Crypto & Security Utilities
 	passwordHasher := hasher.NewBcryptHasher()
+	captchaMan := captcha.NewStringCaptcha(nil)
 	jwtMaker, err := jwt.NewJWTMaker(cfg.Environment.JWT.SecretKey)
 	if err != nil {
 		log.Fatalf("failed to initialize JWT maker: %v", err)
@@ -127,12 +130,23 @@ func main() {
 		cfg.Constant,
 	)
 
+	captchaService := service.NewCaptchaService(
+		captchaRepo,
+		captchaMan,
+		service.CaptchaServiceConfig{
+			TTL: cfg.Environment.Captcha.TTL,
+		},
+		cfg.Constant,
+	)
+
 	// 7. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
+	captchaHandler := handler.NewCaptchaHandler(captchaService)
 	engine := router.New(router.Dependencies{
-		AuthHandler: authHandler,
-		TokenMaker:  jwtMaker,
-		TokenRepo:   tokenRepo,
+		AuthHandler:    authHandler,
+		CaptchaHandler: captchaHandler,
+		TokenMaker:     jwtMaker,
+		TokenRepo:      tokenRepo,
 	})
 
 	// 8. HTTP Server Lifecycle & Graceful Shutdown

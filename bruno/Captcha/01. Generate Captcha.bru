@@ -1,0 +1,15 @@
+meta {
+  name: 01. Generate Captcha
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/captcha/generate
+  body: none
+  auth: none
+}
+
+vars:post-response {
+  captchaId: res.body.data.captcha_id
+}
