@@ -40,6 +40,10 @@ type LoginRequest struct {
 	Password   string `json:"password" binding:"required"`
 }
 
+type LoginWithOTPRequest struct {
+	Identifier string `json:"identifier" binding:"required"`
+}
+
 type LoginWithEmailRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }

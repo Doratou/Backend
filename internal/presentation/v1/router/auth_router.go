@@ -25,8 +25,7 @@ func RegisterAuthRoutes(
 		// Public registration & login endpoints
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
-		auth.POST("/login/email", authHandler.LoginWithEmail)
-		auth.POST("/login/phone", authHandler.LoginWithPhone)
+		auth.POST("/login/otp", authHandler.LoginWithOTP)
 
 		// Password reset (protected by CaptchaGuard if configured)
 		if captchaMiddleware != nil {

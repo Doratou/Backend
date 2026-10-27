@@ -325,8 +325,23 @@ func (s *authService) Logout(ctx context.Context, accessToken string) error {
 	return nil
 }
 
-func (s *authService) LoginWithEmail(ctx context.Context, req dto.LoginWithEmailRequest) (*dto.AuthResponse, error) {
-	verified, err := s.otpService.IsVerified(ctx, req.Email, enum.OTPTypeEmail)
+func (s *authService) LoginWithOTP(ctx context.Context, req dto.LoginWithOTPRequest) (*dto.AuthResponse, error) {
+	req.Identifier = strings.TrimSpace(req.Identifier)
+	if req.Identifier == "" {
+		return nil, exception.ErrBadRequest
+	}
+
+	var otpType enum.OTPType
+	var isEmail bool
+	if strings.Contains(req.Identifier, "@") {
+		otpType = enum.OTPTypeEmail
+		isEmail = true
+	} else {
+		otpType = enum.OTPTypePhone
+		isEmail = false
+	}
+
+	verified, err := s.otpService.IsVerified(ctx, req.Identifier, otpType)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +349,13 @@ func (s *authService) LoginWithEmail(ctx context.Context, req dto.LoginWithEmail
 		return nil, exception.ErrUnverifiedCredentials
 	}
 
-	user, err := s.userRepo.FindByEmail(ctx, req.Email)
+	var user *entity.User
+	if isEmail {
+		user, err = s.userRepo.FindByEmail(ctx, req.Identifier)
+	} else {
+		user, err = s.userRepo.FindByPhone(ctx, req.Identifier)
+	}
+
 	if err != nil {
 		if errors.Is(err, exception.ErrUserNotFound) {
 			return nil, exception.ErrUserNotFound
@@ -346,14 +367,17 @@ func (s *authService) LoginWithEmail(ctx context.Context, req dto.LoginWithEmail
 		return nil, exception.ErrUserInactive
 	}
 
-	if !user.IsEmailVerified {
+	if isEmail && !user.IsEmailVerified {
 		user.IsEmailVerified = true
 		_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, true, user.IsPhoneVerified)
+	} else if !isEmail && !user.IsPhoneVerified {
+		user.IsPhoneVerified = true
+		_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, user.IsEmailVerified, true)
 	}
 
 	// Clear verified flag atomically from Redis
 	_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
-		return s.otpService.ClearVerified(trxCtx, req.Email, enum.OTPTypeEmail)
+		return s.otpService.ClearVerified(trxCtx, req.Identifier, otpType)
 	})
 
 	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
@@ -372,51 +396,12 @@ func (s *authService) LoginWithEmail(ctx context.Context, req dto.LoginWithEmail
 	}, nil
 }
 
+func (s *authService) LoginWithEmail(ctx context.Context, req dto.LoginWithEmailRequest) (*dto.AuthResponse, error) {
+	return s.LoginWithOTP(ctx, dto.LoginWithOTPRequest{Identifier: req.Email})
+}
+
 func (s *authService) LoginWithPhone(ctx context.Context, req dto.LoginWithPhoneRequest) (*dto.AuthResponse, error) {
-	verified, err := s.otpService.IsVerified(ctx, req.Phone, enum.OTPTypePhone)
-	if err != nil {
-		return nil, err
-	}
-	if !verified {
-		return nil, exception.ErrUnverifiedCredentials
-	}
-
-	user, err := s.userRepo.FindByPhone(ctx, req.Phone)
-	if err != nil {
-		if errors.Is(err, exception.ErrUserNotFound) {
-			return nil, exception.ErrUserNotFound
-		}
-		return nil, err
-	}
-
-	if user.Status != enum.UserStatusActive {
-		return nil, exception.ErrUserInactive
-	}
-
-	if !user.IsPhoneVerified {
-		user.IsPhoneVerified = true
-		_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, user.IsEmailVerified, true)
-	}
-
-	// Clear verified flag atomically from Redis
-	_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
-		return s.otpService.ClearVerified(trxCtx, req.Phone, enum.OTPTypePhone)
-	})
-
-	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
-	if err != nil {
-		return nil, err
-	}
-
-	userResponse := dto.ToUserResponse(user)
-	return &dto.AuthResponse{
-		User:                  userResponse,
-		AccessToken:           accessToken,
-		AccessTokenExpiresAt:  accessClaims.ExpiresAt.Time,
-		RefreshToken:          refreshToken,
-		RefreshTokenExpiresAt: refreshClaims.ExpiresAt.Time,
-		ExpiresAt:             accessClaims.ExpiresAt.Time,
-	}, nil
+	return s.LoginWithOTP(ctx, dto.LoginWithOTPRequest{Identifier: req.Phone})
 }
 
 func (s *authService) ChangePassword(ctx context.Context, userID int64, req dto.ChangePasswordRequest) error {

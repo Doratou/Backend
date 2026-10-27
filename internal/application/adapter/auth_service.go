@@ -9,6 +9,7 @@ import (
 type AuthService interface {
 	Register(ctx context.Context, req dto.RegisterRequest) (*dto.AuthResponse, error)
 	Login(ctx context.Context, req dto.LoginRequest) (*dto.AuthResponse, error)
+	LoginWithOTP(ctx context.Context, req dto.LoginWithOTPRequest) (*dto.AuthResponse, error)
 	LoginWithEmail(ctx context.Context, req dto.LoginWithEmailRequest) (*dto.AuthResponse, error)
 	LoginWithPhone(ctx context.Context, req dto.LoginWithPhoneRequest) (*dto.AuthResponse, error)
 	ChangePassword(ctx context.Context, userID int64, req dto.ChangePasswordRequest) error
