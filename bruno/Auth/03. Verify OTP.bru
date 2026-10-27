@@ -17,7 +17,6 @@ headers {
 body:json {
   {
     "identifier": "{{seedUserEmail}}",
-    "type": "email",
     "code": "12345"
   }
 }
@@ -31,14 +30,13 @@ docs {
 
   ## Description
 
-  Validates the OTP code received by the user. Upon success, marks the identifier as verified in Redis for a 15-minute registration/login window.
+  Validates the OTP code received by the user. The backend automatically determines the channel from the identifier. Upon success, marks the identifier as verified in Redis for a 15-minute registration/login/reset window.
 
   ## Request
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `identifier` | `string` | Yes | Verified email address or mobile phone number |
-  | `type` | `string` | Yes | Verification channel, must be `email` or `phone` |
+  | `identifier` | `string` | Yes | Target email address or mobile phone number |
   | `code` | `string` | Yes | One-time password verification code |
 
   ## Response
@@ -48,7 +46,8 @@ docs {
   {
     "success": true,
     "data": {
-      "verified": true
+      "status": "verified",
+      "message": "verification successful"
     }
   }
   ```
