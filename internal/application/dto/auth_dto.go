@@ -8,8 +8,7 @@ import (
 )
 
 type SendOTPRequest struct {
-	Identifier string       `json:"identifier" binding:"required"`
-	Type       enum.OTPType `json:"type" binding:"required,oneof=email phone"`
+	Identifier string `json:"identifier" binding:"required"`
 }
 
 type SendOTPResponse struct {
@@ -18,9 +17,8 @@ type SendOTPResponse struct {
 }
 
 type VerifyOTPRequest struct {
-	Identifier string       `json:"identifier" binding:"required"`
-	Type       enum.OTPType `json:"type" binding:"required,oneof=email phone"`
-	Code       string       `json:"code" binding:"required,min=4,max=8"`
+	Identifier string `json:"identifier" binding:"required"`
+	Code       string `json:"code" binding:"required,min=4,max=8"`
 }
 
 type VerifyOTPResponse struct {
@@ -58,9 +56,8 @@ type ChangePasswordRequest struct {
 }
 
 type ResetPasswordRequest struct {
-	Identifier  string       `json:"identifier" binding:"required"`
-	Type        enum.OTPType `json:"type" binding:"required,oneof=email phone"`
-	NewPassword string       `json:"new_password" binding:"required,min=6,max=100"`
+	Identifier  string `json:"identifier" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6,max=100"`
 }
 
 type RefreshRequest struct {

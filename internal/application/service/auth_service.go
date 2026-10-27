@@ -93,12 +93,29 @@ func (s *authService) issueTokenPair(ctx context.Context, userID int64, role enu
 	return accessToken, accessClaims, refreshToken, refreshClaims, nil
 }
 
+func (s *authService) detectOTPType(identifier string) enum.OTPType {
+	if strings.Contains(identifier, "@") {
+		return enum.OTPTypeEmail
+	}
+	return enum.OTPTypePhone
+}
+
 func (s *authService) SendOTP(ctx context.Context, req dto.SendOTPRequest) (*dto.SendOTPResponse, error) {
-	return s.otpService.SendOTP(ctx, req.Identifier, req.Type)
+	req.Identifier = strings.TrimSpace(req.Identifier)
+	if req.Identifier == "" {
+		return nil, exception.ErrBadRequest
+	}
+	otpType := s.detectOTPType(req.Identifier)
+	return s.otpService.SendOTP(ctx, req.Identifier, otpType)
 }
 
 func (s *authService) VerifyOTP(ctx context.Context, req dto.VerifyOTPRequest) (*dto.VerifyOTPResponse, error) {
-	return s.otpService.VerifyOTP(ctx, req.Identifier, req.Type, req.Code)
+	req.Identifier = strings.TrimSpace(req.Identifier)
+	if req.Identifier == "" {
+		return nil, exception.ErrBadRequest
+	}
+	otpType := s.detectOTPType(req.Identifier)
+	return s.otpService.VerifyOTP(ctx, req.Identifier, otpType, req.Code)
 }
 
 func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*dto.AuthResponse, error) {
@@ -331,15 +348,8 @@ func (s *authService) LoginWithOTP(ctx context.Context, req dto.LoginWithOTPRequ
 		return nil, exception.ErrBadRequest
 	}
 
-	var otpType enum.OTPType
-	var isEmail bool
-	if strings.Contains(req.Identifier, "@") {
-		otpType = enum.OTPTypeEmail
-		isEmail = true
-	} else {
-		otpType = enum.OTPTypePhone
-		isEmail = false
-	}
+	otpType := s.detectOTPType(req.Identifier)
+	isEmail := otpType == enum.OTPTypeEmail
 
 	verified, err := s.otpService.IsVerified(ctx, req.Identifier, otpType)
 	if err != nil {
@@ -433,7 +443,13 @@ func (s *authService) ChangePassword(ctx context.Context, userID int64, req dto.
 }
 
 func (s *authService) ResetPassword(ctx context.Context, req dto.ResetPasswordRequest) error {
-	verified, err := s.otpService.IsVerified(ctx, req.Identifier, req.Type)
+	req.Identifier = strings.TrimSpace(req.Identifier)
+	if req.Identifier == "" {
+		return exception.ErrBadRequest
+	}
+	otpType := s.detectOTPType(req.Identifier)
+
+	verified, err := s.otpService.IsVerified(ctx, req.Identifier, otpType)
 	if err != nil {
 		return err
 	}
@@ -442,7 +458,7 @@ func (s *authService) ResetPassword(ctx context.Context, req dto.ResetPasswordRe
 	}
 
 	var user *entity.User
-	if req.Type == enum.OTPTypeEmail {
+	if otpType == enum.OTPTypeEmail {
 		user, err = s.userRepo.FindByEmail(ctx, req.Identifier)
 	} else {
 		user, err = s.userRepo.FindByPhone(ctx, req.Identifier)
@@ -469,7 +485,7 @@ func (s *authService) ResetPassword(ctx context.Context, req dto.ResetPasswordRe
 
 	// Clear verified flag atomically from Redis
 	_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
-		return s.otpService.ClearVerified(trxCtx, req.Identifier, req.Type)
+		return s.otpService.ClearVerified(trxCtx, req.Identifier, otpType)
 	})
 
 	// Purge existing refresh sessions for security

@@ -18,8 +18,7 @@ headers {
 
 body:json {
   {
-    "identifier": "{{seedUserPhone}}",
-    "type": "phone"
+    "identifier": "{{seedUserPhone}}"
   }
 }
 
@@ -32,7 +31,7 @@ docs {
 
   ## Description
 
-  Dispatches a one-time verification code (OTP) via SMS to the specified mobile phone number. Protected by CaptchaGuard when captcha is enabled.
+  Dispatches a one-time verification code (OTP) via SMS to the specified mobile phone number. The backend automatically determines the channel from the identifier. Protected by CaptchaGuard when captcha is enabled.
 
   ## Request
 
@@ -48,7 +47,6 @@ docs {
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `identifier` | `string` | Yes | Target mobile phone number |
-  | `type` | `string` | Yes | Verification type, must be `phone` |
 
   ## Response
 
@@ -57,15 +55,14 @@ docs {
   {
     "success": true,
     "data": {
-      "identifier": "09120000001",
-      "type": "phone",
-      "expires_at": "2026-10-25T21:46:00Z"
+      "expires_in_seconds": 180,
+      "message": "verification code sent to 09120000001"
     }
   }
   ```
 
   ## Errors
 
-  * `400 Bad Request` — Invalid phone number, unsupported type, or missing captcha headers
+  * `400 Bad Request` — Invalid phone number or missing captcha headers
   * `429 Too Many Requests` — Rate limit exceeded
 }

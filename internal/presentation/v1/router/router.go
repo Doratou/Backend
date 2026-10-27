@@ -24,7 +24,7 @@ type Dependencies struct {
 // New builds the fully configured Gin engine with global middlewares and versioned routes.
 func New(deps Dependencies) *gin.Engine {
 	engine := gin.New()
-	engine.Use(gin.Logger(), gin.Recovery())
+	engine.Use(gin.Logger(), gin.Recovery(), middleware.CORS())
 
 	engine.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
