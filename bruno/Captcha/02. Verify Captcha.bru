@@ -20,3 +20,39 @@ body:json {
     "code": "GTnM18P"
   }
 }
+
+docs {
+  # Verify Captcha
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/captcha/verify`
+  **Auth:** None
+
+  ## Description
+
+  Validates a user submitted captcha solution. Upon successful verification, the challenge token is immediately deleted from Redis (single-use enforcement).
+
+  ## Request
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `captcha_id` | `string` | Yes | Unique identifier of the captcha challenge |
+  | `code` | `string` | Yes | User submitted captcha code (case-insensitive) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "valid": true
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing required fields or incorrect captcha code
+  * `404 Not Found` — Captcha challenge not found or expired
+}

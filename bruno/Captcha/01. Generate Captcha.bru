@@ -35,3 +35,33 @@ script:post-response {
     });
   }
 }
+
+docs {
+  # Generate Captcha
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/captcha/generate`
+  **Auth:** None
+
+  ## Description
+
+  Generates a new alphanumeric captcha challenge image and stores its expected solution in Redis with a 2-minute TTL.
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "captcha_id": "8VqO29jZ3X",
+      "captcha_image_base64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+      "expires_at": "2026-10-25T21:45:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `500 Internal Server Error` — Failed to generate captcha challenge
+}
