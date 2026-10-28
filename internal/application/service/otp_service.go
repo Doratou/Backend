@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	netmail "net/mail"
+	"strings"
 	"time"
 
 	"github.com/Doratou/Backend/bootstrap"
@@ -14,24 +16,28 @@ import (
 	"github.com/Doratou/Backend/internal/domain/repository/cache"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	"github.com/Doratou/Backend/pkg/random"
+	mail "github.com/Doratou/Backend/pkg/wneessen-go-mail"
 )
 
 type OTPServiceConfig struct {
-	TTL         time.Duration
-	VerifiedTTL time.Duration
-	Digits      int
+	TTL               time.Duration
+	VerifiedTTL       time.Duration
+	Digits            int
+	EmailDeliveryMode string
 }
 
 type otpService struct {
-	repo      cache.OTPRepository
-	redisTrx  redisInfra.TrxManager
-	randomEng *random.RandomGeneratorEngine
-	cfg       OTPServiceConfig
+	repo        cache.OTPRepository
+	redisTrx    redisInfra.TrxManager
+	randomEng   *random.RandomGeneratorEngine
+	emailSender mail.Sender
+	cfg         OTPServiceConfig
 }
 
 func NewOTPService(
 	repo cache.OTPRepository,
 	redisTrx redisInfra.TrxManager,
+	emailSender mail.Sender,
 	cfg OTPServiceConfig,
 	consts *bootstrap.Constant,
 ) adapter.OTPService {
@@ -51,10 +57,11 @@ func NewOTPService(
 	}
 
 	return &otpService{
-		repo:      repo,
-		redisTrx:  redisTrx,
-		randomEng: random.NewRandomGeneratorEngine(),
-		cfg:       cfg,
+		repo:        repo,
+		redisTrx:    redisTrx,
+		randomEng:   random.NewRandomGeneratorEngine(),
+		emailSender: emailSender,
+		cfg:         cfg,
 	}
 }
 
@@ -68,15 +75,37 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 		return nil, exception.ErrOTPUnsupportedType
 	}
 
+	if otpType == enum.OTPTypeEmail {
+		address, err := netmail.ParseAddress(identifier)
+		if err != nil || address.Address != identifier {
+			return nil, exception.ErrBadRequest
+		}
+		if !strings.EqualFold(strings.TrimSpace(s.cfg.EmailDeliveryMode), "SMTP") {
+			return nil, exception.Wrap(exception.ErrInternal, fmt.Errorf("EMAIL_DELIVERY_MODE must be SMTP"))
+		}
+		if s.emailSender == nil {
+			return nil, exception.Wrap(exception.ErrInternal, fmt.Errorf("email sender is not configured"))
+		}
+	}
+
 	code := s.generateCode()
 
 	if err := s.repo.SetOTP(ctx, otpType, identifier, code, s.cfg.TTL); err != nil {
 		return nil, err
 	}
 
-	// In development, log the OTP code to stdout for immediate testing
-	//TODO : real otp email/phone sender
-	log.Printf("[OTP DEV LOG] Type: %s | Identifier: %s | Code: %s (Expires in %v)", otpType, identifier, code, s.cfg.TTL)
+	if otpType == enum.OTPTypeEmail {
+		if err := s.emailSender.Send(ctx, mail.SendOptions{
+			To:        []string{identifier},
+			Subject:   "Doratou verification code",
+			PlainBody: fmt.Sprintf("Your Doratou verification code is: %s\nThis code expires in %d seconds.", code, int64(s.cfg.TTL.Seconds())),
+		}); err != nil {
+			log.Printf("failed to send OTP email: %v", err)
+			return nil, exception.Wrap(exception.ErrInternal, err)
+		}
+	} else {
+		log.Printf("[OTP DEV LOG] Type: %s | Identifier: %s | Code: %s (Expires in %v)", otpType, identifier, code, s.cfg.TTL)
+	}
 
 	return &dto.SendOTPResponse{
 		ExpiresInSeconds: int64(s.cfg.TTL.Seconds()),

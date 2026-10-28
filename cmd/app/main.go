@@ -24,6 +24,7 @@ import (
 	"github.com/Doratou/Backend/internal/presentation/v1/router"
 	"github.com/Doratou/Backend/pkg/captcha"
 	"github.com/Doratou/Backend/pkg/hasher"
+	mail "github.com/Doratou/Backend/pkg/wneessen-go-mail"
 )
 
 func main() {
@@ -104,13 +105,21 @@ func main() {
 	cancelSeed()
 
 	// 6. Application Services
+	emailSender := mail.NewMailer(mail.EmailConfig{
+		From:     cfg.Environment.Email.DoratouEmail,
+		Password: cfg.Environment.Email.DoratouEmailAppPassword,
+		SMTPHost: cfg.Environment.Email.SMTPHost,
+		SMTPPort: cfg.Environment.Email.SMTPPort,
+	})
 	otpService := service.NewOTPService(
 		otpRepo,
 		redisTrxManager,
+		emailSender,
 		service.OTPServiceConfig{
-			TTL:         cfg.Environment.OTP.TTL,
-			VerifiedTTL: cfg.Environment.OTP.VerifiedTTL,
-			Digits:      cfg.Environment.OTP.Digits,
+			TTL:               cfg.Environment.OTP.TTL,
+			VerifiedTTL:       cfg.Environment.OTP.VerifiedTTL,
+			Digits:            cfg.Environment.OTP.Digits,
+			EmailDeliveryMode: cfg.Environment.Email.DeliveryMode,
 		},
 		cfg.Constant,
 	)
