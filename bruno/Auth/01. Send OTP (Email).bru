@@ -1,0 +1,68 @@
+meta {
+  name: 01. Send OTP (Email)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/otp/send
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  ~X-Captcha-ID: {{captchaId}}
+  ~X-Captcha-Code: 
+}
+
+body:json {
+  {
+    "identifier": "{{seedUserEmail}}"
+  }
+}
+
+docs {
+  # Send OTP (Email)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/auth/otp/send`
+  **Auth:** None
+
+  ## Description
+
+  Dispatches a one-time verification code (OTP) to the specified email address. The backend automatically determines the channel from the identifier. Protected by CaptchaGuard when captcha is enabled.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `X-Captcha-ID` | `string` | Conditional | Captcha challenge ID (required when `CAPTCHA_ENABLED=true`) |
+  | `X-Captcha-Code` | `string` | Conditional | Solved captcha answer (required when `CAPTCHA_ENABLED=true`) |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `identifier` | `string` | Yes | Target recipient email address |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "expires_in_seconds": 180,
+      "message": "verification code sent to user@doratou.local"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid input or missing captcha headers
+  * `429 Too Many Requests` — Rate limit exceeded
+}

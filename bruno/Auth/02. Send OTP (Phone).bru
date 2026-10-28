@@ -1,0 +1,68 @@
+meta {
+  name: 02. Send OTP (Phone)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/otp/send
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  ~X-Captcha-ID: {{captchaId}}
+  ~X-Captcha-Code: 
+}
+
+body:json {
+  {
+    "identifier": "{{seedUserPhone}}"
+  }
+}
+
+docs {
+  # Send OTP (Phone)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/auth/otp/send`
+  **Auth:** None
+
+  ## Description
+
+  Dispatches a one-time verification code (OTP) via SMS to the specified mobile phone number. The backend automatically determines the channel from the identifier. Protected by CaptchaGuard when captcha is enabled.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `X-Captcha-ID` | `string` | Conditional | Captcha challenge ID (required when `CAPTCHA_ENABLED=true`) |
+  | `X-Captcha-Code` | `string` | Conditional | Solved captcha answer (required when `CAPTCHA_ENABLED=true`) |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `identifier` | `string` | Yes | Target mobile phone number |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "expires_in_seconds": 180,
+      "message": "verification code sent to 09120000001"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid phone number or missing captcha headers
+  * `429 Too Many Requests` — Rate limit exceeded
+}

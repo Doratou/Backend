@@ -1,0 +1,67 @@
+meta {
+  name: 01. Generate Captcha
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/captcha/generate
+  body: none
+  auth: none
+}
+
+vars:post-response {
+  captchaId: res.body.data.captcha_id
+}
+
+script:post-response {
+  const resData = res.getBody();
+  
+  if (resData?.data?.captcha_image_base64) {
+    const imgSrc = resData.data.captcha_image_base64;
+    const captchaId = resData.data.captcha_id || '';
+  
+    const html = `
+      <div style="font-family: sans-serif; padding: 20px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px;">
+        <h3 style="margin: 0;">Captcha Preview</h3>
+        <img src="${imgSrc}" alt="Captcha" style="border: 1px solid #ccc; border-radius: 6px; padding: 4px; background: #fff;" />
+        <span style="font-size: 12px; color: #888;">ID: <code>${captchaId}</code></span>
+      </div>
+    `;
+  
+    bru.visualize('html', {
+      name: 'Captcha',
+      content: html
+    });
+  }
+}
+
+docs {
+  # Generate Captcha
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/captcha/generate`
+  **Auth:** None
+
+  ## Description
+
+  Generates a new alphanumeric captcha challenge image and stores its expected solution in Redis with a 2-minute TTL.
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "captcha_id": "8VqO29jZ3X",
+      "captcha_image_base64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+      "expires_at": "2026-10-25T21:45:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `500 Internal Server Error` — Failed to generate captcha challenge
+}

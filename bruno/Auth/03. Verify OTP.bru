@@ -1,0 +1,60 @@
+meta {
+  name: 03. Verify OTP
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/otp/verify
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "identifier": "{{seedUserEmail}}",
+    "code": "12345"
+  }
+}
+
+docs {
+  # Verify OTP
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/auth/otp/verify`
+  **Auth:** None
+
+  ## Description
+
+  Validates the OTP code received by the user. The backend automatically determines the channel from the identifier. Upon success, marks the identifier as verified in Redis for a 15-minute registration/login/reset window.
+
+  ## Request
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `identifier` | `string` | Yes | Target email address or mobile phone number |
+  | `code` | `string` | Yes | One-time password verification code |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "status": "verified",
+      "message": "verification successful"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing or malformed parameters
+  * `401 Unauthorized` — Verification code is invalid or has expired
+  * `404 Not Found` — Verification code session not found
+}
