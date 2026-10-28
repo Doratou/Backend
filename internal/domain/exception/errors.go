@@ -116,6 +116,7 @@ var (
 
 var (
 	ErrDomainFriendshipNotFound         = errors.New("friendship not found")
+	ErrDomainFriendshipAlreadyExists    = errors.New("a friendship already exists between these users")
 	ErrDomainFriendRequestAlreadyExists = errors.New("a pending friend request already exists")
 	ErrDomainAlreadyFriends             = errors.New("users are already friends")
 	ErrDomainSelfFriendRequest          = errors.New("cannot send a friend request to yourself")
@@ -125,6 +126,7 @@ var (
 
 var (
 	ErrFriendshipNotFound         = &AppError{Code: "FRIENDSHIP_NOT_FOUND", Message: "friendship not found", HTTPStatus: http.StatusNotFound, Err: ErrDomainFriendshipNotFound}
+	ErrFriendshipAlreadyExists    = &AppError{Code: "FRIENDSHIP_ALREADY_EXISTS", Message: "a friendship already exists between these users", HTTPStatus: http.StatusConflict, Err: ErrDomainFriendshipAlreadyExists}
 	ErrFriendRequestAlreadyExists = &AppError{Code: "FRIEND_REQUEST_ALREADY_EXISTS", Message: "a pending friend request already exists", HTTPStatus: http.StatusConflict, Err: ErrDomainFriendRequestAlreadyExists}
 	ErrAlreadyFriends             = &AppError{Code: "ALREADY_FRIENDS", Message: "users are already friends", HTTPStatus: http.StatusConflict, Err: ErrDomainAlreadyFriends}
 	ErrSelfFriendRequest          = &AppError{Code: "SELF_FRIEND_REQUEST", Message: "cannot send a friend request to yourself", HTTPStatus: http.StatusBadRequest, Err: ErrDomainSelfFriendRequest}
