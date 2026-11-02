@@ -20,10 +20,11 @@ import (
 )
 
 type OTPServiceConfig struct {
-	TTL               time.Duration
-	VerifiedTTL       time.Duration
-	Digits            int
-	EmailDeliveryMode string
+	TTL                  time.Duration
+	VerifiedTTL          time.Duration
+	Digits               int
+	EmailDeliveryEnabled bool
+	EmailDeliveryMode    string
 }
 
 type otpService struct {
@@ -80,6 +81,8 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 		if err != nil || address.Address != identifier {
 			return nil, exception.ErrBadRequest
 		}
+	}
+	if otpType == enum.OTPTypeEmail && s.cfg.EmailDeliveryEnabled {
 		if !strings.EqualFold(strings.TrimSpace(s.cfg.EmailDeliveryMode), "SMTP") {
 			return nil, exception.Wrap(exception.ErrInternal, fmt.Errorf("EMAIL_DELIVERY_MODE must be SMTP"))
 		}
@@ -94,7 +97,7 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 		return nil, err
 	}
 
-	if otpType == enum.OTPTypeEmail {
+	if otpType == enum.OTPTypeEmail && s.cfg.EmailDeliveryEnabled {
 		if err := s.emailSender.Send(ctx, mail.SendOptions{
 			To:        []string{identifier},
 			Subject:   "Doratou verification code",

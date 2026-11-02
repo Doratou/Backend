@@ -23,6 +23,7 @@ type EmailConfig struct {
 	DoratouEmailAppPassword string `mapstructure:"DORATOU_EMAIL_APP_PASSWORD" json:"-"`
 	SMTPHost                string `mapstructure:"SMTP_HOST"`
 	SMTPPort                string `mapstructure:"SMTP_HOST_PORT"`
+	DeliveryEnabled         bool   `mapstructure:"EMAIL_DELIVERY_ENABLED"`
 	DeliveryMode            string `mapstructure:"EMAIL_DELIVERY_MODE"`
 }
 

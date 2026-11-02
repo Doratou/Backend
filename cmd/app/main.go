@@ -117,10 +117,11 @@ func main() {
 		redisTrxManager,
 		emailSender,
 		service.OTPServiceConfig{
-			TTL:               cfg.Environment.OTP.TTL,
-			VerifiedTTL:       cfg.Environment.OTP.VerifiedTTL,
-			Digits:            cfg.Environment.OTP.Digits,
-			EmailDeliveryMode: cfg.Environment.Email.DeliveryMode,
+			TTL:                  cfg.Environment.OTP.TTL,
+			VerifiedTTL:          cfg.Environment.OTP.VerifiedTTL,
+			Digits:               cfg.Environment.OTP.Digits,
+			EmailDeliveryEnabled: cfg.Environment.Email.DeliveryEnabled,
+			EmailDeliveryMode:    cfg.Environment.Email.DeliveryMode,
 		},
 		cfg.Constant,
 	)
