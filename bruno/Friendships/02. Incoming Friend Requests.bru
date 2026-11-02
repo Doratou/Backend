@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/v1/friendships/requests
+  url: {{baseUrl}}/api/v1/friendships/requests?direction=incoming&page=1&limit=10
   body: none
   auth: bearer
 }
@@ -13,7 +13,7 @@ get {
 params:query {
   direction: incoming
   page: 1
-  limit: 20
+  limit: 10
 }
 
 headers {
@@ -33,9 +33,13 @@ docs {
 
   ## Description
 
-  Lists pending friend requests received by the authenticated user, ordered by latest request time descending, then ID descending. Accepted, rejected, and soft-deleted records are excluded. Each item contains only the users' public summary fields.
+  Lists non-deleted PENDING friend requests received by the authenticated user. Results are ordered by latest request time descending, then ID descending (`requested_at DESC, id DESC`). Accepted, rejected, and soft-deleted records are excluded.
 
-  Use the recipient's token. For an existing request, take its `id` from this response and use it in the accept or reject URL. The request action URLs also support `friendRequestId`, which is saved automatically when Send Friend Request succeeds in the same collection session.
+  Use the recipient's token. To accept or reject a selected request, use that item's `id`, not either user's ID. Reading this list does not automatically save `friendRequestId`; copy the selected ID into the action URL or set the variable manually. Send Friend Request saves it only after a successful send in the same Bruno session.
+
+  Each item's `created_at` represents the latest request time (`requested_at` in the database), not the original row creation time. An allowed resend updates this timestamp and preserves the relationship ID.
+
+  Only the authenticated account's ACTIVE status is checked for this list. The other participant's summary contains `id`, `name`, and `avatar_attachment_id`; no email, phone, or password is returned. If that user has been soft-deleted, the summary keeps the user ID and may contain an empty name and a null avatar.
 
   ## Request
 
@@ -43,21 +47,24 @@ docs {
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Authorization` | `string` | Yes | Authenticated user's Bearer access token (`Bearer <token>`) |
 
   ### Query Parameters
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `direction` | `string` | Yes | `incoming` for requests received by the current user |
-  | `page` | `integer` | No | Page number, minimum 1; defaults to 1 |
-  | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20 |
+  | `direction` | `string` | Yes | `incoming` for this request; the endpoint accepts only lowercase `incoming` or `outgoing` |
+  | `page` | `integer` | No | Minimum 1; defaults to 1 |
+  | `limit` | `integer` | No | From 1 to 100; defaults to 20 |
 
   No request body is required.
+
+  Omitting `page` or `limit`, or providing an empty query value, uses its default. Explicit zero, negative values, non-integers, `limit` above 100, integer overflow, and an overflowing pagination offset return `400 BAD_REQUEST`. A page beyond the last result still returns `200 OK` with an empty `items` array.
 
   ## Response
 
   **`200 OK`**
+
   ```json
   {
     "success": true,
@@ -81,20 +88,37 @@ docs {
       ],
       "pagination": {
         "page": 1,
-        "limit": 20,
+        "limit": 10,
         "total": 1
       }
     }
   }
   ```
 
-  An empty result returns `items: []`. `total` counts all matching requests before pagination and may remain positive for an empty page beyond the last result.
+  This example matches the saved Bruno query `page=1&limit=10`. `total` counts all matching requests before pagination. No results return `items: []`; `total` can remain positive on a page beyond the last result.
 
   ## Errors
 
-  * `400 Bad Request` — Missing or invalid direction, invalid page or limit, or an overflowing pagination offset
-  * `401 Unauthorized` — Missing, invalid, expired, or revoked access token
-  * `403 Forbidden` — User account is deactivated
-  * `404 Not Found` — Authenticated user no longer exists or has been deleted
-  * `500 Internal Server Error` — Database failure
+  Each error returns the HTTP status below and the JSON envelope shown in the example. The `code` and `error` strings match the backend definitions. Internal database and Redis details are not returned.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Missing or invalid direction, invalid page or limit, integer overflow, or an overflowing pagination offset. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing, empty, or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The access token is malformed or invalid, or a refresh token was supplied. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token has expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated user does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Redis blacklist lookup, database access, or a transaction fails. |
+
+  **Example: 400 Bad Request**
+
+  ```json
+  {
+    "success": false,
+    "code": "BAD_REQUEST",
+    "error": "bad request payload or parameters"
+  }
+  ```
 }

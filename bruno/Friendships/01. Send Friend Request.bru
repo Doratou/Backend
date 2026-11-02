@@ -20,7 +20,7 @@ auth:bearer {
 
 body:json {
   {
-    "receiver_user_id": 2
+    "receiver_user_id": {{receiver_user_id}}
   }
 }
 
@@ -40,17 +40,23 @@ docs {
 
   ## Description
 
-  Creates a pending friend request from the authenticated user to another active user. The requester is determined from the access token. Requests to yourself, duplicate pending requests in either direction, and requests between existing friends are rejected.
+  Creates a PENDING friend request from the authenticated user to another ACTIVE user. The requester is determined from the access token. The request body requires `receiver_user_id`, a positive JSON integer in the BIGINT range.
 
-  Replace the sample receiver ID with the other user's actual ID. Log in through Auth to populate `token`. A successful response saves `friendRequestId` as a runtime variable for the request action endpoints.
+  In this Bruno request, set `receiver_user_id` in the selected environment or collection variables to the other user's actual ID. The body uses `{{receiver_user_id}}` without quotation marks so the resolved value is a JSON number. Log in through Auth to populate `token`. A successful response saves `friendRequestId` as a runtime variable for the request action endpoints. Runtime variables belong to this Bruno collection session and are not shared with Postman. Logging in as another user replaces `token` while the saved request ID remains available.
 
-  Use the receiver's token to accept or reject a request, and the sender's token to cancel it. Accept, reject, and cancel are alternative actions on a pending request; do not run all three against the same request in sequence. Logging in as another user replaces `token` while the saved request ID remains available.
+  Each unordered pair of users has one database record. An allowed resend reuses the same record and ID, updates the sender and recipient to the new direction, sets the latest request time, clears `responded_at` and `deleted_at`, and restores PENDING. The response field `created_at` represents this latest request time, backed by `requested_at` in the database. Both the first send and an allowed resend return `201 Created`.
 
-  Each unordered user pair has one database record, including after cancellation or friendship removal. Sending again reuses the same ID, updates the sender, recipient and latest request time, clears responded_at and restores the record to PENDING. The response created_at represents the latest request time.
+  A non-deleted PENDING request blocks another send in either direction with `409 FRIEND_REQUEST_ALREADY_EXISTS`, regardless of its age. A non-deleted ACCEPTED relationship returns `409 ALREADY_FRIENDS`. Waiting for the cooldown does not expire a pending request.
 
-  After rejection, the same sender must wait FRIENDSHIP_REQUEST_COOLDOWN from responded_at (24 hours by default). After canceling a pending request, the same sender must wait until that interval has passed from the request time. A pending request still blocks duplicate sends regardless of its age. The previous recipient may initiate a request in the opposite direction.
+  After rejection, the same sender must wait `FRIENDSHIP_REQUEST_COOLDOWN` from `responded_at` before sending again. Legacy rejected rows without `responded_at` use `updated_at`. Sending before that interval expires returns `429 FRIEND_REQUEST_COOLDOWN`.
 
-  Refresh the request list before acting on an old saved ID because IDs are reused for the latest request.
+  After cancellation of a pending request, the same sender must wait until the cooldown has elapsed from the latest request's send time, not its cancellation time. The previous recipient may initiate a reverse request after rejection or cancellation. Removing an ACCEPTED friendship does not impose this unaccepted-request cooldown.
+
+  `FRIENDSHIP_REQUEST_COOLDOWN` is a backend `.env` duration, such as `24h`. A missing or non-positive value falls back to 24 hours. Restart the backend after changing it. The 429 response has no remaining-time field or `Retry-After` header.
+
+  Use the recipient's token to accept or reject a pending request and the sender's token to cancel it. These are alternative actions on PENDING; do not run all three in sequence on the same request. Refresh the relevant list before using an old saved ID because that ID refers to the latest state and direction.
+
+  Apply the project migrations, including `00003_reuse_friendships_and_add_request_time.sql`, before using this API version.
 
   ## Request
 
@@ -58,17 +64,27 @@ docs {
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Authorization` | `string` | Yes | Authenticated user's Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
 
   ### Body
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `receiver_user_id` | `integer` | Yes | Positive BIGINT user ID of the recipient; must differ from the authenticated user's ID |
+  | `receiver_user_id` | `integer` | Yes | JSON integer from 1 to 9223372036854775807 identifying another ACTIVE user; quoted numbers are invalid |
+
+  ```json
+  {
+    "receiver_user_id": 2
+  }
+  ```
+
+  The JSON above is an example. The saved request resolves `{{receiver_user_id}}` from Bruno variables.
 
   ## Response
 
   **`201 Created`**
+
   ```json
   {
     "success": true,
@@ -85,11 +101,32 @@ docs {
 
   ## Errors
 
-  * `400 Bad Request` — Missing or invalid receiver ID, malformed JSON, or a request to yourself
-  * `401 Unauthorized` — Missing, invalid, expired, or revoked access token
-  * `403 Forbidden` — Requester or recipient account is deactivated
-  * `404 Not Found` — Requester or recipient user does not exist or has been deleted
-  * `409 Conflict` — A pending request or friendship already exists, or a concurrent operation changed the relationship
-  * `429 Too Many Requests` ? FRIEND_REQUEST_COOLDOWN: please wait before sending another friend request to this user
-  * `500 Internal Server Error` — Database or transaction failure
+  Each error returns the HTTP status below and the JSON envelope shown in the example. The `code` and `error` strings match the backend definitions. Internal database and Redis details are not returned.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Malformed JSON; missing, non-positive, fractional, quoted, or out-of-range receiver ID; or an unresolved Bruno variable. |
+  | 400 | `SELF_FRIEND_REQUEST` | `cannot send a friend request to yourself` | The receiver ID equals the authenticated user's ID. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing, empty, or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The access token is malformed or invalid, or a refresh token was supplied. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token has expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated user or recipient account is not ACTIVE. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated user or recipient does not exist or has been soft-deleted. |
+  | 409 | `FRIEND_REQUEST_ALREADY_EXISTS` | `a pending friend request already exists` | A non-deleted PENDING request already exists in either direction. |
+  | 409 | `ALREADY_FRIENDS` | `users are already friends` | A non-deleted ACCEPTED friendship already exists. |
+  | 409 | `FRIENDSHIP_ALREADY_EXISTS` | `a friendship already exists between these users` | Concurrent sends collide with the unique unordered user-pair constraint. |
+  | 409 | `FRIENDSHIP_INVALID_STATUS` | `friendship status does not allow this operation` | An existing relationship has a status that cannot be reopened. |
+  | 429 | `FRIEND_REQUEST_COOLDOWN` | `please wait before sending another friend request to this user` | The same sender resends before the rejection or cancellation cooldown expires. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Redis blacklist lookup, database access, or a transaction fails. |
+
+  **Example: 429 Too Many Requests**
+
+  ```json
+  {
+    "success": false,
+    "code": "FRIEND_REQUEST_COOLDOWN",
+    "error": "please wait before sending another friend request to this user"
+  }
+  ```
 }
