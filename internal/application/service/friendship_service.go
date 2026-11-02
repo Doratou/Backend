@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
+	"github.com/Doratou/Backend/bootstrap"
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
 	"github.com/Doratou/Backend/internal/domain/entity"
@@ -14,21 +16,34 @@ import (
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 )
 
+type FriendshipServiceConfig struct {
+	RequestCooldown time.Duration
+}
+
 type friendshipService struct {
 	friendshipRepo domain_db.FriendshipRepository
 	userRepo       domain_db.UserRepository
 	dbTrx          database.TrxManager
+	cfg            FriendshipServiceConfig
 }
 
 func NewFriendshipService(
 	friendshipRepo domain_db.FriendshipRepository,
 	userRepo domain_db.UserRepository,
 	dbTrx database.TrxManager,
+	cfg FriendshipServiceConfig,
+	consts *bootstrap.Constant,
 ) adapter.FriendshipService {
+	if cfg.RequestCooldown <= 0 {
+		defaultCooldown := consts.Friendship.DefaultRequestCooldown
+		log.Printf("[CONFIG NOTICE] Friendship RequestCooldown is not configured or non-positive (%v), applying default: %v", cfg.RequestCooldown, defaultCooldown)
+		cfg.RequestCooldown = defaultCooldown
+	}
 	return &friendshipService{
 		friendshipRepo: friendshipRepo,
 		userRepo:       userRepo,
 		dbTrx:          dbTrx,
+		cfg:            cfg,
 	}
 }
 
@@ -52,28 +67,32 @@ func (s *friendshipService) SendRequest(ctx context.Context, userID int64, req d
 		if err != nil && !errors.Is(err, exception.ErrFriendshipNotFound) {
 			return err
 		}
-		if err == nil {
+		if err == nil && !existing.DeletedAt.Valid {
 			switch existing.Status {
 			case enum.FriendshipStatusPending:
 				return exception.ErrFriendRequestAlreadyExists
 			case enum.FriendshipStatusAccepted:
 				return exception.ErrAlreadyFriends
 			case enum.FriendshipStatusRejected:
-				if err := s.friendshipRepo.DeleteByID(trxCtx, existing.ID, enum.FriendshipStatusRejected); err != nil {
-					if errors.Is(err, exception.ErrFriendshipNotFound) {
-						return exception.ErrFriendshipInvalidStatus
-					}
-					return err
-				}
 			default:
 				return exception.ErrFriendshipInvalidStatus
 			}
+		}
+
+		now := time.Now().UTC()
+		if err == nil && s.requestCooldownActive(existing, userID, now) {
+			return exception.ErrFriendRequestCooldown
 		}
 
 		friendship = &entity.Friendship{
 			RequesterUserID: userID,
 			ReceiverUserID:  req.ReceiverUserID,
 			Status:          enum.FriendshipStatusPending,
+			RequestedAt:     now,
+		}
+		if err == nil {
+			friendship.BaseEntity = existing.BaseEntity
+			return s.friendshipRepo.ReopenRequest(trxCtx, friendship)
 		}
 		return s.friendshipRepo.Create(trxCtx, friendship)
 	})
@@ -239,6 +258,23 @@ func (s *friendshipService) ensureActiveUser(ctx context.Context, userID int64) 
 		return exception.ErrUserInactive
 	}
 	return nil
+}
+
+func (s *friendshipService) requestCooldownActive(friendship *entity.Friendship, userID int64, now time.Time) bool {
+	if friendship.RequesterUserID != userID {
+		return false
+	}
+	if friendship.Status == enum.FriendshipStatusRejected {
+		rejectedAt := friendship.UpdatedAt
+		if friendship.RespondedAt != nil {
+			rejectedAt = *friendship.RespondedAt
+		}
+		return now.Before(rejectedAt.Add(s.cfg.RequestCooldown))
+	}
+	if friendship.Status == enum.FriendshipStatusPending && friendship.DeletedAt.Valid {
+		return now.Before(friendship.RequestedAt.Add(s.cfg.RequestCooldown))
+	}
+	return false
 }
 
 func friendshipPagination(page, limit int) (int, int, int, error) {

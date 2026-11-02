@@ -79,7 +79,7 @@ func ToFriendRequestResponse(friendship *entity.Friendship) FriendRequestRespons
 		RequesterUserID: friendship.RequesterUserID,
 		ReceiverUserID:  friendship.ReceiverUserID,
 		Status:          friendship.Status,
-		CreatedAt:       friendship.CreatedAt,
+		CreatedAt:       friendship.RequestedAt,
 		RespondedAt:     friendship.RespondedAt,
 	}
 }
@@ -98,7 +98,7 @@ func ToFriendRequestListItem(friendship *entity.Friendship) FriendRequestListIte
 		Requester: toFriendshipUserResponse(friendship.RequesterUserID, friendship.RequesterUser),
 		Receiver:  toFriendshipUserResponse(friendship.ReceiverUserID, friendship.ReceiverUser),
 		Status:    friendship.Status,
-		CreatedAt: friendship.CreatedAt,
+		CreatedAt: friendship.RequestedAt,
 	}
 }
 

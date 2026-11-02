@@ -1,0 +1,79 @@
+meta {
+  name: 04. Accept Friend Request
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/friendships/requests/{{friendRequestId}}/accept
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body?.success && body?.data?.id) {
+    bru.setVar("friendshipId", body.data.id);
+  }
+}
+
+docs {
+  # Accept Friend Request
+
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/friendships/requests/:id/accept`
+  **Auth:** Required
+
+  ## Description
+
+  Accepts a pending friend request. Only the recipient may perform this action. The status becomes `ACCEPTED`, `responded_at` is set, and the relationship appears in both users' friend lists.
+
+  Log in as the recipient before sending this request. `friendRequestId` is saved by Send Friend Request, or the selected incoming request ID can be entered directly in the URL. A successful response saves `friendshipId` for Remove Friend.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Recipient's Bearer access token (`Bearer <token>`) |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `integer` | Yes | Positive BIGINT ID of the pending request, not a user ID |
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 501,
+      "status": "ACCEPTED",
+      "responded_at": "2026-10-29T10:05:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid or non-positive request ID
+  * `401 Unauthorized` — Missing, invalid, expired, or revoked access token
+  * `403 Forbidden` — Current user is not the recipient, or their account is deactivated
+  * `404 Not Found` — Request or authenticated user does not exist or has been soft-deleted
+  * `409 Conflict` — Request is no longer pending or changed during a concurrent operation
+  * `500 Internal Server Error` — Database or transaction failure
+}

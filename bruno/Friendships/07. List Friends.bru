@@ -1,0 +1,92 @@
+meta {
+  name: 07. List Friends
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/friendships
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Friends
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/friendships`
+  **Auth:** Required
+
+  ## Description
+
+  Lists the authenticated user's accepted, non-deleted friendships, ordered by latest request time descending, then ID descending. The other user's summary is returned regardless of who originally sent the request. Pending and rejected requests are excluded.
+
+  `friendship_id` identifies the relationship for Remove Friend; `user.id` identifies the other user. The `friends_since` timestamp comes from the acceptance time. Soft-deleted users may have an empty name and a null avatar in the summary.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Page number, minimum 1; defaults to 1 |
+  | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20 |
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "friendship_id": 501,
+          "user": {
+            "id": 2,
+            "name": "Default Admin",
+            "avatar_attachment_id": null
+          },
+          "friends_since": "2026-10-29T10:05:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  An empty result returns `items: []`. `total` counts all matching friendships before pagination and may remain positive for an empty page beyond the last result.
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid page or limit, or an overflowing pagination offset
+  * `401 Unauthorized` — Missing, invalid, expired, or revoked access token
+  * `403 Forbidden` — User account is deactivated
+  * `404 Not Found` — Authenticated user no longer exists or has been deleted
+  * `500 Internal Server Error` — Database failure
+}

@@ -8,14 +8,19 @@ import (
 )
 
 type Environment struct {
-	DataBase   DataBase      `mapstructure:",squash"`
-	Redis      Redis         `mapstructure:",squash"`
-	HttpServer HttpServer    `mapstructure:",squash"`
-	JWT        JWTConfig     `mapstructure:",squash"`
-	OTP        OTPConfig     `mapstructure:",squash"`
-	Seed       SeedConfig    `mapstructure:",squash"`
-	Captcha    CaptchaConfig `mapstructure:",squash"`
-	Email      EmailConfig   `mapstructure:",squash"`
+	DataBase   DataBase         `mapstructure:",squash"`
+	Redis      Redis            `mapstructure:",squash"`
+	HttpServer HttpServer       `mapstructure:",squash"`
+	JWT        JWTConfig        `mapstructure:",squash"`
+	OTP        OTPConfig        `mapstructure:",squash"`
+	Seed       SeedConfig       `mapstructure:",squash"`
+	Captcha    CaptchaConfig    `mapstructure:",squash"`
+	Email      EmailConfig      `mapstructure:",squash"`
+	Friendship FriendshipConfig `mapstructure:",squash"`
+}
+
+type FriendshipConfig struct {
+	RequestCooldown time.Duration `mapstructure:"FRIENDSHIP_REQUEST_COOLDOWN"`
 }
 
 type EmailConfig struct {

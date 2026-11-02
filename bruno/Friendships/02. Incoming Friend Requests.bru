@@ -1,0 +1,100 @@
+meta {
+  name: 02. Incoming Friend Requests
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/friendships/requests
+  body: none
+  auth: bearer
+}
+
+params:query {
+  direction: incoming
+  page: 1
+  limit: 20
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Incoming Friend Requests
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/friendships/requests?direction=incoming`
+  **Auth:** Required
+
+  ## Description
+
+  Lists pending friend requests received by the authenticated user, ordered by latest request time descending, then ID descending. Accepted, rejected, and soft-deleted records are excluded. Each item contains only the users' public summary fields.
+
+  Use the recipient's token. For an existing request, take its `id` from this response and use it in the accept or reject URL. The request action URLs also support `friendRequestId`, which is saved automatically when Send Friend Request succeeds in the same collection session.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `direction` | `string` | Yes | `incoming` for requests received by the current user |
+  | `page` | `integer` | No | Page number, minimum 1; defaults to 1 |
+  | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20 |
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 501,
+          "requester": {
+            "id": 1,
+            "name": "Default User",
+            "avatar_attachment_id": null
+          },
+          "receiver": {
+            "id": 2,
+            "name": "Default Admin",
+            "avatar_attachment_id": null
+          },
+          "status": "PENDING",
+          "created_at": "2026-10-29T10:00:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  An empty result returns `items: []`. `total` counts all matching requests before pagination and may remain positive for an empty page beyond the last result.
+
+  ## Errors
+
+  * `400 Bad Request` — Missing or invalid direction, invalid page or limit, or an overflowing pagination offset
+  * `401 Unauthorized` — Missing, invalid, expired, or revoked access token
+  * `403 Forbidden` — User account is deactivated
+  * `404 Not Found` — Authenticated user no longer exists or has been deleted
+  * `500 Internal Server Error` — Database failure
+}

@@ -38,7 +38,7 @@ func (r *friendshipRepository) FindByID(ctx context.Context, id int64) (*entity.
 	var friendship entity.Friendship
 	db := r.getDB(ctx)
 
-	err := db.Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment").
+	err := db.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment").
 		Where("id = ?", id).First(&friendship).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -56,7 +56,7 @@ func (r *friendshipRepository) FindByUserPair(ctx context.Context, firstUserID, 
 		firstUserID, secondUserID = secondUserID, firstUserID
 	}
 
-	err := db.Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment").
+	err := db.Unscoped().Clauses(clause.Locking{Strength: "UPDATE"}).Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment").
 		Where("LEAST(requester_user_id, receiver_user_id) = ? AND GREATEST(requester_user_id, receiver_user_id) = ?", firstUserID, secondUserID).
 		First(&friendship).Error
 	if err != nil {
@@ -66,6 +66,31 @@ func (r *friendshipRepository) FindByUserPair(ctx context.Context, firstUserID, 
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 	return &friendship, nil
+}
+
+func (r *friendshipRepository) ReopenRequest(ctx context.Context, friendship *entity.Friendship) error {
+	db := r.getDB(ctx)
+	updatedAt := db.NowFunc()
+	res := db.Unscoped().Model(&entity.Friendship{}).Where("id = ?", friendship.ID).
+		Updates(map[string]any{
+			"requester_user_id": friendship.RequesterUserID,
+			"receiver_user_id":  friendship.ReceiverUserID,
+			"status":            friendship.Status,
+			"requested_at":      friendship.RequestedAt,
+			"responded_at":      nil,
+			"deleted_at":        nil,
+			"updated_at":        updatedAt,
+		})
+	if res.Error != nil {
+		return friendshipPersistenceError(res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return exception.ErrFriendshipNotFound
+	}
+	friendship.UpdatedAt = updatedAt
+	friendship.RespondedAt = nil
+	friendship.DeletedAt = gorm.DeletedAt{}
+	return nil
 }
 
 func (r *friendshipRepository) FindIncomingRequests(ctx context.Context, userID int64, limit, offset int) ([]*entity.Friendship, int64, error) {
@@ -124,7 +149,7 @@ func (r *friendshipRepository) findAll(db *gorm.DB, limit, offset int) ([]*entit
 		return nil, 0, exception.Wrap(exception.ErrInternal, err)
 	}
 
-	query := db.Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment").Order("id DESC")
+	query := db.Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment").Order("requested_at DESC").Order("id DESC")
 	if limit > 0 {
 		query = query.Limit(limit)
 	}

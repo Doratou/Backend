@@ -9,6 +9,7 @@ import (
 
 type FriendshipRepository interface {
 	Create(ctx context.Context, friendship *entity.Friendship) error
+	ReopenRequest(ctx context.Context, friendship *entity.Friendship) error
 	FindByID(ctx context.Context, id int64) (*entity.Friendship, error)
 	FindByUserPair(ctx context.Context, firstUserID, secondUserID int64) (*entity.Friendship, error)
 	FindIncomingRequests(ctx context.Context, userID int64, limit, offset int) ([]*entity.Friendship, int64, error)

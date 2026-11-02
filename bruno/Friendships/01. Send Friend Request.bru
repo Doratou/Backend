@@ -1,0 +1,95 @@
+meta {
+  name: 01. Send Friend Request
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/friendships/requests
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "receiver_user_id": 2
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body?.success && body?.data?.id) {
+    bru.setVar("friendRequestId", body.data.id);
+  }
+}
+
+docs {
+  # Send Friend Request
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/friendships/requests`
+  **Auth:** Required
+
+  ## Description
+
+  Creates a pending friend request from the authenticated user to another active user. The requester is determined from the access token. Requests to yourself, duplicate pending requests in either direction, and requests between existing friends are rejected.
+
+  Replace the sample receiver ID with the other user's actual ID. Log in through Auth to populate `token`. A successful response saves `friendRequestId` as a runtime variable for the request action endpoints.
+
+  Use the receiver's token to accept or reject a request, and the sender's token to cancel it. Accept, reject, and cancel are alternative actions on a pending request; do not run all three against the same request in sequence. Logging in as another user replaces `token` while the saved request ID remains available.
+
+  Each unordered user pair has one database record, including after cancellation or friendship removal. Sending again reuses the same ID, updates the sender, recipient and latest request time, clears responded_at and restores the record to PENDING. The response created_at represents the latest request time.
+
+  After rejection, the same sender must wait FRIENDSHIP_REQUEST_COOLDOWN from responded_at (24 hours by default). After canceling a pending request, the same sender must wait until that interval has passed from the request time. A pending request still blocks duplicate sends regardless of its age. The previous recipient may initiate a request in the opposite direction.
+
+  Refresh the request list before acting on an old saved ID because IDs are reused for the latest request.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `receiver_user_id` | `integer` | Yes | Positive BIGINT user ID of the recipient; must differ from the authenticated user's ID |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 501,
+      "requester_user_id": 1,
+      "receiver_user_id": 2,
+      "status": "PENDING",
+      "created_at": "2026-10-29T10:00:00Z",
+      "responded_at": null
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing or invalid receiver ID, malformed JSON, or a request to yourself
+  * `401 Unauthorized` — Missing, invalid, expired, or revoked access token
+  * `403 Forbidden` — Requester or recipient account is deactivated
+  * `404 Not Found` — Requester or recipient user does not exist or has been deleted
+  * `409 Conflict` — A pending request or friendship already exists, or a concurrent operation changed the relationship
+  * `429 Too Many Requests` ? FRIEND_REQUEST_COOLDOWN: please wait before sending another friend request to this user
+  * `500 Internal Server Error` — Database or transaction failure
+}

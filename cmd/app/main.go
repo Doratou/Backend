@@ -141,7 +141,15 @@ func main() {
 		cfg.Constant,
 	)
 
-	friendshipService := service.NewFriendshipService(friendshipRepo, userRepo, dbTrxManager)
+	friendshipService := service.NewFriendshipService(
+		friendshipRepo,
+		userRepo,
+		dbTrxManager,
+		service.FriendshipServiceConfig{
+			RequestCooldown: cfg.Environment.Friendship.RequestCooldown,
+		},
+		cfg.Constant,
+	)
 
 	captchaService := service.NewCaptchaService(
 		captchaRepo,
