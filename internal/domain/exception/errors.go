@@ -70,6 +70,14 @@ var (
 	ErrDomainCaptchaInvalid       = errors.New("captcha code is invalid")
 	ErrDomainCaptchaRequired      = errors.New("captcha verification is required")
 
+	ErrDomainReportNotFound        = errors.New("report not found")
+	ErrDomainReportTargetRequired  = errors.New("reported user id or reported group id must be provided")
+	ErrDomainReportSelfForbidden   = errors.New("you cannot report yourself")
+	ErrDomainInvalidReportReason   = errors.New("invalid report reason")
+	ErrDomainInvalidReportStatus   = errors.New("invalid report status")
+	ErrDomainReportAlreadyResolved = errors.New("report has already been resolved")
+	ErrDomainForbiddenRole         = errors.New("forbidden: insufficient permissions")
+
 	ErrDomainBadRequest           = errors.New("bad request")
 	ErrDomainInternal             = errors.New("internal server error")
 )
@@ -108,6 +116,15 @@ var (
 	ErrCaptchaNotFound           = &AppError{Code: "CAPTCHA_NOT_FOUND", Message: "captcha not found or expired", HTTPStatus: http.StatusNotFound, Err: ErrDomainCaptchaNotFound}
 	ErrCaptchaInvalid            = &AppError{Code: "CAPTCHA_INVALID", Message: "captcha verification failed", HTTPStatus: http.StatusBadRequest, Err: ErrDomainCaptchaInvalid}
 	ErrCaptchaRequired           = &AppError{Code: "CAPTCHA_REQUIRED", Message: "captcha headers X-Captcha-ID and X-Captcha-Code are required", HTTPStatus: http.StatusBadRequest, Err: ErrDomainCaptchaRequired}
+
+	// Admin Report & Moderation
+	ErrReportNotFound            = &AppError{Code: "REPORT_NOT_FOUND", Message: "report not found", HTTPStatus: http.StatusNotFound, Err: ErrDomainReportNotFound}
+	ErrReportTargetRequired      = &AppError{Code: "REPORT_TARGET_REQUIRED", Message: "at least one of reported user id or group id is required", HTTPStatus: http.StatusBadRequest, Err: ErrDomainReportTargetRequired}
+	ErrReportSelfForbidden       = &AppError{Code: "REPORT_SELF_FORBIDDEN", Message: "you cannot report yourself", HTTPStatus: http.StatusBadRequest, Err: ErrDomainReportSelfForbidden}
+	ErrInvalidReportReason       = &AppError{Code: "INVALID_REPORT_REASON", Message: "invalid report reason provided", HTTPStatus: http.StatusBadRequest, Err: ErrDomainInvalidReportReason}
+	ErrInvalidReportStatus       = &AppError{Code: "INVALID_REPORT_STATUS", Message: "invalid report status provided", HTTPStatus: http.StatusBadRequest, Err: ErrDomainInvalidReportStatus}
+	ErrReportAlreadyResolved     = &AppError{Code: "REPORT_ALREADY_RESOLVED", Message: "report has already been reviewed and resolved", HTTPStatus: http.StatusBadRequest, Err: ErrDomainReportAlreadyResolved}
+	ErrForbiddenRole             = &AppError{Code: "FORBIDDEN_ROLE", Message: "you do not have permission to access this resource", HTTPStatus: http.StatusForbidden, Err: ErrDomainForbiddenRole}
 
 	// General
 	ErrBadRequest                = &AppError{Code: "BAD_REQUEST", Message: "bad request payload or parameters", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
