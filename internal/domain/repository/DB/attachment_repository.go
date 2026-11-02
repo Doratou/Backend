@@ -7,6 +7,22 @@ import (
 	"github.com/Doratou/Backend/internal/domain/enum"
 )
 
+// AttachmentFilter holds query parameters for filtering attachments.
+type AttachmentFilter struct {
+	UploadedByUserID *int64
+	GroupID          *int64
+	ExpenseID        *int64
+	Type             *enum.AttachmentType
+	IsPublic         *bool
+	Search           string
+}
+
+// Pagination defines page and limit parameters.
+type Pagination struct {
+	Page     int
+	PageSize int
+}
+
 // AttachmentRepository defines a comprehensive CRUD and query interface for Attachment entities.
 type AttachmentRepository interface {
 	// Create persists a new attachment record.
@@ -17,6 +33,9 @@ type AttachmentRepository interface {
 
 	// FindByObjectKey retrieves an attachment by its object storage key.
 	FindByObjectKey(ctx context.Context, objectKey string) (*entity.Attachment, error)
+
+	// FindByHash retrieves an attachment by its file content hash (Deduplication).
+	FindByHash(ctx context.Context, hash string) (*entity.Attachment, error)
 
 	// FindByUploadedByUser lists attachments uploaded by a specific user.
 	FindByUploadedByUser(ctx context.Context, userID int64, limit, offset int) ([]*entity.Attachment, error)
@@ -29,6 +48,9 @@ type AttachmentRepository interface {
 
 	// FindByType lists attachments filtered by type (e.g. PROFILE_IMAGE, GALLERY_IMAGE).
 	FindByType(ctx context.Context, attachmentType enum.AttachmentType, limit, offset int) ([]*entity.Attachment, error)
+
+	// List retrieves attachments based on dynamic filters and pagination, returning items and total count.
+	List(ctx context.Context, filter AttachmentFilter, pagination Pagination) ([]*entity.Attachment, int64, error)
 
 	// Update updates an existing attachment's metadata.
 	Update(ctx context.Context, attachment *entity.Attachment) error

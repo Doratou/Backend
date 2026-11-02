@@ -60,6 +60,20 @@ func (r *attachmentRepository) FindByObjectKey(ctx context.Context, objectKey st
 	return &attachment, nil
 }
 
+func (r *attachmentRepository) FindByHash(ctx context.Context, hash string) (*entity.Attachment, error) {
+	var attachment entity.Attachment
+	db := r.getDB(ctx)
+
+	err := db.Where("file_hash = ?", hash).First(&attachment).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.ErrAttachmentNotFound
+		}
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return &attachment, nil
+}
+
 func (r *attachmentRepository) FindByUploadedByUser(ctx context.Context, userID int64, limit, offset int) ([]*entity.Attachment, error) {
 	var attachments []*entity.Attachment
 	db := r.getDB(ctx).Where("uploaded_by_user_id = ?", userID).Order("id DESC")
@@ -116,6 +130,52 @@ func (r *attachmentRepository) FindByType(ctx context.Context, attachmentType en
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 	return attachments, nil
+}
+
+func (r *attachmentRepository) List(ctx context.Context, filter domain_repo.AttachmentFilter, pagination domain_repo.Pagination) ([]*entity.Attachment, int64, error) {
+	db := r.getDB(ctx).Model(&entity.Attachment{})
+
+	if filter.UploadedByUserID != nil {
+		db = db.Where("uploaded_by_user_id = ?", *filter.UploadedByUserID)
+	}
+	if filter.GroupID != nil {
+		db = db.Where("group_id = ?", *filter.GroupID)
+	}
+	if filter.ExpenseID != nil {
+		db = db.Where("expense_id = ?", *filter.ExpenseID)
+	}
+	if filter.Type != nil {
+		db = db.Where("type = ?", *filter.Type)
+	}
+	if filter.IsPublic != nil {
+		db = db.Where("is_public = ?", *filter.IsPublic)
+	}
+	if filter.Search != "" {
+		searchTerm := "%" + filter.Search + "%"
+		db = db.Where("original_filename ILIKE ?", searchTerm)
+	}
+
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	pageSize := pagination.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	page := pagination.Page
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * pageSize
+
+	var attachments []*entity.Attachment
+	if err := db.Order("id DESC").Limit(pageSize).Offset(offset).Find(&attachments).Error; err != nil {
+		return nil, 0, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	return attachments, total, nil
 }
 
 func (r *attachmentRepository) Update(ctx context.Context, attachment *entity.Attachment) error {

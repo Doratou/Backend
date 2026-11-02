@@ -17,11 +17,12 @@ const (
 type AttachmentType string
 
 const (
-	AttachmentTypeProfileImage   AttachmentType = "PROFILE_IMAGE"
-	AttachmentTypeGroupCover     AttachmentType = "GROUP_COVER"
-	AttachmentTypeGalleryImage   AttachmentType = "GALLERY_IMAGE"
-	AttachmentTypeGalleryVideo   AttachmentType = "GALLERY_VIDEO"
-	AttachmentTypeExpenseReceipt AttachmentType = "EXPENSE_RECEIPT"
+	AttachmentTypeProfileImage      AttachmentType = "PROFILE_IMAGE"
+	AttachmentTypeGroupCover        AttachmentType = "GROUP_COVER"
+	AttachmentTypeGalleryImage      AttachmentType = "GALLERY_IMAGE"
+	AttachmentTypeGalleryVideo      AttachmentType = "GALLERY_VIDEO"
+	AttachmentTypeExpenseReceipt    AttachmentType = "EXPENSE_RECEIPT"
+	AttachmentTypeSettlementReceipt AttachmentType = "SETTLEMENT_RECEIPT"
 )
 
 type OTPType string
