@@ -153,12 +153,9 @@ func (s *groupService) Delete(ctx context.Context, userID int64, role enum.UserR
 }
 
 func (s *groupService) Clone(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.CloneGroupRequest) (*dto.GroupResponse, error) {
-	source, _, err := s.groups.FindByID(ctx, groupID)
+	source, err := s.ownedGroup(ctx, userID, role, groupID)
 	if err != nil {
 		return nil, err
-	}
-	if role != enum.UserRoleAdmin && source.CreatedByUserID != userID {
-		return nil, exception.ErrGroupOwnerRequired
 	}
 	if source.Status != enum.GroupStatusInactive {
 		return nil, exception.ErrGroupMustBeInactiveToClone
@@ -176,27 +173,10 @@ func (s *groupService) Get(ctx context.Context, userID int64, role enum.UserRole
 	if err != nil {
 		return nil, err
 	}
-	// Groups are only visible to active members.
-	if role != enum.UserRoleAdmin {
-		isMember, err := s.groups.IsActiveMember(ctx, groupID, userID)
-		if err != nil {
-			return nil, err
-		}
-		if !isMember {
-			return nil, exception.ErrGroupForbidden
-		}
-	}
-	result := toGroupResponse(group, count)
-	members, err := s.groups.ListActiveMembers(ctx, groupID)
-	if err != nil {
+	if err := s.authorizeGroupAccess(ctx, userID, role, groupID); err != nil {
 		return nil, err
 	}
-	result.Members = toGroupMemberResponses(members, group.CreatedByUserID)
-	result.Invites, err = s.groupInviteResponses(ctx, groupID)
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
+	return s.buildGroupDetailResponse(ctx, group, count)
 }
 
 func (s *groupService) ListMembers(ctx context.Context, userID int64, role enum.UserRole, groupID int64) ([]dto.GroupMemberResponse, error) {
@@ -204,14 +184,8 @@ func (s *groupService) ListMembers(ctx context.Context, userID int64, role enum.
 	if err != nil {
 		return nil, err
 	}
-	if role != enum.UserRoleAdmin {
-		isMember, err := s.groups.IsActiveMember(ctx, groupID, userID)
-		if err != nil {
-			return nil, err
-		}
-		if !isMember {
-			return nil, exception.ErrGroupForbidden
-		}
+	if err := s.authorizeGroupAccess(ctx, userID, role, groupID); err != nil {
+		return nil, err
 	}
 	members, err := s.groups.ListActiveMembers(ctx, groupID)
 	if err != nil {
@@ -271,11 +245,8 @@ func (s *groupService) CreateInvite(ctx context.Context, userID int64, role enum
 	if req.Password == "" || len(req.Password) > 72 {
 		return nil, exception.ErrInviteInvalidPasswordFormat
 	}
-	if req.MaxUses != nil && *req.MaxUses <= 0 {
-		return nil, exception.ErrInviteInvalidMaxUses
-	}
-	if req.ExpiresAt != nil && !req.ExpiresAt.After(time.Now()) {
-		return nil, exception.ErrInviteInvalidExpiration
+	if err := validateInviteParams(req.ExpiresAt, req.MaxUses); err != nil {
+		return nil, err
 	}
 	passwordHash, err := s.hasher.Hash(req.Password)
 	if err != nil {
@@ -332,16 +303,11 @@ func (s *groupService) UpdateInvite(ctx context.Context, userID int64, role enum
 	if req.ExpiresAt == nil && req.MaxUses == nil {
 		return nil, exception.ErrInviteNoFieldsToUpdate
 	}
-	if req.ExpiresAt != nil && !req.ExpiresAt.After(time.Now()) {
-		return nil, exception.ErrInviteInvalidExpiration
+	if err := validateInviteParams(req.ExpiresAt, req.MaxUses); err != nil {
+		return nil, err
 	}
-	if req.MaxUses != nil {
-		if *req.MaxUses <= 0 {
-			return nil, exception.ErrInviteInvalidMaxUses
-		}
-		if *req.MaxUses < invite.UsedCount {
-			return nil, exception.ErrInviteInvalidMaxUses
-		}
+	if req.MaxUses != nil && *req.MaxUses < invite.UsedCount {
+		return nil, exception.ErrInviteInvalidMaxUses
 	}
 	invite.ExpiresAt = req.ExpiresAt
 	invite.MaxUses = req.MaxUses
@@ -384,17 +350,11 @@ func (s *groupService) JoinGroupByInvite(ctx context.Context, userID int64, toke
 	if err != nil {
 		return nil, err
 	}
-	response := toGroupResponse(group, count)
-	members, err := s.groups.ListActiveMembers(ctx, groupID)
+	res, err := s.buildGroupDetailResponse(ctx, group, count)
 	if err != nil {
 		return nil, err
 	}
-	response.Members = toGroupMemberResponses(members, group.CreatedByUserID)
-	response.Invites, err = s.groupInviteResponses(ctx, groupID)
-	if err != nil {
-		return nil, err
-	}
-	return &response, nil
+	return res, nil
 }
 
 func (s *groupService) ListInvites(ctx context.Context, userID int64, role enum.UserRole, groupID int64) ([]dto.GroupInviteResponse, error) {
@@ -413,27 +373,9 @@ func (s *groupService) ListInvites(ctx context.Context, userID int64, role enum.
 	return s.groupInviteResponses(ctx, groupID)
 }
 
-func (s *groupService) groupInviteResponses(ctx context.Context, groupID int64) ([]dto.GroupInviteResponse, error) {
-	invites, err := s.groups.FindInvitesByGroupID(ctx, groupID)
-	if err != nil {
-		return nil, err
-	}
-	responses := make([]dto.GroupInviteResponse, 0, len(invites))
-	for i := range invites {
-		response := toGroupInviteResponse(&invites[i])
-		if invites[i].TokenCiphertext != "" {
-			token, err := s.decryptInviteToken(invites[i].TokenCiphertext)
-			if err != nil {
-				return nil, exception.Wrap(exception.ErrInternal, err)
-			}
-			response.Token = token
-			response.InviteURL = "/api/v1/groups/invites/" + token + "/join"
-		}
-		responses = append(responses, response)
-	}
-	return responses, nil
-}
-
+// =================================================================
+// SECURITY & ENCRYPTION HELPERS
+// =================================================================
 func (s *groupService) encryptInviteToken(token string) (string, error) {
 	aead, err := s.inviteAEAD()
 	if err != nil {
@@ -478,6 +420,14 @@ func (s *groupService) inviteAEAD() (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
+func hashInviteToken(token string) string {
+	digest := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(digest[:])
+}
+
+// =================================================================
+// AUTHORIZATION & VALIDATION HELPERS
+// =================================================================
 func (s *groupService) authorizedInvite(ctx context.Context, userID int64, role enum.UserRole, groupID, inviteID int64) (*entity.GroupInvite, error) {
 	group, _, err := s.groups.FindByID(ctx, groupID)
 	if err != nil {
@@ -489,6 +439,30 @@ func (s *groupService) authorizedInvite(ctx context.Context, userID int64, role 
 	return s.groups.FindInviteByID(ctx, groupID, inviteID)
 }
 
+func (s *groupService) authorizeGroupAccess(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error {
+	if role == enum.UserRoleAdmin {
+		return nil
+	}
+	isMember, err := s.groups.IsActiveMember(ctx, groupID, userID)
+	if err != nil {
+		return err
+	}
+	if !isMember {
+		return exception.ErrGroupForbidden
+	}
+	return nil
+}
+
+func validateInviteParams(expiresAt *time.Time, maxUses *int) error {
+	if maxUses != nil && *maxUses <= 0 {
+		return exception.ErrInviteInvalidMaxUses
+	}
+	if expiresAt != nil && !expiresAt.After(time.Now()) {
+		return exception.ErrInviteInvalidExpiration
+	}
+	return nil
+}
+
 func requireInviteManager(group *entity.Group, userID int64, role enum.UserRole) error {
 	if role != enum.UserRoleAdmin && group.CreatedByUserID != userID {
 		return exception.ErrGroupOwnerRequired
@@ -496,9 +470,45 @@ func requireInviteManager(group *entity.Group, userID int64, role enum.UserRole)
 	return nil
 }
 
-func hashInviteToken(token string) string {
-	digest := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(digest[:])
+// =================================================================
+// RESPONSE BUILDERS & MAPPERS
+// =================================================================
+func (s *groupService) buildGroupDetailResponse(ctx context.Context, group *entity.Group, count int64) (*dto.GroupResponse, error) {
+	result := toGroupResponse(group, count)
+	members, err := s.groups.ListActiveMembers(ctx, group.ID)
+	if err != nil {
+		return nil, err
+	}
+	result.Members = toGroupMemberResponses(members, group.CreatedByUserID)
+
+	invites, err := s.groupInviteResponses(ctx, group.ID)
+	if err != nil {
+		return nil, err
+	}
+	result.Invites = invites
+
+	return &result, nil
+}
+
+func (s *groupService) groupInviteResponses(ctx context.Context, groupID int64) ([]dto.GroupInviteResponse, error) {
+	invites, err := s.groups.FindInvitesByGroupID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	responses := make([]dto.GroupInviteResponse, 0, len(invites))
+	for i := range invites {
+		response := toGroupInviteResponse(&invites[i])
+		if invites[i].TokenCiphertext != "" {
+			token, err := s.decryptInviteToken(invites[i].TokenCiphertext)
+			if err != nil {
+				return nil, exception.Wrap(exception.ErrInternal, err)
+			}
+			response.Token = token
+			response.InviteURL = "/api/v1/groups/invites/" + token + "/join"
+		}
+		responses = append(responses, response)
+	}
+	return responses, nil
 }
 
 func toGroupInviteResponse(invite *entity.GroupInvite) dto.GroupInviteResponse {
