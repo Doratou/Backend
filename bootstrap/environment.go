@@ -8,14 +8,19 @@ import (
 )
 
 type Environment struct {
-	DataBase   DataBase      `mapstructure:",squash"`
-	Redis      Redis         `mapstructure:",squash"`
-	HttpServer HttpServer    `mapstructure:",squash"`
-	JWT        JWTConfig     `mapstructure:",squash"`
-	OTP        OTPConfig     `mapstructure:",squash"`
-	Seed       SeedConfig    `mapstructure:",squash"`
-	Captcha    CaptchaConfig `mapstructure:",squash"`
-	Email      EmailConfig   `mapstructure:",squash"`
+	DataBase   DataBase         `mapstructure:",squash"`
+	Redis      Redis            `mapstructure:",squash"`
+	HttpServer HttpServer       `mapstructure:",squash"`
+	JWT        JWTConfig        `mapstructure:",squash"`
+	OTP        OTPConfig        `mapstructure:",squash"`
+	Seed       SeedConfig       `mapstructure:",squash"`
+	Captcha    CaptchaConfig    `mapstructure:",squash"`
+	Email      EmailConfig      `mapstructure:",squash"`
+	Friendship FriendshipConfig `mapstructure:",squash"`
+}
+
+type FriendshipConfig struct {
+	RequestCooldown time.Duration `mapstructure:"FRIENDSHIP_REQUEST_COOLDOWN"`
 }
 
 type EmailConfig struct {
@@ -23,6 +28,7 @@ type EmailConfig struct {
 	DoratouEmailAppPassword string `mapstructure:"DORATOU_EMAIL_APP_PASSWORD" json:"-"`
 	SMTPHost                string `mapstructure:"SMTP_HOST"`
 	SMTPPort                string `mapstructure:"SMTP_HOST_PORT"`
+	DeliveryEnabled         bool   `mapstructure:"EMAIL_DELIVERY_ENABLED"`
 	DeliveryMode            string `mapstructure:"EMAIL_DELIVERY_MODE"`
 }
 
