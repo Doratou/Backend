@@ -1,0 +1,34 @@
+meta {
+  name: 01. Create Invitation (Owner)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/groups/{{groupId}}/invites
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "password": "password",
+    "expires_at": "2027-06-07T14:30:00Z",
+    "max_uses": 2
+  }
+}
+
+vars:pre-request {
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIxIiwiZXhwIjoxNzkzODIxMDg5LCJpYXQiOjE3OTM3MzQ2ODksImp0aSI6ImY2YzAwNDEwLWQ3N2ItNDQwNC04NjNlLWFjMGNmNWQxZTBlNyJ9.csWDG2GfbR8chhCyAhgpRSFVv3PjCOnboA538lRu5ps
+  groupId: 3
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}

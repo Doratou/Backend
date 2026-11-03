@@ -5,9 +5,15 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/v1/groups
+  url: {{baseUrl}}/api/v1/groups?limit=2&offset=0&status=ACTIVE
   body: none
   auth: inherit
+}
+
+params:query {
+  limit: 2
+  offset: 0
+  status: ACTIVE
 }
 
 headers {
@@ -15,7 +21,7 @@ headers {
 }
 
 vars:pre-request {
-  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzNjc5ODU5LCJpYXQiOjE3OTM1OTM0NTksImp0aSI6IjhkZTQ0YTVhLWUyZTEtNDI0NC05ZDMwLWFiYmIyM2ZmOWU1OCJ9.adA9WqAmXx_RqDr-bpRICr9XKTCR6vb6b7OBDD2Ko28
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzODE2NjA4LCJpYXQiOjE3OTM3MzAyMDgsImp0aSI6IjAxYmE3OGY1LWQyOWYtNDg0ZC1iZGQyLWRiNGNkZGEyYzhhNiJ9.Mg0ShkJY4y97KU8CSN8eryNaa4ybFzHfZh5n0zTJNoU
 }
 
 settings {

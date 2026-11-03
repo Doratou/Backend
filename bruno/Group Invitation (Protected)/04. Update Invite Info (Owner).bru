@@ -1,0 +1,27 @@
+meta {
+  name: 04. Update Invite Info (Owner)
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/groups/{{groupId}}/invites/{{inviteId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+vars:pre-request {
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIxIiwiZXhwIjoxNzkzODIxMDg5LCJpYXQiOjE3OTM3MzQ2ODksImp0aSI6ImY2YzAwNDEwLWQ3N2ItNDQwNC04NjNlLWFjMGNmNWQxZTBlNyJ9.csWDG2GfbR8chhCyAhgpRSFVv3PjCOnboA538lRu5ps
+  groupId: 3
+  inviteId: 4
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
