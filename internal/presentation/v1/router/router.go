@@ -15,6 +15,7 @@ import (
 type Dependencies struct {
 	AuthHandler    *handler.AuthHandler
 	CaptchaHandler *handler.CaptchaHandler
+	GroupHandler   *handler.GroupHandler
 	CaptchaService adapter.CaptchaService
 	CaptchaEnabled bool
 	TokenMaker     jwt.TokenMaker
@@ -45,6 +46,7 @@ func New(deps Dependencies) *gin.Engine {
 	v1 := engine.Group("/api/v1")
 	RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware, captchaMiddleware)
 	RegisterCaptchaRoutes(v1, deps.CaptchaHandler)
+	RegisterGroupRoutes(v1, deps.GroupHandler, authMiddleware)
 
 	return engine
 }

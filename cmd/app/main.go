@@ -85,6 +85,7 @@ func main() {
 
 	// 4. Repositories
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
+	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
 	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
@@ -147,13 +148,16 @@ func main() {
 		},
 		cfg.Constant,
 	)
+	groupService := service.NewGroupService(groupRepo)
 
 	// 7. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
+	groupHandler := handler.NewGroupHandler(groupService)
 	engine := router.New(router.Dependencies{
 		AuthHandler:    authHandler,
 		CaptchaHandler: captchaHandler,
+		GroupHandler:   groupHandler,
 		CaptchaService: captchaService,
 		CaptchaEnabled: cfg.Environment.Captcha.Enabled,
 		TokenMaker:     jwtMaker,
