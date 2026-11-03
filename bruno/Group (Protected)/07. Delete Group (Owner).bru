@@ -1,0 +1,26 @@
+meta {
+  name: 07. Delete Group (Owner)
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/groups/{{groupId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+vars:pre-request {
+  groupId: 2
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzNjc5ODU5LCJpYXQiOjE3OTM1OTM0NTksImp0aSI6IjhkZTQ0YTVhLWUyZTEtNDI0NC05ZDMwLWFiYmIyM2ZmOWU1OCJ9.adA9WqAmXx_RqDr-bpRICr9XKTCR6vb6b7OBDD2Ko28
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}

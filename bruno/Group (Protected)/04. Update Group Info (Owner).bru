@@ -1,0 +1,32 @@
+meta {
+  name: 04. Update Group Info (Owner)
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/groups/{{GroupId}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "title": "new test group"
+  }
+}
+
+vars:pre-request {
+  GroupId: 1
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzNjc5ODU5LCJpYXQiOjE3OTM1OTM0NTksImp0aSI6IjhkZTQ0YTVhLWUyZTEtNDI0NC05ZDMwLWFiYmIyM2ZmOWU1OCJ9.adA9WqAmXx_RqDr-bpRICr9XKTCR6vb6b7OBDD2Ko28
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}

@@ -1,0 +1,26 @@
+meta {
+  name: 03. Get Group By Id
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{GroupId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+vars:pre-request {
+  GroupId: 10
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzODE1NTUxLCJpYXQiOjE3OTM3MjkxNTEsImp0aSI6IjM2YmQ3YjRiLWEwYzItNDVkYS1iZTUyLWM0ZGFhZjI1MGJkMyJ9.KmveVQWn-yPCk2GQ8tsjjd6W4LEAUuLw5zuOCKL32yk
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}

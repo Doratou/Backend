@@ -1,0 +1,33 @@
+meta {
+  name: 08. Clone Group
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/groups/{{groupId}}/clone
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "title": "clone test group",
+    "description": "just test"
+  }
+}
+
+vars:pre-request {
+  groupId: 1
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzNjc5ODU5LCJpYXQiOjE3OTM1OTM0NTksImp0aSI6IjhkZTQ0YTVhLWUyZTEtNDI0NC05ZDMwLWFiYmIyM2ZmOWU1OCJ9.adA9WqAmXx_RqDr-bpRICr9XKTCR6vb6b7OBDD2Ko28
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
