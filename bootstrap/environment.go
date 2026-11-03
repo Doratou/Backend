@@ -8,14 +8,15 @@ import (
 )
 
 type Environment struct {
-	DataBase   DataBase      `mapstructure:",squash"`
-	Redis      Redis         `mapstructure:",squash"`
-	HttpServer HttpServer    `mapstructure:",squash"`
-	JWT        JWTConfig     `mapstructure:",squash"`
-	OTP        OTPConfig     `mapstructure:",squash"`
-	Seed       SeedConfig    `mapstructure:",squash"`
-	Captcha    CaptchaConfig `mapstructure:",squash"`
-	Email      EmailConfig   `mapstructure:",squash"`
+	DataBase   DataBase         `mapstructure:",squash"`
+	Redis      Redis            `mapstructure:",squash"`
+	HttpServer HttpServer       `mapstructure:",squash"`
+	JWT        JWTConfig        `mapstructure:",squash"`
+	OTP        OTPConfig        `mapstructure:",squash"`
+	Seed       SeedConfig       `mapstructure:",squash"`
+	Captcha    CaptchaConfig    `mapstructure:",squash"`
+	Email      EmailConfig      `mapstructure:",squash"`
+	Invite     InvitationConfig `mapstructure:",squash"`
 }
 
 type EmailConfig struct {
@@ -74,6 +75,10 @@ type Redis struct {
 type HttpServer struct {
 	Domain string `mapstructure:"HTTP_DOMAIN"`
 	Port   string `mapstructure:"HTTP_PORT"`
+}
+
+type InvitationConfig struct {
+	SecretKey string `mapstructure:"INVITE_ENCRYPTION_SECRET"`
 }
 
 func NewEnvironment() (*Environment, error) {

@@ -14,6 +14,7 @@ type GroupMember struct {
 	Status   enum.GroupMemberStatus `gorm:"column:status;size:15;not null;default:ACTIVE;index:idx_group_members_user_status" json:"status"`
 	JoinedAt time.Time              `gorm:"column:joined_at;not null;default:CURRENT_TIMESTAMP" json:"joined_at"`
 	LeftAt   *time.Time             `gorm:"column:left_at" json:"left_at,omitempty"`
+	User     *User                  `gorm:"foreignKey:UserID;references:ID" json:"-"`
 }
 
 func (GroupMember) TableName() string { return "group_members" }

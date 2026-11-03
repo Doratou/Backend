@@ -26,7 +26,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 	}
 	var req dto.CreateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		fail(c, exception.Wrap(exception.ErrGroupInvalidPayload, err))
 		return
 	}
 	result, err := h.service.Create(c.Request.Context(), userID, req)
@@ -45,12 +45,12 @@ func (h *GroupHandler) ListMine(c *gin.Context) {
 	}
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if err != nil || limit < 1 || limit > 100 {
-		fail(c, exception.ErrBadRequest)
+		fail(c, exception.ErrGroupInvalidPagination)
 		return
 	}
 	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	if err != nil || offset < 0 {
-		fail(c, exception.ErrBadRequest)
+		fail(c, exception.ErrGroupInvalidPagination)
 		return
 	}
 	var status *string
@@ -73,12 +73,12 @@ func (h *GroupHandler) ListAll(c *gin.Context) {
 	}
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if err != nil || limit < 1 || limit > 100 {
-		fail(c, exception.ErrBadRequest)
+		fail(c, exception.ErrGroupInvalidPagination)
 		return
 	}
 	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	if err != nil || offset < 0 {
-		fail(c, exception.ErrBadRequest)
+		fail(c, exception.ErrGroupInvalidPagination)
 		return
 	}
 	var status *string
@@ -106,7 +106,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		fail(c, exception.Wrap(exception.ErrGroupInvalidUpdatePayload, err))
 		return
 	}
 	result, err := h.service.Update(c.Request.Context(), userID, role, groupID, req)
@@ -178,7 +178,7 @@ func getUserIdentity(c *gin.Context) (int64, enum.UserRole, bool) {
 }
 
 func (h *GroupHandler) Clone(c *gin.Context) {
-	userID, ok := tokencontext.GetUserID(c)
+	userID, role, ok := getUserIdentity(c)
 	if !ok {
 		fail(c, exception.ErrMissingToken)
 		return
@@ -190,10 +190,10 @@ func (h *GroupHandler) Clone(c *gin.Context) {
 	}
 	var req dto.CloneGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		fail(c, exception.Wrap(exception.ErrGroupInvalidPayload, err))
 		return
 	}
-	result, err := h.service.Clone(c.Request.Context(), userID, groupID, req)
+	result, err := h.service.Clone(c.Request.Context(), userID, role, groupID, req)
 	if err != nil {
 		fail(c, err)
 		return
@@ -202,6 +202,67 @@ func (h *GroupHandler) Clone(c *gin.Context) {
 }
 
 func (h *GroupHandler) Get(c *gin.Context) {
+	userID, role, ok := getUserIdentity(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	groupID, err := parseIDParam(c, "groupID")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	result, err := h.service.Get(c.Request.Context(), userID, role, groupID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, result)
+}
+
+func (h *GroupHandler) ListMembers(c *gin.Context) {
+	userID, role, ok := getUserIdentity(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	groupID, err := parseIDParam(c, "groupID")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	members, err := h.service.ListMembers(c.Request.Context(), userID, role, groupID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, members)
+}
+
+func (h *GroupHandler) RemoveMember(c *gin.Context) {
+	userID, role, ok := getUserIdentity(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	groupID, err := parseIDParam(c, "groupID")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	memberID, err := parseIDParam(c, "memberID")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	if err := h.service.RemoveMember(c.Request.Context(), userID, role, groupID, memberID); err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, gin.H{"message": "group member removed successfully"})
+}
+
+func (h *GroupHandler) LeaveGroup(c *gin.Context) {
 	userID, ok := tokencontext.GetUserID(c)
 	if !ok {
 		fail(c, exception.ErrMissingToken)
@@ -212,10 +273,160 @@ func (h *GroupHandler) Get(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	result, err := h.service.Get(c.Request.Context(), userID, groupID)
+	if err := h.service.LeaveGroup(c.Request.Context(), userID, groupID); err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, gin.H{"message": "you left the group successfully"})
+}
+
+func (h *GroupHandler) TransferOwnership(c *gin.Context) {
+	userID, role, ok := getUserIdentity(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	groupID, err := parseIDParam(c, "groupID")
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	success(c, http.StatusOK, result)
+	var req dto.TransferGroupOwnershipRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrGroupInvalidTransferOwner, err))
+		return
+	}
+	if err := h.service.TransferOwnership(c.Request.Context(), userID, role, groupID, req.NewOwnerID); err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, gin.H{"message": "group ownership transferred successfully"})
+}
+
+func (h *GroupHandler) CreateInvite(c *gin.Context) {
+	userID, role, ok := getUserIdentity(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	groupID, err := parseIDParam(c, "groupID")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	var req dto.CreateGroupInviteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrInviteInvalidPayload, err))
+		return
+	}
+	invite, err := h.service.CreateInvite(c.Request.Context(), userID, role, groupID, req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusCreated, invite)
+}
+
+func (h *GroupHandler) ListInvites(c *gin.Context) {
+	userID, role, ok := getUserIdentity(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	groupID, err := parseIDParam(c, "groupID")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	invites, err := h.service.ListInvites(c.Request.Context(), userID, role, groupID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, gin.H{"items": invites, "total": len(invites)})
+}
+
+func (h *GroupHandler) DeactivateInvite(c *gin.Context) {
+	userID, role, groupID, inviteID, ok := h.getInviteRequestIdentity(c)
+	if !ok {
+		return
+	}
+	if err := h.service.DeactivateInvite(c.Request.Context(), userID, role, groupID, inviteID); err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, gin.H{"message": "group invite deactivated successfully"})
+}
+
+func (h *GroupHandler) ChangeInvitePassword(c *gin.Context) {
+	userID, role, groupID, inviteID, ok := h.getInviteRequestIdentity(c)
+	if !ok {
+		return
+	}
+	var req dto.ChangeGroupInvitePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrInviteInvalidPasswordFormat, err))
+		return
+	}
+	if err := h.service.ChangeInvitePassword(c.Request.Context(), userID, role, groupID, inviteID, req.Password); err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, gin.H{"message": "group invite password changed successfully"})
+}
+
+func (h *GroupHandler) UpdateInvite(c *gin.Context) {
+	userID, role, groupID, inviteID, ok := h.getInviteRequestIdentity(c)
+	if !ok {
+		return
+	}
+	var req dto.UpdateGroupInviteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrInviteInvalidPayload, err))
+		return
+	}
+	invite, err := h.service.UpdateInvite(c.Request.Context(), userID, role, groupID, inviteID, req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, invite)
+}
+
+func (h *GroupHandler) JoinGroupByInvite(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	var req dto.JoinGroupByInviteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrInviteJoinPayload, err))
+		return
+	}
+	group, err := h.service.JoinGroupByInvite(c.Request.Context(), userID, c.Param("token"), req.Password)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, group)
+}
+
+func (h *GroupHandler) getInviteRequestIdentity(c *gin.Context) (int64, enum.UserRole, int64, int64, bool) {
+	userID, role, ok := getUserIdentity(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return 0, "", 0, 0, false
+	}
+	groupID, err := parseIDParam(c, "groupID")
+	if err != nil {
+		fail(c, err)
+		return 0, "", 0, 0, false
+	}
+	inviteID, err := parseIDParam(c, "inviteID")
+	if err != nil {
+		fail(c, err)
+		return 0, "", 0, 0, false
+	}
+	return userID, role, groupID, inviteID, true
 }

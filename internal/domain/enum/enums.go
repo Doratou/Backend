@@ -28,6 +28,13 @@ const (
 	GroupMemberStatusInactive GroupMemberStatus = "INACTIVE"
 )
 
+type GroupMemberRole string
+
+const (
+	GroupMemberRoleOwner  GroupMemberRole = "OWNER"
+	GroupMemberRoleMember GroupMemberRole = "MEMBER"
+)
+
 type AttachmentType string
 
 const (

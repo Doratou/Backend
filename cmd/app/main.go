@@ -148,7 +148,7 @@ func main() {
 		},
 		cfg.Constant,
 	)
-	groupService := service.NewGroupService(groupRepo)
+	groupService := service.NewGroupService(groupRepo, passwordHasher, cfg.Environment.Invite.SecretKey)
 
 	// 7. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
