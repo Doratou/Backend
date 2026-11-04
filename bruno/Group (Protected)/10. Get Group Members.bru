@@ -24,3 +24,47 @@ settings {
   timeout: 0
   forwardAuthorizationHeader: false
 }
+
+docs {
+  ## Method, Endpoint, and Auth
+
+  `GET /api/v1/groups/:groupID/members` — Active group member or site admin; Bearer access token required.
+
+  ## Description
+
+  Returns active group members and their group roles.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive group ID. |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <access-token>` |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": [
+      {"member_id": 11, "user_id": 7, "name": "Owner", "role": "OWNER", "joined_at": "2026-11-04T10:00:00Z"},
+      {"member_id": 12, "user_id": 8, "name": "Member", "role": "MEMBER", "joined_at": "2026-11-04T10:10:00Z"}
+    ]
+  }
+  ```
+
+  ## Errors
+
+  - `400 GROUP_INVALID_ID` — `groupID` is not a positive integer.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `403 GROUP_FORBIDDEN` — Requester is neither an active member nor an admin.
+  - `404 GROUP_NOT_FOUND` — Group does not exist or was deleted.
+}

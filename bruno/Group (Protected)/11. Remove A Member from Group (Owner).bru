@@ -25,3 +25,44 @@ settings {
   timeout: 0
   forwardAuthorizationHeader: false
 }
+
+docs {
+  ## Method, Endpoint, and Auth
+
+  `DELETE /api/v1/groups/:groupID/members/:memberID` — Group owner or site admin; Bearer access token required.
+
+  ## Description
+
+  Deactivates a member's membership. Use `member_id` from the group members response, not `user_id`.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive group ID. |
+  | `memberID` | `integer` | Yes | Positive group-members row ID (`member_id`). |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <access-token>` |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {"success": true, "data": {"message": "group member removed successfully"}}
+  ```
+
+  ## Errors
+
+  - `400 GROUP_INVALID_ID` / `GROUP_INVALID_MEMBER_ID` — Invalid path ID.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `403 GROUP_OWNER_REQUIRED` — Requester is neither the owner nor an admin.
+  - `404 GROUP_NOT_FOUND` — Group does not exist or was deleted.
+  - `404 GROUP_MEMBER_NOT_FOUND` — Member is not active in this group.
+  - `409 GROUP_OWNER_CANNOT_BE_REMOVED` — The owner's membership cannot be removed.
+}

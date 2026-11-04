@@ -1,0 +1,67 @@
+meta {
+  name: 03. Deactive Invitation (Owner)
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/groups/{{groupId}}/invites/{{inviteId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+vars:pre-request {
+  groupId: 3
+  inviteId: 3
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIxIiwiZXhwIjoxNzkzODIxMDg5LCJpYXQiOjE3OTM3MzQ2ODksImp0aSI6ImY2YzAwNDEwLWQ3N2ItNDQwNC04NjNlLWFjMGNmNWQxZTBlNyJ9.csWDG2GfbR8chhCyAhgpRSFVv3PjCOnboA538lRu5ps
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Auth
+  
+  `DELETE /api/v1/groups/:groupID/invites/:inviteID` — Group owner or site admin; Bearer access token required.
+  
+  ## Description
+  
+  Deactivates an invitation link. Repeating the request is safe and returns success.
+  
+  ## Request
+  
+  ### Path Parameters
+  
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive group ID. |
+  | `inviteID` | `integer` | Yes | Positive invitation ID. |
+  
+  ### Headers
+  
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <access-token>` |
+  
+  ## Response
+  
+  **`200 OK`**
+  ```json
+  {"success": true, "data": {"message": "group invite deactivated successfully"}}
+  ```
+  
+  ## Errors
+  
+  - `400 GROUP_INVALID_ID` / `INVITE_INVALID_ID` — Invalid path ID.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `403 GROUP_OWNER_REQUIRED` — Requester is neither the owner nor an admin.
+  - `404 GROUP_NOT_FOUND` — Group does not exist or was deleted.
+  - `404 INVITE_NOT_FOUND` — Invitation does not exist in this group.
+}

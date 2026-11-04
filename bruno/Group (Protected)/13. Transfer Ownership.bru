@@ -6,12 +6,18 @@ meta {
 
 post {
   url: {{baseUrl}}/api/v1/groups/{{groupId}}/transfer-ownership
-  body: none
+  body: json
   auth: inherit
 }
 
 headers {
   Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "new_owner_id": 1
+  }
 }
 
 vars:pre-request {
