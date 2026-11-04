@@ -96,7 +96,7 @@ func SeedManualTestData(ctx context.Context, db database.Database, h hasher.Hash
 			Name:            u.Name,
 			Email:           &email,
 			Phone:           &phone,
-			PasswordHash:    pwdHash,
+			PasswordHash:    &pwdHash,
 			SystemRole:      u.Role,
 			Status:          enum.UserStatusActive,
 			IsEmailVerified: true,
