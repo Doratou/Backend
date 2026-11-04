@@ -9,6 +9,7 @@ cd "$ROOT_DIR"
 COMPOSE_PATH="${COMPOSE_PATH:-docker/docker-compose.yaml}"
 ENV_FILE="${ENV_FILE:-.env}"
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-$ROOT_DIR/migrations}"
+DB_SERVICE="${DB_SERVICE:-db}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
