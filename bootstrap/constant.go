@@ -3,10 +3,11 @@ package bootstrap
 import "time"
 
 type Constant struct {
-	Database DBConst
-	Auth     AuthConst
-	OTP      OTPConst
-	Captcha  CaptchaConst
+	Database   DBConst
+	Auth       AuthConst
+	OTP        OTPConst
+	Captcha    CaptchaConst
+	Friendship FriendshipConst
 }
 
 type DBConst struct {
@@ -31,6 +32,10 @@ type CaptchaConst struct {
 	DefaultEnabled bool
 }
 
+type FriendshipConst struct {
+	DefaultRequestCooldown time.Duration
+}
+
 func NewConstant() *Constant {
 	return &Constant{
 		Database: DBConst{
@@ -50,6 +55,9 @@ func NewConstant() *Constant {
 		Captcha: CaptchaConst{
 			DefaultTTL:     2 * time.Minute,
 			DefaultEnabled: true,
+		},
+		Friendship: FriendshipConst{
+			DefaultRequestCooldown: 24 * time.Hour,
 		},
 	}
 }

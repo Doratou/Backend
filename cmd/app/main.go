@@ -85,6 +85,7 @@ func main() {
 
 	// 4. Repositories
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
+	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
@@ -117,10 +118,11 @@ func main() {
 		redisTrxManager,
 		emailSender,
 		service.OTPServiceConfig{
-			TTL:               cfg.Environment.OTP.TTL,
-			VerifiedTTL:       cfg.Environment.OTP.VerifiedTTL,
-			Digits:            cfg.Environment.OTP.Digits,
-			EmailDeliveryMode: cfg.Environment.Email.DeliveryMode,
+			TTL:                  cfg.Environment.OTP.TTL,
+			VerifiedTTL:          cfg.Environment.OTP.VerifiedTTL,
+			Digits:               cfg.Environment.OTP.Digits,
+			EmailDeliveryEnabled: cfg.Environment.Email.DeliveryEnabled,
+			EmailDeliveryMode:    cfg.Environment.Email.DeliveryMode,
 		},
 		cfg.Constant,
 	)
@@ -140,6 +142,16 @@ func main() {
 		cfg.Constant,
 	)
 
+	friendshipService := service.NewFriendshipService(
+		friendshipRepo,
+		userRepo,
+		dbTrxManager,
+		service.FriendshipServiceConfig{
+			RequestCooldown: cfg.Environment.Friendship.RequestCooldown,
+		},
+		cfg.Constant,
+	)
+
 	captchaService := service.NewCaptchaService(
 		captchaRepo,
 		captchaMan,
@@ -153,15 +165,17 @@ func main() {
 	// 7. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
+	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
 	engine := router.New(router.Dependencies{
-		AuthHandler:    authHandler,
-		CaptchaHandler: captchaHandler,
-		GroupHandler:   groupHandler,
-		CaptchaService: captchaService,
-		CaptchaEnabled: cfg.Environment.Captcha.Enabled,
-		TokenMaker:     jwtMaker,
-		TokenRepo:      tokenRepo,
+		AuthHandler:       authHandler,
+		CaptchaHandler:    captchaHandler,
+		GroupHandler:      groupHandler,
+		FriendshipHandler: friendshipHandler,
+		CaptchaService:    captchaService,
+		CaptchaEnabled:    cfg.Environment.Captcha.Enabled,
+		TokenMaker:        jwtMaker,
+		TokenRepo:         tokenRepo,
 	})
 
 	// 8. HTTP Server Lifecycle & Graceful Shutdown

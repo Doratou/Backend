@@ -51,3 +51,11 @@ const (
 	OTPTypeEmail OTPType = "email"
 	OTPTypePhone OTPType = "phone"
 )
+
+type FriendshipStatus string
+
+const (
+	FriendshipStatusPending  FriendshipStatus = "PENDING"
+	FriendshipStatusAccepted FriendshipStatus = "ACCEPTED"
+	FriendshipStatusRejected FriendshipStatus = "REJECTED"
+)

@@ -1,0 +1,116 @@
+meta {
+  name: 07. List Friends
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/friendships
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Friends
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/friendships`
+  **Auth:** Required
+
+  ## Description
+
+  Lists the authenticated user's non-deleted ACCEPTED friendships, ordered by latest request time descending, then ID descending (`requested_at DESC, id DESC`). Pending, rejected, and soft-deleted relationships are excluded. The other participant's summary is returned regardless of who originally sent the request.
+
+  `friendship_id` identifies the relationship for Remove Friend; `user.id` identifies the other user. `friends_since` is the acceptance time (`responded_at`), which can be null on legacy rows without a response timestamp.
+
+  Only the authenticated account's ACTIVE status is checked for this list. The other participant's summary contains `id`, `name`, and `avatar_attachment_id`; no email, phone, or password is returned. If that user has been soft-deleted, the summary keeps the user ID and may contain an empty name and a null avatar.
+
+  This Bruno request does not automatically save `friendshipId`. Accept Friend Request saves that runtime variable after a successful acceptance. Otherwise, copy the selected item's `friendship_id` into the Remove Friend URL or set the variable manually.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Authenticated user's Bearer access token (`Bearer <token>`) |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Minimum 1; defaults to 1 |
+  | `limit` | `integer` | No | From 1 to 100; defaults to 20 |
+
+  No request body is required.
+
+  Omitting `page` or `limit`, or providing an empty query value, uses its default. Explicit zero, negative values, non-integers, `limit` above 100, integer overflow, and an overflowing pagination offset return `400 BAD_REQUEST`. A page beyond the last result still returns `200 OK` with an empty `items` array.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "friendship_id": 501,
+          "user": {
+            "id": 2,
+            "name": "Default Admin",
+            "avatar_attachment_id": null
+          },
+          "friends_since": "2026-10-29T10:05:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  This example matches `page=1&limit=20`. `total` counts all matching friendships before pagination. No results return `items: []`; `total` can remain positive on a page beyond the last result.
+
+  ## Errors
+
+  Each error returns the HTTP status below and the JSON envelope shown in the example. The `code` and `error` strings match the backend definitions. Internal database and Redis details are not returned.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid page or limit, integer overflow, or an overflowing pagination offset. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing, empty, or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The access token is malformed or invalid, or a refresh token was supplied. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token has expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated user does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Redis blacklist lookup, database access, or a transaction fails. |
+
+  **Example: 400 Bad Request**
+
+  ```json
+  {
+    "success": false,
+    "code": "BAD_REQUEST",
+    "error": "bad request payload or parameters"
+  }
+  ```
+}
