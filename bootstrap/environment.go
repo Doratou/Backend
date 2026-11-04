@@ -16,6 +16,7 @@ type Environment struct {
 	Seed       SeedConfig       `mapstructure:",squash"`
 	Captcha    CaptchaConfig    `mapstructure:",squash"`
 	Email      EmailConfig      `mapstructure:",squash"`
+	Invite     InvitationConfig `mapstructure:",squash"`
 	Friendship FriendshipConfig `mapstructure:",squash"`
 }
 
@@ -80,6 +81,10 @@ type Redis struct {
 type HttpServer struct {
 	Domain string `mapstructure:"HTTP_DOMAIN"`
 	Port   string `mapstructure:"HTTP_PORT"`
+}
+
+type InvitationConfig struct {
+	SecretKey string `mapstructure:"INVITE_ENCRYPTION_SECRET"`
 }
 
 func NewEnvironment() (*Environment, error) {

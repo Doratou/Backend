@@ -14,6 +14,27 @@ const (
 	UserStatusInactive UserStatus = "INACTIVE"
 )
 
+type GroupStatus string
+
+const (
+	GroupStatusActive   GroupStatus = "ACTIVE"
+	GroupStatusInactive GroupStatus = "INACTIVE"
+)
+
+type GroupMemberStatus string
+
+const (
+	GroupMemberStatusActive   GroupMemberStatus = "ACTIVE"
+	GroupMemberStatusInactive GroupMemberStatus = "INACTIVE"
+)
+
+type GroupMemberRole string
+
+const (
+	GroupMemberRoleOwner  GroupMemberRole = "OWNER"
+	GroupMemberRoleMember GroupMemberRole = "MEMBER"
+)
+
 type AttachmentType string
 
 const (

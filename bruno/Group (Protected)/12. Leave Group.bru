@@ -1,0 +1,65 @@
+meta {
+  name: 12. Leave Group
+  type: http
+  seq: 12
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/groups/{{groupId}}/leave
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+vars:pre-request {
+  groupId: 3
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzODE1NTUxLCJpYXQiOjE3OTM3MjkxNTEsImp0aSI6IjM2YmQ3YjRiLWEwYzItNDVkYS1iZTUyLWM0ZGFhZjI1MGJkMyJ9.KmveVQWn-yPCk2GQ8tsjjd6W4LEAUuLw5zuOCKL32yk
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Auth
+
+  `DELETE /api/v1/groups/:groupID/leave` — Active group member; Bearer access token required.
+
+  ## Description
+
+  Deactivates the authenticated user's membership in the group.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive group ID. |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <access-token>` |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {"success": true, "data": {"message": "you left the group successfully"}}
+  ```
+
+  ## Errors
+
+  - `400 GROUP_INVALID_ID` — `groupID` is not a positive integer.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `404 GROUP_NOT_FOUND` — Group does not exist or was deleted.
+  - `404 GROUP_MEMBER_NOT_FOUND` — Requester is not an active member.
+  - `409 GROUP_OWNER_CANNOT_LEAVE` — Owner must transfer ownership first.
+}
