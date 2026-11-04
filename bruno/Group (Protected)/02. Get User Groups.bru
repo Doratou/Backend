@@ -1,0 +1,89 @@
+meta {
+  name: 02. Get User Groups
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups?limit=2&offset=0&status=ACTIVE
+  body: none
+  auth: inherit
+}
+
+params:query {
+  limit: 2
+  offset: 0
+  status: ACTIVE
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+vars:pre-request {
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzODE2NjA4LCJpYXQiOjE3OTM3MzAyMDgsImp0aSI6IjAxYmE3OGY1LWQyOWYtNDg0ZC1iZGQyLWRiNGNkZGEyYzhhNiJ9.Mg0ShkJY4y97KU8CSN8eryNaa4ybFzHfZh5n0zTJNoU
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Auth
+
+  `GET /api/v1/groups` — Bearer access token required.
+
+  ## Description
+
+  Returns the authenticated user's active group memberships with optional status filtering and pagination.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <access-token>` |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20. |
+  | `offset` | `integer` | No | Zero-based offset; defaults to 0. |
+  | `status` | `string` | No | `ACTIVE` or `INACTIVE`. |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 42,
+          "title": "Weekend trip",
+          "created_by_user_id": 7,
+          "status": "ACTIVE",
+          "is_premium": false,
+          "created_at": "2026-11-04T10:00:00Z",
+          "updated_at": "2026-11-04T10:00:00Z"
+        }
+      ],
+      "total": 1,
+      "limit": 2,
+      "offset": 0
+    }
+  }
+  ```
+
+  ## Errors
+
+  - `400 GROUP_INVALID_PAGINATION` — Invalid `limit` or `offset`.
+  - `400 GROUP_INVALID_STATUS` — Status is not `ACTIVE` or `INACTIVE`.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `500 INTERNAL_SERVER_ERROR` — Groups could not be retrieved.
+}

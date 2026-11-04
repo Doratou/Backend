@@ -1,0 +1,64 @@
+meta {
+  name: 07. Delete Group (Owner)
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/groups/{{groupId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+vars:pre-request {
+  groupId: 3
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIxIiwiZXhwIjoxNzkzODIxMDg5LCJpYXQiOjE3OTM3MzQ2ODksImp0aSI6ImY2YzAwNDEwLWQ3N2ItNDQwNC04NjNlLWFjMGNmNWQxZTBlNyJ9.csWDG2GfbR8chhCyAhgpRSFVv3PjCOnboA538lRu5ps
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Auth
+
+  `DELETE /api/v1/groups/:groupID` — Group owner or site admin; Bearer access token required.
+
+  ## Description
+
+  Soft-deletes the group so it no longer appears in group queries.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive group ID. |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <access-token>` |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {"success": true, "data": {"message": "group deleted successfully"}}
+  ```
+
+  ## Errors
+
+  - `400 GROUP_INVALID_ID` — `groupID` is not a positive integer.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `403 GROUP_FORBIDDEN` — Requester is neither the owner nor an admin.
+  - `404 GROUP_NOT_FOUND` — Group does not exist or was already deleted.
+}
