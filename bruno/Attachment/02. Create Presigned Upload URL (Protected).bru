@@ -1,0 +1,85 @@
+meta {
+  name: 02. Create Presigned Upload URL (Protected)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/presigned-upload
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filename": "squad_cover.jpg",
+    "type": "GROUP_COVER",
+    "file_size_bytes": 2097152,
+    "mime_type": "image/jpeg",
+    "is_public": true
+  }
+}
+
+vars:post-response {
+  presignedUploadUrl: res.body.data.upload_url
+  presignedObjectKey: res.body.data.object_key
+}
+
+docs {
+  # Create Presigned Upload URL (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/presigned-upload`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Generates a temporary presigned `PUT` URL allowing the client (web or mobile) to upload the file directly to RustFS / S3 storage without routing binary payload through the application server.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `filename` | `string` | Yes | Name of the file |
+  | `type` | `string` | Yes | Attachment type (e.g. `GROUP_COVER`) |
+  | `file_size_bytes` | `int64` | Yes | Expected file size in bytes |
+  | `mime_type` | `string` | Yes | MIME type of the file |
+  | `is_public` | `boolean` | No | Whether the file should be publicly accessible |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "upload_url": "http://127.0.0.1:9000/doratou-storage/attachments/group_cover/2026/11/abc123_squad_cover.jpg?X-Amz-Algorithm=...",
+      "object_key": "attachments/group_cover/2026/11/abc123_squad_cover.jpg",
+      "expires_in_seconds": 900
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid file type, missing required fields
+  * `401 Unauthorized` — Missing or invalid Bearer token
+  * `413 Payload Too Large` — File size exceeds limit
+}

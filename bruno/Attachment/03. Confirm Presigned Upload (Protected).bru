@@ -1,0 +1,86 @@
+meta {
+  name: 03. Confirm Presigned Upload (Protected)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/confirm-upload
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "object_key": "{{presignedObjectKey}}",
+    "original_filename": "squad_cover.jpg",
+    "type": "GROUP_COVER",
+    "is_public": true
+  }
+}
+
+docs {
+  # Confirm Presigned Upload (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/confirm-upload`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Invoked by the client after completing the direct `PUT` upload to storage. The backend verifies that the object exists in RustFS, queries its exact size and ETag, and registers the metadata record into the PostgreSQL database.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `object_key` | `string` | Yes | Object storage key returned by `presigned-upload` |
+  | `original_filename` | `string` | Yes | Original file name |
+  | `type` | `string` | Yes | Attachment type |
+  | `group_id` | `int64` | No | Associated squad/group ID |
+  | `expense_id` | `int64` | No | Associated expense ID |
+  | `is_public` | `boolean` | No | Public accessibility flag |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 2,
+      "uploaded_by_user_id": 1,
+      "type": "GROUP_COVER",
+      "original_filename": "squad_cover.jpg",
+      "object_key": "attachments/group_cover/2026/11/abc123_squad_cover.jpg",
+      "mime_type": "image/jpeg",
+      "file_size_bytes": 2097152,
+      "is_public": true,
+      "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/group_cover/2026/11/abc123_squad_cover.jpg"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing required fields
+  * `401 Unauthorized` — Missing or invalid Bearer token
+  * `404 Not Found` — Object does not exist in storage (upload failed or wrong key)
+}

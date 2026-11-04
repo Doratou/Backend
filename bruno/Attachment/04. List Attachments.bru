@@ -1,0 +1,77 @@
+meta {
+  name: 04. List Attachments
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/attachments?page=1&page_size=10
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 1
+  page_size: 10
+  ~type: PROFILE_IMAGE
+  ~group_id: 
+  ~expense_id: 
+  ~uploaded_by_user_id: 
+  ~is_public: true
+  ~search: avatar
+}
+
+docs {
+  # List Attachments
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/attachments`
+  **Auth:** None (Public)
+
+  ## Description
+
+  Queries attachments with dynamic filtering (`type`, `group_id`, `expense_id`, `uploaded_by_user_id`, `is_public`, and `search` on filename) with pagination metadata.
+
+  ## Request
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `int` | No | Page number (default: `1`) |
+  | `page_size` | `int` | No | Items per page (default: `20`) |
+  | `type` | `string` | No | Filter by attachment type |
+  | `group_id` | `int64` | No | Filter by squad/group ID |
+  | `expense_id` | `int64` | No | Filter by expense ID |
+  | `uploaded_by_user_id` | `int64` | No | Filter by uploader user ID |
+  | `is_public` | `boolean` | No | Filter by public flag |
+  | `search` | `string` | No | Search query for filename |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 1,
+          "uploaded_by_user_id": 1,
+          "type": "PROFILE_IMAGE",
+          "original_filename": "avatar.png",
+          "object_key": "attachments/profile_image/2026/11/550e8400_avatar.png",
+          "mime_type": "image/png",
+          "file_size_bytes": 1048576,
+          "is_public": true,
+          "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/profile_image/2026/11/550e8400_avatar.png"
+        }
+      ],
+      "total_count": 1,
+      "page": 1,
+      "page_size": 10,
+      "total_pages": 1
+    }
+  }
+  ```
+}

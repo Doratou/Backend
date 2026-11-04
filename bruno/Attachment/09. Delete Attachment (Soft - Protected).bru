@@ -1,0 +1,53 @@
+meta {
+  name: 09. Delete Attachment (Soft - Protected)
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/attachments/{{attachmentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Delete Attachment (Soft - Protected)
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/attachments/:id`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Soft-deletes the attachment record by populating `deleted_at`. The underlying object remains in storage, and can be restored or cleaned up later by background tasks.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "attachment deleted successfully"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — User does not own the attachment
+  * `404 Not Found` — Attachment does not exist
+}

@@ -1,0 +1,63 @@
+meta {
+  name: 10. Hard Delete Attachment (Permanent - Protected)
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/attachments/{{attachmentId}}?hard=true
+  body: none
+  auth: bearer
+}
+
+params:query {
+  hard: true
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Hard Delete Attachment (Permanent - Protected)
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/attachments/:id?hard=true`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Permanently deletes the attachment record from PostgreSQL and completely removes the physical file object (and any associated thumbnail) from RustFS / S3 storage.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `hard` | `boolean` | Yes | Must be `true` for permanent purge |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "attachment deleted successfully"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — User does not own the attachment
+  * `404 Not Found` — Attachment does not exist
+}

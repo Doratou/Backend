@@ -1,0 +1,41 @@
+meta {
+  name: 07. Download Attachment Stream
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/attachments/{{attachmentId}}/download
+  body: none
+  auth: none
+}
+
+docs {
+  # Download Attachment Stream
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/attachments/:id/download`
+  **Auth:** None (Public)
+
+  ## Description
+
+  Streams the raw file bytes directly from RustFS / S3 storage through the backend server as a file download. Sets the `Content-Disposition: attachment; filename="..."`, `Content-Type`, and `Content-Length` headers properly.
+
+  ## Request
+
+  ### URL Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Attachment ID |
+
+  ## Response
+
+  **`200 OK`**
+  Binary stream with appropriate file download headers.
+
+  ## Errors
+
+  * `404 Not Found` — Attachment does not exist
+  * `503 Service Unavailable` — RustFS / S3 storage is unreachable
+}

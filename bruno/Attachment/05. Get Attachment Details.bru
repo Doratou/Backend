@@ -1,0 +1,65 @@
+meta {
+  name: 05. Get Attachment Details
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/attachments/{{attachmentId}}
+  body: none
+  auth: none
+}
+
+docs {
+  # Get Attachment Details
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/attachments/:id`
+  **Auth:** None (Public)
+
+  ## Description
+
+  Retrieves detailed metadata for a specific attachment by its primary key ID, including dimensions, file hash, and an active access URL.
+
+  ## Request
+
+  ### URL Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Attachment ID |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "uploaded_by_user_id": 1,
+      "group_id": null,
+      "expense_id": null,
+      "type": "PROFILE_IMAGE",
+      "original_filename": "avatar.png",
+      "object_key": "attachments/profile_image/2026/11/550e8400_avatar.png",
+      "thumbnail_object_key": null,
+      "mime_type": "image/png",
+      "file_size_bytes": 1048576,
+      "file_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "width": 800,
+      "height": 800,
+      "duration_seconds": null,
+      "is_public": true,
+      "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/profile_image/2026/11/550e8400_avatar.png",
+      "uploaded_at": "2026-11-02T18:00:00Z",
+      "created_at": "2026-11-02T18:00:00Z",
+      "updated_at": "2026-11-02T18:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `404 Not Found` — Attachment with specified ID does not exist
+}

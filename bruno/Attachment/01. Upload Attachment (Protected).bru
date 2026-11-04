@@ -1,0 +1,94 @@
+meta {
+  name: 01. Upload Attachment (Protected)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/upload
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file()
+  type: PROFILE_IMAGE
+  is_public: true
+}
+
+vars:post-response {
+  attachmentId: res.body.data.id
+  attachmentObjectKey: res.body.data.object_key
+}
+
+docs {
+  # Upload Attachment (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/upload`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Uploads a file directly through the backend server using `multipart/form-data`. The server inspects the binary content for MIME sniffing, validates the file size against configured limits for the attachment type, extracts dimensions if it is an image, generates a SHA-256 hash, stores the object in RustFS / S3, and records metadata in PostgreSQL.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `multipart/form-data` |
+
+  ### Form Data
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `file` | `file` | Yes | Binary media file to upload |
+  | `type` | `string` | Yes | `PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `GALLERY_VIDEO`, `EXPENSE_RECEIPT`, `SETTLEMENT_RECEIPT` |
+  | `group_id` | `int64` | No | Associated squad/group ID |
+  | `expense_id` | `int64` | No | Associated expense ID |
+  | `is_public` | `boolean` | No | Override public access (`true`/`false`) |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "uploaded_by_user_id": 1,
+      "group_id": null,
+      "expense_id": null,
+      "type": "PROFILE_IMAGE",
+      "original_filename": "avatar.png",
+      "object_key": "attachments/profile_image/2026/11/550e8400_avatar.png",
+      "thumbnail_object_key": null,
+      "mime_type": "image/png",
+      "file_size_bytes": 1048576,
+      "file_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "width": 800,
+      "height": 800,
+      "duration_seconds": null,
+      "is_public": true,
+      "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/profile_image/2026/11/550e8400_avatar.png",
+      "uploaded_at": "2026-11-02T18:00:00Z",
+      "created_at": "2026-11-02T18:00:00Z",
+      "updated_at": "2026-11-02T18:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing file, invalid mime type, or payload errors
+  * `401 Unauthorized` — Missing or invalid Bearer token
+  * `413 Payload Too Large` — File size exceeds limit for specified type
+  * `503 Service Unavailable` — RustFS / S3 storage is unreachable
+}
