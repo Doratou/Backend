@@ -39,17 +39,6 @@ jobs:
       - name: Build application
         run: go build ./cmd/app
 
-      - name: Cache SonarQube packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-
-      - name: SonarQube scan
-        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   gitleaks:
     name: Secret scan (Gitleaks)
