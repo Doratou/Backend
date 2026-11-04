@@ -1,5 +1,11 @@
 .git
+.idea
+.vscode
 .env
 .env.*
 !.env.example
 bin
+tests/
+migrations/
+bruno/
+docker/
