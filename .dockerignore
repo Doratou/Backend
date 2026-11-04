@@ -6,6 +6,4 @@
 !.env.example
 bin
 tests/
-migrations/
 bruno/
-docker/
