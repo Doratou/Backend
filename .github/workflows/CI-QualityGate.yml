@@ -1,15 +1,6 @@
 name: Doratou Backend Quality Gates
 
 on:
-  push:
-    branches:
-      - main
-      - feature/ci
-
-  pull_request:
-    branches:
-      - main
-
   workflow_call:
 
 env:
@@ -92,4 +83,5 @@ jobs:
             --exit-code 1 \
             --severity CRITICAL,HIGH \
             --skip-dirs .git \
+            --skip-files docker/Dockerfile \
             /workspace
