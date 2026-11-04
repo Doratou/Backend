@@ -16,7 +16,7 @@ type Dependencies struct {
 	AuthHandler       *handler.AuthHandler
 	CaptchaHandler    *handler.CaptchaHandler
 	FriendshipHandler *handler.FriendshipHandler
-	GroupHandler   *handler.GroupHandler
+	GroupHandler      *handler.GroupHandler
 	CaptchaService    adapter.CaptchaService
 	CaptchaEnabled    bool
 	TokenMaker        jwt.TokenMaker
