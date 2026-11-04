@@ -5,7 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 require_docker
 
 user="$(env_get PDB_USER admin)"
-name="$(env_get PDB_NAME doratou)"
+name="$(env_get PDB_DB_NAME doratou)"
 
 if [ "${YES:-}" != "1" ]; then
   echo "This will DELETE ALL DATA in database '$name' and re-run all migrations."

@@ -66,7 +66,7 @@ function Invoke-Migrate([string[]]$MigrateArgs) {
     if (-not (Test-Path $MigrationsDir)) { Fail "Migrations folder not found: $MigrationsDir" }
     $user = Get-EnvValue 'PDB_USER' 'admin'
     $pass = Get-EnvValue 'PDB_PASSWORD' 'admin'
-    $name = Get-EnvValue 'PDB_NAME' 'doratou'
+    $name = Get-EnvValue 'PDB_DB_NAME' 'doratou'
     $port = Get-EnvValue 'DB_HOST_PORT' (Get-EnvValue 'PDB_PORT' '5432')
     $url  = "postgres://${user}:${pass}@127.0.0.1:${port}/${name}?sslmode=disable"
     Invoke-Checked 'goose' (@('-dir', $MigrationsDir, 'postgres', $url) + $MigrateArgs)

@@ -4,7 +4,7 @@
 Assert-Docker
 
 $user = Get-EnvValue 'PDB_USER' 'admin'
-$name = Get-EnvValue 'PDB_NAME' 'doratou'
+$name = Get-EnvValue 'PDB_DB_NAME' 'doratou'
 
 if ((Get-Setting 'YES' '') -ne '1') {
     Write-Host "This will DELETE ALL DATA in database '$name' and re-run all migrations."

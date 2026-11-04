@@ -46,7 +46,7 @@ run_migrate() {
   local user pass name port url
   user="$(env_get PDB_USER admin)"
   pass="$(env_get PDB_PASSWORD admin)"
-  name="$(env_get PDB_NAME doratou)"
+  name="$(env_get PDB_DB_NAME doratou)"
   port="$(env_get PDB_PORT 5432)"
   url="postgres://${user}:${pass}@127.0.0.1:${port}/${name}?sslmode=disable"
   goose -dir "$MIGRATIONS_DIR" postgres "$url" "$@"
