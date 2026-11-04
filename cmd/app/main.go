@@ -20,6 +20,7 @@ import (
 	postgresRepo "github.com/Doratou/Backend/internal/infrastructure/repository/postgres"
 	redisRepo "github.com/Doratou/Backend/internal/infrastructure/repository/redis"
 	"github.com/Doratou/Backend/internal/infrastructure/seed"
+	"github.com/Doratou/Backend/internal/infrastructure/storage"
 	"github.com/Doratou/Backend/internal/presentation/v1/handler"
 	"github.com/Doratou/Backend/internal/presentation/v1/router"
 	"github.com/Doratou/Backend/pkg/captcha"
@@ -79,17 +80,37 @@ func main() {
 	defer redisCache.GetClient().Close()
 	log.Print("Redis connected")
 
-	// 3. Infrastructure Transaction Managers
+	// 3. RustFS / MinIO S3 Object Storage connection
+	rustfsEnv := cfg.Environment.RustFS
+	rustfsCfg := &storage.Config{
+		Endpoint:        rustfsEnv.Endpoint,
+		AccessKeyID:     rustfsEnv.AccessKeyID,
+		SecretAccessKey: rustfsEnv.SecretAccessKey,
+		Bucket:          rustfsEnv.BucketName,
+		UseSSL:          rustfsEnv.UseSSL,
+		Region:          rustfsEnv.Region,
+		MaxConcurrency:  rustfsEnv.MaxConcurrency,
+	}
+	rustfsConnCtx, cancelRustFS := context.WithTimeout(context.Background(), 10*time.Second)
+	rustfsStorage, err := storage.NewRustFSRepository(rustfsConnCtx, rustfsCfg)
+	cancelRustFS()
+	if err != nil {
+		log.Fatalf("failed to connect to RustFS storage: %v", err)
+	}
+	log.Print("RustFS storage connected and bucket verified")
+
+	// 4. Infrastructure Transaction Managers
 	dbTrxManager := database.NewTrxManager(postgresDB)
 	redisTrxManager := redisInfra.NewTrxManager(redisCache, 3, 20*time.Millisecond)
 
-	// 4. Repositories
+	// 5. Repositories
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
+	attachmentRepo := postgresRepo.NewAttachmentRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
 	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
 
-	// 5. Crypto & Security Utilities
+	// 6. Crypto & Security Utilities
 	passwordHasher := hasher.NewBcryptHasher()
 	captchaMan := captcha.NewDigitCaptcha(nil)
 	jwtMaker, err := jwt.NewJWTMaker(cfg.Environment.JWT.SecretKey)
@@ -97,14 +118,14 @@ func main() {
 		log.Fatalf("failed to initialize JWT maker: %v", err)
 	}
 
-	// 5.1 Database Seeder (idempotent: seeds regular user & admin user if not present)
+	// 6.1 Database Seeder (idempotent: seeds regular user & admin user if not present)
 	seedCtx, cancelSeed := context.WithTimeout(context.Background(), 15*time.Second)
 	if err := seed.Run(seedCtx, userRepo, passwordHasher, cfg.Environment.Seed); err != nil {
 		log.Printf("[SEED WARNING] database seeder finished with notice/error: %v", err)
 	}
 	cancelSeed()
 
-	// 6. Application Services
+	// 7. Application Services
 	emailSender := mail.NewMailer(mail.EmailConfig{
 		From:     cfg.Environment.Email.DoratouEmail,
 		Password: cfg.Environment.Email.DoratouEmailAppPassword,
@@ -148,19 +169,32 @@ func main() {
 		cfg.Constant,
 	)
 
-	// 7. Presentation Handlers & Routers
+	attachmentService := service.NewAttachmentService(
+		attachmentRepo,
+		rustfsStorage,
+		service.AttachmentServiceConfig{
+			PublicURLPrefix:     rustfsEnv.PublicURLPrefix,
+			DefaultPresignedTTL: cfg.Constant.Attachment.DefaultPresignedTTL,
+		},
+		cfg.Constant,
+	)
+
+	// 8. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
+	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
+
 	engine := router.New(router.Dependencies{
-		AuthHandler:    authHandler,
-		CaptchaHandler: captchaHandler,
-		CaptchaService: captchaService,
-		CaptchaEnabled: cfg.Environment.Captcha.Enabled,
-		TokenMaker:     jwtMaker,
-		TokenRepo:      tokenRepo,
+		AuthHandler:       authHandler,
+		CaptchaHandler:    captchaHandler,
+		AttachmentHandler: attachmentHandler,
+		CaptchaService:    captchaService,
+		CaptchaEnabled:    cfg.Environment.Captcha.Enabled,
+		TokenMaker:        jwtMaker,
+		TokenRepo:         tokenRepo,
 	})
 
-	// 8. HTTP Server Lifecycle & Graceful Shutdown
+	// 9. HTTP Server Lifecycle & Graceful Shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
