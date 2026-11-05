@@ -15,9 +15,9 @@ headers {
 }
 
 vars:pre-request {
-  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzODE2NjA4LCJpYXQiOjE3OTM3MzAyMDgsImp0aSI6IjAxYmE3OGY1LWQyOWYtNDg0ZC1iZGQyLWRiNGNkZGEyYzhhNiJ9.Mg0ShkJY4y97KU8CSN8eryNaa4ybFzHfZh5n0zTJNoU
-  groupId: 3
-  memberId: 3
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzOTkzNzAzLCJpYXQiOjE3OTM5MDczMDMsImp0aSI6IjRjYmE4MDRiLTQyZjQtNGZhOS05OTMxLWU4YjBhMDFmN2ZhZiJ9.a27SvHzCkr6ds0yYjZ3KCvhMN4A780vgcDv2v7d4ta4
+  groupId: 1
+  memberId: 2
 }
 
 settings {
@@ -28,37 +28,37 @@ settings {
 
 docs {
   ## Method, Endpoint, and Auth
-
+  
   `DELETE /api/v1/groups/:groupID/members/:memberID` — Group owner or site admin; Bearer access token required.
-
+  
   ## Description
-
+  
   Deactivates a member's membership. Use `member_id` from the group members response, not `user_id`.
-
+  
   ## Request
-
+  
   ### Path Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `groupID` | `integer` | Yes | Positive group ID. |
   | `memberID` | `integer` | Yes | Positive group-members row ID (`member_id`). |
-
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | `Bearer <access-token>` |
-
+  
   ## Response
-
+  
   **`200 OK`**
   ```json
   {"success": true, "data": {"message": "group member removed successfully"}}
   ```
-
+  
   ## Errors
-
+  
   - `400 GROUP_INVALID_ID` / `GROUP_INVALID_MEMBER_ID` — Invalid path ID.
   - `401 MISSING_TOKEN` — Access token is missing or invalid.
   - `403 GROUP_OWNER_REQUIRED` — Requester is neither the owner nor an admin.

@@ -5,14 +5,14 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/v1/groups?limit=2&offset=0&status=ACTIVE
+  url: {{baseUrl}}/api/v1/groups?page=1&limit=2&status=ACTIVE
   body: none
   auth: inherit
 }
 
 params:query {
   limit: 2
-  offset: 0
+  page: 1
   status: ACTIVE
 }
 
@@ -51,8 +51,8 @@ docs {
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
+  | `page` | `integer` | No | 1-based page number; defaults to 1. |
   | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20. |
-  | `offset` | `integer` | No | Zero-based offset; defaults to 0. |
   | `status` | `string` | No | `ACTIVE` or `INACTIVE`. |
 
   ## Response
@@ -73,16 +73,18 @@ docs {
           "updated_at": "2026-11-04T10:00:00Z"
         }
       ],
-      "total": 1,
-      "limit": 2,
-      "offset": 0
+      "pagination": {
+        "page": 1,
+        "limit": 2,
+        "total": 1
+      }
     }
   }
   ```
 
   ## Errors
 
-  - `400 GROUP_INVALID_PAGINATION` — Invalid `limit` or `offset`.
+  - `400 GROUP_INVALID_PAGINATION` — Invalid `page` or `limit` (including page/offset overflow).
   - `400 GROUP_INVALID_STATUS` — Status is not `ACTIVE` or `INACTIVE`.
   - `401 MISSING_TOKEN` — Access token is missing or invalid.
   - `500 INTERNAL_SERVER_ERROR` — Groups could not be retrieved.

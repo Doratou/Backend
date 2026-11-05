@@ -4,13 +4,90 @@ meta {
   seq: 10
 }
 
-get {
-  url: {{baseUrl}}/invites/direct/{{inviteId}}/respond
-  body: none
+post {
+  url: {{baseUrl}}/api/v1/invites/direct/{{inviteId}}/respond
+  body: json
   auth: inherit
+}
+
+vars:pre-request {
+  inviteId: 1
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "response": "ACCEPTED"
+  }
 }
 
 settings {
   encodeUrl: true
+  timeout: 0
   forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Auth
+
+  `POST /api/v1/invites/direct/:inviteID/respond` — Invitation recipient; Bearer access token required.
+
+  ## Description
+
+  Accepts or rejects a pending direct group invitation. Only its recipient can respond. Accepting adds the recipient as an active group member.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `inviteID` | `integer` | Yes | Positive direct invitation ID (the invite object's `id`). |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <recipient-access-token>`. |
+  | `Content-Type` | `string` | Yes | `application/json`. |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `response` | `string` | Yes | Exactly `ACCEPTED` or `REJECTED`. |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 12,
+      "status": "ACCEPTED",
+      "created_at": "2026-11-06T10:00:00Z",
+      "responded_at": "2026-11-06T10:05:00Z",
+      "group": {"id": 1, "title": "Weekend trip"},
+      "sender": {"id": 1, "name": "Owner", "avatar_attachment_id": null},
+      "recipient": {"id": 2, "name": "Friend", "avatar_attachment_id": null}
+    }
+  }
+  ```
+
+  ## Errors
+
+  - `400 INVITE_INVALID_ID` — `inviteID` is not a positive integer.
+  - `400 DIRECT_INVITE_INVALID_RESPONSE` — Body is invalid or response is not `ACCEPTED` / `REJECTED`.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `404 DIRECT_INVITE_NOT_FOUND` — Invitation does not exist for this recipient.
+  - `404 GROUP_NOT_FOUND` — Group was deleted before acceptance.
+  - `409 DIRECT_INVITE_NOT_PENDING` — Invitation has already been answered.
+  - `409 ALREADY_GROUP_MEMBER` — Recipient is already an active group member.
+  - `409 GROUP_INACTIVE` — Group is inactive and cannot accept members.
+  - `500 INTERNAL_SERVER_ERROR` — Response could not be saved.
 }

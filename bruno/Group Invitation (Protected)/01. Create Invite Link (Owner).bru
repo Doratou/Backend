@@ -23,8 +23,8 @@ body:json {
 }
 
 vars:pre-request {
-  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIxIiwiZXhwIjoxNzkzODIxMDg5LCJpYXQiOjE3OTM3MzQ2ODksImp0aSI6ImY2YzAwNDEwLWQ3N2ItNDQwNC04NjNlLWFjMGNmNWQxZTBlNyJ9.csWDG2GfbR8chhCyAhgpRSFVv3PjCOnboA538lRu5ps
-  groupId: 3
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzOTkzNzAzLCJpYXQiOjE3OTM5MDczMDMsImp0aSI6IjRjYmE4MDRiLTQyZjQtNGZhOS05OTMxLWU4YjBhMDFmN2ZhZiJ9.a27SvHzCkr6ds0yYjZ3KCvhMN4A780vgcDv2v7d4ta4
+  groupId: 1
 }
 
 settings {
@@ -36,7 +36,7 @@ settings {
 docs {
   ## Method, Endpoint, and Auth
   
-  `POST /api/v1/groups/:groupID/invites` — Group owner or site admin; Bearer access token required.
+  `POST /api/v1/invites/links/groups/:groupID` — Group owner or site admin; Bearer access token required.
   
   ## Description
   
@@ -75,7 +75,7 @@ docs {
       "id": 5,
       "group_id": 42,
       "token": "opaque-token",
-      "invite_url": "/api/v1/groups/invites/opaque-token/join",
+      "invite_url": "/api/v1/invites/links/opaque-token/join",
       "expires_at": "2027-06-07T14:30:00Z",
       "max_uses": 2,
       "used_count": 0,
@@ -86,10 +86,11 @@ docs {
   
   ## Errors
   
-  - `400 GROUP_INVALID_ID` — `groupID` is not a positive integer.
+  - `400 BAD_REQUEST` — `groupID` is not a positive integer.
   - `400 INVITE_INVALID_PAYLOAD` / `INVITE_INVALID_EXPIRATION` / `INVITE_INVALID_MAX_USES` — Invalid password, expiration, or use limit.
   - `401 MISSING_TOKEN` — Access token is missing or invalid.
   - `403 GROUP_OWNER_REQUIRED` — Requester is neither the owner nor an admin.
   - `404 GROUP_NOT_FOUND` — Group does not exist or was deleted.
   - `409 GROUP_ACTIVE_INVITE_EXISTS` — Group already has a usable invite link.
+  - `500 INTERNAL_SERVER_ERROR` — Invite could not be created.
 }
