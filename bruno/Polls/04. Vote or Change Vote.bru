@@ -1,0 +1,122 @@
+meta {
+  name: 04. Vote or Change Vote
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/groups/{{pollGroupId}}/polls/{{pollId}}/vote
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "option_id": {{pollOptionId}}
+  }
+}
+
+docs {
+  # Vote or Change Vote
+
+  **Method:** `PUT`
+  **Endpoint:** `/api/v1/groups/:groupID/polls/:pollID/vote`
+  **Auth:** Required
+
+  ## Description
+
+  Registers one choice for the authenticated active group member. The option must belong to this poll and must not be soft-deleted. The member is taken from authentication; sending member_id or user_id cannot vote on someone else's behalf.
+
+  The first vote and later changes return 200 OK. Repeating the same choice keeps one database record. Changing a choice updates that record, preserving its original created_at. After withdrawal, voting again restores the same row. To change your choice in Bruno, set pollOptionId manually in the Local environment to another option ID from Get Poll and save the environment. The folder pre-request script clears legacy runtime poll identifiers so your saved environment values are used.
+
+  The poll must be ACTIVE and its group must be ACTIVE. Concurrent voting is serialized with closing, deletion and group freezing. This endpoint never exposes voter identities.
+
+  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; Bruno variable `pollGroupId` |
+  | `pollID` | `integer` | Yes | Positive BIGINT poll ID in this group; Bruno variable `pollId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `option_id` | `integer` | `Yes` | `Positive BIGINT ID of a non-deleted option in this poll` |
+
+  ```json
+  {
+    "option_id": 801
+  }
+  ```
+
+  The saved request resolves `{{pollOptionId}}` without quotes, so it must contain a JSON integer.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "poll_id": 701,
+      "option_id": 801,
+      "created_at": "2026-11-05T10:05:00Z",
+      "updated_at": "2026-11-05T10:05:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the same envelope as the existing Auth and Friendships endpoints. Internal causes are not exposed.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, JSON payload, required field, value type, filter or pagination. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, malformed, not an access token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 403 | `POLL_FORBIDDEN` | `only active group members can access this poll` | The user has no active membership in this group or has left it. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 404 | `POLL_NOT_FOUND` | `poll not found` | The poll does not exist, is soft-deleted, or belongs to another group. |
+  | 404 | `POLL_OPTION_NOT_FOUND` | `option not found in this poll` | The option does not exist, is deleted, or belongs to another poll. |
+  | 409 | `POLL_CLOSED` | `poll is closed and cannot accept vote changes` | The poll is closed; votes cannot be added or changed. |
+  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is inactive; vote changes are frozen. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
+
+  **Example: 404**
+
+  ```json
+  {
+    "success": false,
+    "code": "POLL_OPTION_NOT_FOUND",
+    "error": "option not found in this poll"
+  }
+  ```
+}

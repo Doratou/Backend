@@ -35,7 +35,7 @@ docs {
 
   Lists non-deleted PENDING friend requests sent by the authenticated user. Results are ordered by latest request time descending, then ID descending (`requested_at DESC, id DESC`). Accepted, rejected, and soft-deleted records are excluded.
 
-  Use the sender's token. To cancel a selected request, use that item's `id`, not the recipient's user ID. Reading this list does not automatically save `friendRequestId`; copy the selected ID into the Cancel URL, set the variable manually, or use the runtime ID saved by a successful Send Friend Request.
+  Use the sender's token. To cancel a selected request, set `friendRequestId` manually in the Local environment to that item's `id`, not the recipient's user ID, then save the environment. Neither this list nor Send Friend Request automatically changes that variable.
 
   Each item's `created_at` represents the latest request time (`requested_at` in the database), not the original row creation time. An allowed resend updates this timestamp and preserves the relationship ID.
 

@@ -38,7 +38,7 @@ docs {
 
   Only the authenticated account's ACTIVE status is checked for this list. The other participant's summary contains `id`, `name`, and `avatar_attachment_id`; no email, phone, or password is returned. If that user has been soft-deleted, the summary keeps the user ID and may contain an empty name and a null avatar.
 
-  This Bruno request does not automatically save `friendshipId`. Accept Friend Request saves that runtime variable after a successful acceptance. Otherwise, copy the selected item's `friendship_id` into the Remove Friend URL or set the variable manually.
+  To remove a selected friend, set `friendshipId` manually in the Local environment to the selected item's `friendship_id`, then save the environment before using Remove Friend. Neither this list nor Accept Friend Request automatically changes that variable.
 
   ## Request
 
