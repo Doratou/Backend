@@ -28,8 +28,14 @@ type AttachmentRepository interface {
 	// Create persists a new attachment record.
 	Create(ctx context.Context, attachment *entity.Attachment) error
 
+	// CreateBatch persists multiple attachment records in a single database operation.
+	CreateBatch(ctx context.Context, attachments []*entity.Attachment) error
+
 	// FindByID retrieves an attachment by primary key.
 	FindByID(ctx context.Context, id int64) (*entity.Attachment, error)
+
+	// FindByIDs retrieves multiple attachments by primary keys.
+	FindByIDs(ctx context.Context, ids []int64) ([]*entity.Attachment, error)
 
 	// FindByObjectKey retrieves an attachment by its object storage key.
 	FindByObjectKey(ctx context.Context, objectKey string) (*entity.Attachment, error)
@@ -55,11 +61,20 @@ type AttachmentRepository interface {
 	// Update updates an existing attachment's metadata.
 	Update(ctx context.Context, attachment *entity.Attachment) error
 
+	// UpdateBatch updates common fields for multiple attachments by their IDs.
+	UpdateBatch(ctx context.Context, ids []int64, updates map[string]any) error
+
 	// DeleteByID soft-deletes an attachment record.
 	DeleteByID(ctx context.Context, id int64) error
 
+	// DeleteByIDs soft-deletes multiple attachments.
+	DeleteByIDs(ctx context.Context, ids []int64) error
+
 	// HardDeleteByID permanently deletes an attachment record.
 	HardDeleteByID(ctx context.Context, id int64) error
+
+	// HardDeleteByIDs permanently deletes multiple attachments.
+	HardDeleteByIDs(ctx context.Context, ids []int64) error
 
 	// ExistsByID checks if an attachment exists.
 	ExistsByID(ctx context.Context, id int64) (bool, error)

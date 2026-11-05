@@ -1,6 +1,7 @@
 package service
 
 import (
+	"archive/zip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -152,6 +153,153 @@ func (s *attachmentService) Upload(ctx context.Context, userID int64, fileHeader
 	return dto.ToAttachmentResponse(attachment, accessURL), nil
 }
 
+// UploadBatch handles uploading multiple multipart files with partial-success tolerance.
+func (s *attachmentService) UploadBatch(
+	ctx context.Context,
+	userID int64,
+	files []*multipart.FileHeader,
+	defaultType enum.AttachmentType,
+	groupID, expenseID *int64,
+	isPublic *bool,
+) (*dto.BatchUploadResponse, error) {
+	if len(files) == 0 {
+		return nil, exception.Wrap(exception.ErrBadRequest, fmt.Errorf("no files provided for batch upload"))
+	}
+
+	var (
+		validEntities  []*entity.Attachment
+		uploadedKeys   []string
+		failures       []dto.BatchUploadItemFailure
+		resolvedPublic = s.resolveIsPublic(defaultType, isPublic)
+	)
+
+	for _, fileHeader := range files {
+		if fileHeader == nil {
+			continue
+		}
+
+		file, err := fileHeader.Open()
+		if err != nil {
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: fileHeader.Filename,
+				Error:    fmt.Sprintf("cannot open file: %v", err),
+			})
+			continue
+		}
+
+		headerBytes := make([]byte, 512)
+		n, err := file.Read(headerBytes)
+		if err != nil && err != io.EOF {
+			file.Close()
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: fileHeader.Filename,
+				Error:    fmt.Sprintf("failed to read file header: %v", err),
+			})
+			continue
+		}
+		detectedMime := http.DetectContentType(headerBytes[:n])
+
+		if err := s.validateFile(defaultType, fileHeader.Size, detectedMime); err != nil {
+			file.Close()
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: fileHeader.Filename,
+				Error:    err.Error(),
+			})
+			continue
+		}
+
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			file.Close()
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: fileHeader.Filename,
+				Error:    fmt.Sprintf("seek error: %v", err),
+			})
+			continue
+		}
+		hasher := sha256.New()
+		if _, err := io.Copy(hasher, file); err != nil {
+			file.Close()
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: fileHeader.Filename,
+				Error:    fmt.Sprintf("hash error: %v", err),
+			})
+			continue
+		}
+		fileHash := hex.EncodeToString(hasher.Sum(nil))
+
+		var width, height *int
+		if strings.HasPrefix(detectedMime, "image/") {
+			if _, err := file.Seek(0, io.SeekStart); err == nil {
+				if cfg, _, err := image.DecodeConfig(file); err == nil {
+					w := cfg.Width
+					h := cfg.Height
+					width = &w
+					height = &h
+				}
+			}
+		}
+
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			file.Close()
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: fileHeader.Filename,
+				Error:    fmt.Sprintf("seek before upload error: %v", err),
+			})
+			continue
+		}
+
+		objectKey := s.generateObjectKey(defaultType, fileHeader.Filename)
+
+		if _, err := s.storageRepo.UploadFile(ctx, objectKey, file, fileHeader.Size, detectedMime); err != nil {
+			file.Close()
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: fileHeader.Filename,
+				Error:    fmt.Sprintf("storage upload error: %v", err),
+			})
+			continue
+		}
+		file.Close()
+		uploadedKeys = append(uploadedKeys, objectKey)
+
+		now := time.Now().UTC()
+		validEntities = append(validEntities, &entity.Attachment{
+			UploadedByUserID: &userID,
+			GroupID:          groupID,
+			ExpenseID:        expenseID,
+			Type:             defaultType,
+			OriginalFilename: &fileHeader.Filename,
+			ObjectKey:        &objectKey,
+			MimeType:         &detectedMime,
+			FileSizeBytes:    &fileHeader.Size,
+			FileHash:         &fileHash,
+			Width:            width,
+			Height:           height,
+			IsPublic:         resolvedPublic,
+			UploadedAt:       &now,
+		})
+	}
+
+	if len(validEntities) > 0 {
+		if err := s.attachmentRepo.CreateBatch(ctx, validEntities); err != nil {
+			_ = s.storageRepo.DeleteFilesBatch(context.Background(), uploadedKeys)
+			return nil, err
+		}
+	}
+
+	items := make([]*dto.AttachmentResponse, len(validEntities))
+	for i, ent := range validEntities {
+		url, _ := s.buildAccessURL(ctx, *ent.ObjectKey, ent.IsPublic)
+		items[i] = dto.ToAttachmentResponse(ent, url)
+	}
+
+	return &dto.BatchUploadResponse{
+		SuccessCount: len(items),
+		FailureCount: len(failures),
+		Items:        items,
+		Failures:     failures,
+	}, nil
+}
+
 // CreatePresignedUpload generates a presigned PUT URL allowing clients to upload directly to RustFS.
 func (s *attachmentService) CreatePresignedUpload(ctx context.Context, userID int64, req dto.PresignedUploadRequest) (*dto.PresignedUploadResponse, error) {
 	if err := s.validateFile(req.Type, req.FileSizeBytes, req.MimeType); err != nil {
@@ -168,6 +316,34 @@ func (s *attachmentService) CreatePresignedUpload(ctx context.Context, userID in
 		UploadURL:        uploadURL,
 		ObjectKey:        objectKey,
 		ExpiresInSeconds: int64(s.cfg.DefaultPresignedTTL.Seconds()),
+	}, nil
+}
+
+// CreatePresignedUploadBatch generates direct upload PUT URLs for multiple items.
+func (s *attachmentService) CreatePresignedUploadBatch(ctx context.Context, userID int64, req dto.BatchPresignedUploadRequest) (*dto.BatchPresignedUploadResponse, error) {
+	items := make([]dto.BatchPresignedUploadItemResponse, 0, len(req.Items))
+
+	for _, item := range req.Items {
+		if err := s.validateFile(item.Type, item.FileSizeBytes, item.MimeType); err != nil {
+			return nil, err
+		}
+
+		objectKey := s.generateObjectKey(item.Type, item.Filename)
+		uploadURL, err := s.storageRepo.GetPresignedUploadURL(ctx, objectKey, s.cfg.DefaultPresignedTTL)
+		if err != nil {
+			return nil, exception.Wrap(exception.ErrStorageUnavailable, err)
+		}
+
+		items = append(items, dto.BatchPresignedUploadItemResponse{
+			Filename:         item.Filename,
+			UploadURL:        uploadURL,
+			ObjectKey:        objectKey,
+			ExpiresInSeconds: int64(s.cfg.DefaultPresignedTTL.Seconds()),
+		})
+	}
+
+	return &dto.BatchPresignedUploadResponse{
+		Items: items,
 	}, nil
 }
 
@@ -203,6 +379,63 @@ func (s *attachmentService) ConfirmPresignedUpload(ctx context.Context, userID i
 
 	accessURL, _ := s.buildAccessURL(ctx, req.ObjectKey, isPublic)
 	return dto.ToAttachmentResponse(attachment, accessURL), nil
+}
+
+// ConfirmPresignedUploadBatch confirms and creates database records for multiple uploaded items.
+func (s *attachmentService) ConfirmPresignedUploadBatch(ctx context.Context, userID int64, req dto.BatchConfirmUploadRequest) (*dto.BatchUploadResponse, error) {
+	var (
+		validEntities []*entity.Attachment
+		failures      []dto.BatchUploadItemFailure
+	)
+
+	now := time.Now().UTC()
+	for _, item := range req.Items {
+		stat, err := s.storageRepo.StatObject(ctx, item.ObjectKey)
+		if err != nil {
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: item.OriginalFilename,
+				Error:    fmt.Sprintf("object %q not found in storage: %v", item.ObjectKey, err),
+			})
+			continue
+		}
+
+		isPublic := s.resolveIsPublic(item.Type, item.IsPublic)
+		size := stat.Size
+		mime := stat.ContentType
+
+		validEntities = append(validEntities, &entity.Attachment{
+			UploadedByUserID: &userID,
+			GroupID:          item.GroupID,
+			ExpenseID:        item.ExpenseID,
+			Type:             item.Type,
+			OriginalFilename: &item.OriginalFilename,
+			ObjectKey:        &item.ObjectKey,
+			MimeType:         &mime,
+			FileSizeBytes:    &size,
+			FileHash:         &stat.ETag,
+			IsPublic:         isPublic,
+			UploadedAt:       &now,
+		})
+	}
+
+	if len(validEntities) > 0 {
+		if err := s.attachmentRepo.CreateBatch(ctx, validEntities); err != nil {
+			return nil, err
+		}
+	}
+
+	items := make([]*dto.AttachmentResponse, len(validEntities))
+	for i, ent := range validEntities {
+		url, _ := s.buildAccessURL(ctx, *ent.ObjectKey, ent.IsPublic)
+		items[i] = dto.ToAttachmentResponse(ent, url)
+	}
+
+	return &dto.BatchUploadResponse{
+		SuccessCount: len(items),
+		FailureCount: len(failures),
+		Items:        items,
+		Failures:     failures,
+	}, nil
 }
 
 // GetByID retrieves attachment metadata and generates an access URL.
@@ -274,6 +507,124 @@ func (s *attachmentService) List(ctx context.Context, filter dto.AttachmentFilte
 	}, nil
 }
 
+// GetBatchURLs generates active access URLs for multiple attachment IDs.
+func (s *attachmentService) GetBatchURLs(ctx context.Context, ids []int64, expiry time.Duration) (*dto.BatchURLsResponse, error) {
+	if len(ids) == 0 {
+		return &dto.BatchURLsResponse{Items: []dto.BatchURLItem{}}, nil
+	}
+
+	attachments, err := s.attachmentRepo.FindByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	if expiry <= 0 {
+		expiry = s.cfg.DefaultPresignedTTL
+	}
+
+	var privateKeys []string
+	for _, att := range attachments {
+		if !att.IsPublic && att.ObjectKey != nil {
+			privateKeys = append(privateKeys, *att.ObjectKey)
+		}
+	}
+
+	var presignedMap map[string]string
+	if len(privateKeys) > 0 {
+		presignedMap, _ = s.storageRepo.GetPresignedURLsBatch(ctx, privateKeys, expiry)
+	}
+
+	items := make([]dto.BatchURLItem, 0, len(attachments))
+	for _, att := range attachments {
+		if att.ObjectKey == nil {
+			continue
+		}
+		var accessURL string
+		if att.IsPublic {
+			prefix := strings.TrimRight(s.cfg.PublicURLPrefix, "/")
+			accessURL = fmt.Sprintf("%s/%s", prefix, *att.ObjectKey)
+		} else if presignedMap != nil {
+			accessURL = presignedMap[*att.ObjectKey]
+		}
+
+		items = append(items, dto.BatchURLItem{
+			ID:        att.ID,
+			AccessURL: accessURL,
+		})
+	}
+
+	return &dto.BatchURLsResponse{Items: items}, nil
+}
+
+// DownloadZipStream streams an on-the-fly zip archive containing the requested attachments.
+func (s *attachmentService) DownloadZipStream(ctx context.Context, ids []int64, w io.Writer) error {
+	if len(ids) == 0 {
+		return exception.Wrap(exception.ErrBadRequest, fmt.Errorf("no ids provided for zip download"))
+	}
+
+	attachments, err := s.attachmentRepo.FindByIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	if len(attachments) == 0 {
+		return exception.ErrAttachmentNotFound
+	}
+
+	zipWriter := zip.NewWriter(w)
+	defer zipWriter.Close()
+
+	usedNames := make(map[string]int)
+
+	for _, att := range attachments {
+		if att.ObjectKey == nil {
+			continue
+		}
+
+		rc, err := s.storageRepo.DownloadFile(ctx, *att.ObjectKey)
+		if err != nil {
+			log.Printf("[ZIP DOWNLOAD WARNING] skipping object %q: %v", *att.ObjectKey, err)
+			continue
+		}
+
+		baseName := "file"
+		if att.OriginalFilename != nil && *att.OriginalFilename != "" {
+			baseName = *att.OriginalFilename
+		}
+
+		cleanName := baseName
+		count := usedNames[baseName]
+		if count > 0 {
+			ext := filepath.Ext(baseName)
+			raw := strings.TrimSuffix(baseName, ext)
+			cleanName = fmt.Sprintf("%s_%d%s", raw, count, ext)
+		}
+		usedNames[baseName]++
+
+		entryHeader := &zip.FileHeader{
+			Name:     cleanName,
+			Method:   zip.Deflate,
+			Modified: time.Now().UTC(),
+		}
+		if att.FileSizeBytes != nil {
+			entryHeader.UncompressedSize64 = uint64(*att.FileSizeBytes)
+		}
+
+		entryWriter, err := zipWriter.CreateHeader(entryHeader)
+		if err != nil {
+			rc.Close()
+			return exception.Wrap(exception.ErrInternal, err)
+		}
+
+		if _, err := io.Copy(entryWriter, rc); err != nil {
+			rc.Close()
+			return exception.Wrap(exception.ErrInternal, err)
+		}
+		rc.Close()
+	}
+
+	return zipWriter.Flush()
+}
+
 // Update modifies metadata fields of an existing attachment.
 func (s *attachmentService) Update(ctx context.Context, userID int64, id int64, req dto.UpdateAttachmentRequest) (*dto.AttachmentResponse, error) {
 	attachment, err := s.attachmentRepo.FindByID(ctx, id)
@@ -310,6 +661,46 @@ func (s *attachmentService) Update(ctx context.Context, userID int64, id int64, 
 	return dto.ToAttachmentResponse(attachment, accessURL), nil
 }
 
+// UpdateBatch updates common metadata fields for multiple attachments owned by the user.
+func (s *attachmentService) UpdateBatch(ctx context.Context, userID int64, req dto.BatchUpdateAttachmentRequest) error {
+	if len(req.IDs) == 0 {
+		return nil
+	}
+
+	attachments, err := s.attachmentRepo.FindByIDs(ctx, req.IDs)
+	if err != nil {
+		return err
+	}
+	if len(attachments) == 0 {
+		return exception.ErrAttachmentNotFound
+	}
+
+	for _, att := range attachments {
+		if att.UploadedByUserID != nil && *att.UploadedByUserID != userID {
+			return exception.ErrAttachmentForbidden
+		}
+	}
+
+	updates := make(map[string]any)
+	if req.OriginalFilename != nil {
+		updates["original_filename"] = *req.OriginalFilename
+	}
+	if req.GroupID != nil {
+		updates["group_id"] = *req.GroupID
+	}
+	if req.ExpenseID != nil {
+		updates["expense_id"] = *req.ExpenseID
+	}
+	if req.Type != nil {
+		updates["type"] = *req.Type
+	}
+	if req.IsPublic != nil {
+		updates["is_public"] = *req.IsPublic
+	}
+
+	return s.attachmentRepo.UpdateBatch(ctx, req.IDs, updates)
+}
+
 // Delete removes the attachment metadata, optionally hard-deleting the underlying storage object.
 func (s *attachmentService) Delete(ctx context.Context, userID int64, id int64, hardDelete bool) error {
 	attachment, err := s.attachmentRepo.FindByID(ctx, id)
@@ -333,6 +724,45 @@ func (s *attachmentService) Delete(ctx context.Context, userID int64, id int64, 
 	}
 
 	return s.attachmentRepo.DeleteByID(ctx, id)
+}
+
+// DeleteBatch deletes multiple attachments (soft or hard).
+func (s *attachmentService) DeleteBatch(ctx context.Context, userID int64, ids []int64, hardDelete bool) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	attachments, err := s.attachmentRepo.FindByIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	if len(attachments) == 0 {
+		return exception.ErrAttachmentNotFound
+	}
+
+	for _, att := range attachments {
+		if att.UploadedByUserID != nil && *att.UploadedByUserID != userID {
+			return exception.ErrAttachmentForbidden
+		}
+	}
+
+	if hardDelete {
+		var keys []string
+		for _, att := range attachments {
+			if att.ObjectKey != nil {
+				keys = append(keys, *att.ObjectKey)
+			}
+			if att.ThumbnailObjectKey != nil {
+				keys = append(keys, *att.ThumbnailObjectKey)
+			}
+		}
+		if len(keys) > 0 {
+			_ = s.storageRepo.DeleteFilesBatch(ctx, keys)
+		}
+		return s.attachmentRepo.HardDeleteByIDs(ctx, ids)
+	}
+
+	return s.attachmentRepo.DeleteByIDs(ctx, ids)
 }
 
 // GetFreshAccessURL generates an updated direct or presigned URL.
@@ -445,7 +875,6 @@ func (s *attachmentService) generateObjectKey(attType enum.AttachmentType, filen
 	now := time.Now().UTC()
 	cleanExt := strings.ToLower(filepath.Ext(filename))
 	cleanBase := strings.TrimSuffix(filepath.Base(filename), cleanExt)
-	// Sanitize base name
 	cleanBase = strings.ReplaceAll(cleanBase, " ", "_")
 	if len(cleanBase) > 30 {
 		cleanBase = cleanBase[:30]

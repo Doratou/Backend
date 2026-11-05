@@ -7,10 +7,13 @@ import (
 	"time"
 
 	"github.com/Doratou/Backend/internal/application/dto"
+	"github.com/Doratou/Backend/internal/domain/enum"
 )
 
 // AttachmentService defines the application boundary for handling media and attachments.
 type AttachmentService interface {
+	// --- Single-item operations ---
+
 	// Upload processes a multipart file, validates mime/size/magic bytes, uploads to storage, and persists metadata.
 	Upload(ctx context.Context, userID int64, fileHeader *multipart.FileHeader, req dto.UploadAttachmentRequest) (*dto.AttachmentResponse, error)
 
@@ -40,4 +43,27 @@ type AttachmentService interface {
 
 	// DownloadStream retrieves a raw file stream from storage for reverse-proxy downloading.
 	DownloadStream(ctx context.Context, id int64) (io.ReadCloser, *dto.FileStreamMeta, error)
+
+	// --- Batch / Bulk operations ---
+
+	// UploadBatch uploads multiple multipart files concurrently, with partial-success tolerance.
+	UploadBatch(ctx context.Context, userID int64, files []*multipart.FileHeader, defaultType enum.AttachmentType, groupID, expenseID *int64, isPublic *bool) (*dto.BatchUploadResponse, error)
+
+	// CreatePresignedUploadBatch generates direct upload PUT URLs for multiple items.
+	CreatePresignedUploadBatch(ctx context.Context, userID int64, req dto.BatchPresignedUploadRequest) (*dto.BatchPresignedUploadResponse, error)
+
+	// ConfirmPresignedUploadBatch confirms and creates database records for multiple uploaded items.
+	ConfirmPresignedUploadBatch(ctx context.Context, userID int64, req dto.BatchConfirmUploadRequest) (*dto.BatchUploadResponse, error)
+
+	// GetBatchURLs generates active access URLs for multiple attachment IDs.
+	GetBatchURLs(ctx context.Context, ids []int64, expiry time.Duration) (*dto.BatchURLsResponse, error)
+
+	// DownloadZipStream streams an on-the-fly zip archive containing the requested attachments.
+	DownloadZipStream(ctx context.Context, ids []int64, w io.Writer) error
+
+	// UpdateBatch updates common metadata fields for multiple attachments owned by the user.
+	UpdateBatch(ctx context.Context, userID int64, req dto.BatchUpdateAttachmentRequest) error
+
+	// DeleteBatch deletes multiple attachments (soft or hard).
+	DeleteBatch(ctx context.Context, userID int64, ids []int64, hardDelete bool) error
 }

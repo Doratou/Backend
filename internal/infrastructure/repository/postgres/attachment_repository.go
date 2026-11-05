@@ -32,6 +32,17 @@ func (r *attachmentRepository) Create(ctx context.Context, attachment *entity.At
 	return nil
 }
 
+func (r *attachmentRepository) CreateBatch(ctx context.Context, attachments []*entity.Attachment) error {
+	if len(attachments) == 0 {
+		return nil
+	}
+	db := r.getDB(ctx)
+	if err := db.Create(&attachments).Error; err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+	return nil
+}
+
 func (r *attachmentRepository) FindByID(ctx context.Context, id int64) (*entity.Attachment, error) {
 	var attachment entity.Attachment
 	db := r.getDB(ctx)
@@ -44,6 +55,19 @@ func (r *attachmentRepository) FindByID(ctx context.Context, id int64) (*entity.
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 	return &attachment, nil
+}
+
+func (r *attachmentRepository) FindByIDs(ctx context.Context, ids []int64) ([]*entity.Attachment, error) {
+	if len(ids) == 0 {
+		return []*entity.Attachment{}, nil
+	}
+	var attachments []*entity.Attachment
+	db := r.getDB(ctx)
+
+	if err := db.Where("id IN (?)", ids).Find(&attachments).Error; err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return attachments, nil
 }
 
 func (r *attachmentRepository) FindByObjectKey(ctx context.Context, objectKey string) (*entity.Attachment, error) {
@@ -186,6 +210,17 @@ func (r *attachmentRepository) Update(ctx context.Context, attachment *entity.At
 	return nil
 }
 
+func (r *attachmentRepository) UpdateBatch(ctx context.Context, ids []int64, updates map[string]any) error {
+	if len(ids) == 0 || len(updates) == 0 {
+		return nil
+	}
+	db := r.getDB(ctx)
+	if err := db.Model(&entity.Attachment{}).Where("id IN (?)", ids).Updates(updates).Error; err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+	return nil
+}
+
 func (r *attachmentRepository) DeleteByID(ctx context.Context, id int64) error {
 	db := r.getDB(ctx)
 	res := db.Where("id = ?", id).Delete(&entity.Attachment{})
@@ -198,6 +233,18 @@ func (r *attachmentRepository) DeleteByID(ctx context.Context, id int64) error {
 	return nil
 }
 
+func (r *attachmentRepository) DeleteByIDs(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db := r.getDB(ctx)
+	res := db.Where("id IN (?)", ids).Delete(&entity.Attachment{})
+	if res.Error != nil {
+		return exception.Wrap(exception.ErrInternal, res.Error)
+	}
+	return nil
+}
+
 func (r *attachmentRepository) HardDeleteByID(ctx context.Context, id int64) error {
 	db := r.getDB(ctx)
 	res := db.Unscoped().Where("id = ?", id).Delete(&entity.Attachment{})
@@ -206,6 +253,18 @@ func (r *attachmentRepository) HardDeleteByID(ctx context.Context, id int64) err
 	}
 	if res.RowsAffected == 0 {
 		return exception.ErrAttachmentNotFound
+	}
+	return nil
+}
+
+func (r *attachmentRepository) HardDeleteByIDs(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db := r.getDB(ctx)
+	res := db.Unscoped().Where("id IN (?)", ids).Delete(&entity.Attachment{})
+	if res.Error != nil {
+		return exception.Wrap(exception.ErrInternal, res.Error)
 	}
 	return nil
 }

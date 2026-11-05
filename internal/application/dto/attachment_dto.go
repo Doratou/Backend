@@ -15,6 +15,20 @@ type UploadAttachmentRequest struct {
 	IsPublic  *bool               `form:"is_public"`
 }
 
+// BatchUploadItemFailure records an individual failed file in a batch upload.
+type BatchUploadItemFailure struct {
+	Filename string `json:"filename"`
+	Error    string `json:"error"`
+}
+
+// BatchUploadResponse returns both successful items and any failed items.
+type BatchUploadResponse struct {
+	SuccessCount int                      `json:"success_count"`
+	FailureCount int                      `json:"failure_count"`
+	Items        []*AttachmentResponse    `json:"items"`
+	Failures     []BatchUploadItemFailure `json:"failures,omitempty"`
+}
+
 // PresignedUploadRequest requests a direct PUT upload URL for client-side uploads.
 type PresignedUploadRequest struct {
 	Filename      string              `json:"filename" binding:"required"`
@@ -33,6 +47,35 @@ type PresignedUploadResponse struct {
 	ExpiresInSeconds int64  `json:"expires_in_seconds"`
 }
 
+// BatchPresignedUploadItemRequest is one item in a batch presigned URL request.
+type BatchPresignedUploadItemRequest struct {
+	Filename      string              `json:"filename" binding:"required"`
+	Type          enum.AttachmentType `json:"type" binding:"required"`
+	FileSizeBytes int64               `json:"file_size_bytes" binding:"required,gt=0"`
+	MimeType      string              `json:"mime_type" binding:"required"`
+	GroupID       *int64              `json:"group_id"`
+	ExpenseID     *int64              `json:"expense_id"`
+	IsPublic      *bool               `json:"is_public"`
+}
+
+// BatchPresignedUploadRequest encapsulates multiple presigned upload URL requests.
+type BatchPresignedUploadRequest struct {
+	Items []BatchPresignedUploadItemRequest `json:"items" binding:"required,min=1,max=50,dive"`
+}
+
+// BatchPresignedUploadItemResponse is one generated upload URL item.
+type BatchPresignedUploadItemResponse struct {
+	Filename         string `json:"filename"`
+	UploadURL        string `json:"upload_url"`
+	ObjectKey        string `json:"object_key"`
+	ExpiresInSeconds int64  `json:"expires_in_seconds"`
+}
+
+// BatchPresignedUploadResponse holds all generated direct upload URLs.
+type BatchPresignedUploadResponse struct {
+	Items []BatchPresignedUploadItemResponse `json:"items"`
+}
+
 // ConfirmPresignedUploadRequest is called after a client completes direct upload to storage.
 type ConfirmPresignedUploadRequest struct {
 	ObjectKey        string              `json:"object_key" binding:"required"`
@@ -43,6 +86,21 @@ type ConfirmPresignedUploadRequest struct {
 	IsPublic         *bool               `json:"is_public"`
 }
 
+// BatchConfirmUploadItemRequest is one item in a batch confirm request.
+type BatchConfirmUploadItemRequest struct {
+	ObjectKey        string              `json:"object_key" binding:"required"`
+	OriginalFilename string              `json:"original_filename" binding:"required"`
+	Type             enum.AttachmentType `json:"type" binding:"required"`
+	GroupID          *int64              `json:"group_id"`
+	ExpenseID        *int64              `json:"expense_id"`
+	IsPublic         *bool               `json:"is_public"`
+}
+
+// BatchConfirmUploadRequest encapsulates multiple files to confirm at once.
+type BatchConfirmUploadRequest struct {
+	Items []BatchConfirmUploadItemRequest `json:"items" binding:"required,min=1,max=50,dive"`
+}
+
 // UpdateAttachmentRequest modifies an attachment's metadata.
 type UpdateAttachmentRequest struct {
 	OriginalFilename *string              `json:"original_filename" binding:"omitempty,min=1,max=255"`
@@ -50,6 +108,43 @@ type UpdateAttachmentRequest struct {
 	ExpenseID        *int64               `json:"expense_id"`
 	Type             *enum.AttachmentType `json:"type"`
 	IsPublic         *bool                `json:"is_public"`
+}
+
+// BatchUpdateAttachmentRequest applies bulk updates to multiple attachment records.
+type BatchUpdateAttachmentRequest struct {
+	IDs              []int64              `json:"ids" binding:"required,min=1,max=100"`
+	OriginalFilename *string              `json:"original_filename"`
+	GroupID          *int64               `json:"group_id"`
+	ExpenseID        *int64               `json:"expense_id"`
+	Type             *enum.AttachmentType `json:"type"`
+	IsPublic         *bool                `json:"is_public"`
+}
+
+// BatchDeleteRequest specifies a list of IDs to delete.
+type BatchDeleteRequest struct {
+	IDs []int64 `json:"ids" binding:"required,min=1,max=100"`
+}
+
+// BatchGetURLsRequest requests active download URLs for multiple IDs.
+type BatchGetURLsRequest struct {
+	IDs []int64 `json:"ids" binding:"required,min=1,max=100"`
+}
+
+// BatchURLItem is a pair of attachment ID and its generated URL.
+type BatchURLItem struct {
+	ID        int64  `json:"id"`
+	AccessURL string `json:"access_url"`
+}
+
+// BatchURLsResponse returns access URLs for requested attachment IDs.
+type BatchURLsResponse struct {
+	Items []BatchURLItem `json:"items"`
+}
+
+// BatchDownloadZipRequest requests an on-the-fly zip stream of specified attachments.
+type BatchDownloadZipRequest struct {
+	IDs         []int64 `json:"ids" binding:"required,min=1,max=50"`
+	ArchiveName string  `json:"archive_name"`
 }
 
 // AttachmentFilterRequest contains query parameters for filtering attachments.
