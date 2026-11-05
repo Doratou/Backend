@@ -1,0 +1,118 @@
+meta {
+  name: 03. Get Poll
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{pollGroupId}}/polls/{{pollId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Poll
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/polls/:pollID`
+  **Auth:** Required
+
+  ## Description
+
+  Returns the poll, its non-deleted options in ID order, counts for every option, total_votes and my_option_id. Results are visible immediately, including before the viewer votes and after the poll closes. Options with no votes have vote_count=0; my_option_id is null when the current member has no active vote.
+
+  PUBLIC and PRIVATE detail responses both contain aggregate results and only the current member's own choice. To see other voters in a PUBLIC poll, use List Poll Voters. No voter identities are included here. Inactive groups remain readable with is_frozen=true. A poll from another group cannot be accessed by changing pollId alone.
+
+  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; Bruno variable `pollGroupId` |
+  | `pollID` | `integer` | Yes | Positive BIGINT poll ID in this group; Bruno variable `pollId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 701,
+      "group_id": 10,
+      "created_by_member_id": 30,
+      "question": "Which day works best?",
+      "visibility": "PUBLIC",
+      "status": "ACTIVE",
+      "is_frozen": false,
+      "closed_at": null,
+      "created_at": "2026-11-05T10:00:00Z",
+      "updated_at": "2026-11-05T10:00:00Z",
+      "options": [
+        {
+          "id": 801,
+          "title": "Friday",
+          "vote_count": 1
+        },
+        {
+          "id": 802,
+          "title": "Saturday",
+          "vote_count": 1
+        }
+      ],
+      "total_votes": 2,
+      "my_option_id": 801
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the same envelope as the existing Auth and Friendships endpoints. Internal causes are not exposed.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, JSON payload, required field, value type, filter or pagination. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, malformed, not an access token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 403 | `POLL_FORBIDDEN` | `only active group members can access this poll` | The user has no active membership in this group or has left it. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 404 | `POLL_NOT_FOUND` | `poll not found` | The poll does not exist, is soft-deleted, or belongs to another group. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
+
+  **Example: 400**
+
+  ```json
+  {
+    "success": false,
+    "code": "BAD_REQUEST",
+    "error": "bad request payload or parameters"
+  }
+  ```
+}

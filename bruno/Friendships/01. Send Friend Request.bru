@@ -24,13 +24,6 @@ body:json {
   }
 }
 
-script:post-response {
-  const body = res.getBody();
-  if (body?.success && body?.data?.id) {
-    bru.setVar("friendRequestId", body.data.id);
-  }
-}
-
 docs {
   # Send Friend Request
 
@@ -42,7 +35,7 @@ docs {
 
   Creates a PENDING friend request from the authenticated user to another ACTIVE user. The requester is determined from the access token. The request body requires `receiver_user_id`, a positive JSON integer in the BIGINT range.
 
-  In this Bruno request, set `receiver_user_id` in the selected environment or collection variables to the other user's actual ID. The body uses `{{receiver_user_id}}` without quotation marks so the resolved value is a JSON number. Log in through Auth to populate `token`. A successful response saves `friendRequestId` as a runtime variable for the request action endpoints. Runtime variables belong to this Bruno collection session and are not shared with Postman. Logging in as another user replaces `token` while the saved request ID remains available.
+  In this Bruno request, set `receiver_user_id` manually in the selected Local environment to the other user's actual ID. The body uses `{{receiver_user_id}}` without quotation marks so the resolved value is a JSON number. Log in through Auth to populate `token`. After a successful response, copy `data.id` into `friendRequestId` in the Local environment and save it before using the request action endpoints. No response automatically changes friendship identifiers. Logging in as another user replaces `token` while your manually configured IDs remain unchanged. Bruno environment values are independent of Postman.
 
   Each unordered pair of users has one database record. An allowed resend reuses the same record and ID, updates the sender and recipient to the new direction, sets the latest request time, clears `responded_at` and `deleted_at`, and restores PENDING. The response field `created_at` represents this latest request time, backed by `requested_at` in the database. Both the first send and an allowed resend return `201 Created`.
 

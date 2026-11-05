@@ -18,13 +18,6 @@ auth:bearer {
   token: {{token}}
 }
 
-script:post-response {
-  const body = res.getBody();
-  if (body?.success && body?.data?.id) {
-    bru.setVar("friendshipId", body.data.id);
-  }
-}
-
 docs {
   # Accept Friend Request
 
@@ -36,7 +29,7 @@ docs {
 
   Accepts a PENDING friend request. Only the current recipient may perform this action. The status becomes ACCEPTED, `responded_at` is set to the acceptance time, and the relationship appears in both users' friend lists.
 
-  Log in as the recipient before sending this request. `friendRequestId` is saved by Send Friend Request; for an existing request, copy the selected Incoming Friend Requests item's `id` into the URL or set the variable manually. A successful acceptance saves `friendshipId` for Remove Friend.
+  Log in as the recipient before sending this request. Set `friendRequestId` manually in the Local environment to `data.id` from Send Friend Request or the selected Incoming Friend Requests item's `id`, then save the environment. After a successful acceptance, set `friendshipId` manually to the returned `data.id` before using Remove Friend. This request does not automatically change either identifier.
 
   This action is an alternative to Reject or Cancel. Repeating Accept as the recipient after acceptance returns `409 FRIENDSHIP_INVALID_STATUS`.
 
