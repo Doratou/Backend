@@ -73,15 +73,19 @@ var (
 	ErrDomainGroupOwnerCannotLeave        = errors.New("group owner must transfer ownership before leaving")
 	ErrDomainGroupOwnerCannotBeRemoved    = errors.New("group owner cannot be removed")
 	ErrDomainGroupTransferTargetNotMember = errors.New("new group owner must be an active member")
-	ErrDomainInviteNotFound               = errors.New("group invite not found")
-	ErrDomainInviteExpired                = errors.New("group invite has expired")
-	ErrDomainInviteRevoked                = errors.New("group invite has been deactivated")
-	ErrDomainInviteUsesExhausted          = errors.New("group invite has reached its usage limit")
-	ErrDomainInvitePasswordInvalid        = errors.New("group invite password is invalid")
 	ErrDomainAlreadyGroupMember           = errors.New("user is already an active group member")
 	ErrDomainGroupInactive                = errors.New("group is inactive")
-	ErrDomainGroupActiveInviteExists      = errors.New("group already has an active invitation link")
 	ErrDomainGroupMustBeInactiveToClone   = errors.New("only inactive groups can be cloned")
+
+	ErrDomainInviteNotFound          = errors.New("group invite not found")
+	ErrDomainInviteExpired           = errors.New("group invite has expired")
+	ErrDomainInviteRevoked           = errors.New("group invite has been deactivated")
+	ErrDomainInviteUsesExhausted     = errors.New("group invite has reached its usage limit")
+	ErrDomainInvitePasswordInvalid   = errors.New("group invite password is invalid")
+	ErrDomainGroupActiveInviteExists = errors.New("group already has an active invitation link")
+	ErrDomainDirectInvitePending     = errors.New("a direct group invitation is already pending")
+	ErrDomainDirectInviteCooldown    = errors.New("direct group invitation cooldown is active")
+	ErrDomainDirectInviteNotPending  = errors.New("direct group invitation is no longer pending")
 
 	ErrDomainCaptchaNotFound = errors.New("captcha not found or expired")
 	ErrDomainCaptchaInvalid  = errors.New("captcha code is invalid")
@@ -146,22 +150,32 @@ var (
 	ErrGroupInvalidPagination       = &AppError{Code: "GROUP_INVALID_PAGINATION", Message: "limit must be an integer from 1 to 100 and offset must be a non-negative integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidStatus           = &AppError{Code: "GROUP_INVALID_STATUS", Message: "status must be ACTIVE or INACTIVE", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidTransferOwner    = &AppError{Code: "GROUP_INVALID_TRANSFER_OWNER", Message: "new_owner_id must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrInviteNotFound               = &AppError{Code: "INVITE_NOT_FOUND", Message: "group invite not found", HTTPStatus: http.StatusNotFound, Err: ErrDomainInviteNotFound}
-	ErrInviteExpired                = &AppError{Code: "INVITE_EXPIRED", Message: "group invite has expired", HTTPStatus: http.StatusGone, Err: ErrDomainInviteExpired}
-	ErrInviteRevoked                = &AppError{Code: "INVITE_DEACTIVATED", Message: "group invite has been deactivated", HTTPStatus: http.StatusGone, Err: ErrDomainInviteRevoked}
-	ErrInviteUsesExhausted          = &AppError{Code: "INVITE_USES_EXHAUSTED", Message: "group invite has reached its usage limit", HTTPStatus: http.StatusGone, Err: ErrDomainInviteUsesExhausted}
-	ErrInvitePasswordInvalid        = &AppError{Code: "INVITE_PASSWORD_INVALID", Message: "invite password is incorrect", HTTPStatus: http.StatusUnauthorized, Err: ErrDomainInvitePasswordInvalid}
 	ErrAlreadyGroupMember           = &AppError{Code: "ALREADY_GROUP_MEMBER", Message: "you are already an active member of this group", HTTPStatus: http.StatusConflict, Err: ErrDomainAlreadyGroupMember}
 	ErrGroupInactive                = &AppError{Code: "GROUP_INACTIVE", Message: "group is inactive and cannot accept new members", HTTPStatus: http.StatusConflict, Err: ErrDomainGroupInactive}
-	ErrGroupActiveInviteExists      = &AppError{Code: "GROUP_ACTIVE_INVITE_EXISTS", Message: "this group already has an active invite link; deactivate it or wait until it expires or reaches its usage limit before creating another", HTTPStatus: http.StatusConflict, Err: ErrDomainGroupActiveInviteExists}
 	ErrGroupMustBeInactiveToClone   = &AppError{Code: "GROUP_MUST_BE_INACTIVE_TO_CLONE", Message: "only inactive groups can be cloned", HTTPStatus: http.StatusConflict, Err: ErrDomainGroupMustBeInactiveToClone}
-	ErrInviteInvalidPayload         = &AppError{Code: "INVITE_INVALID_PAYLOAD", Message: "invite data is invalid: provide a password of 8–72 bytes, a future expires_at timestamp, and a positive max_uses value when supplied", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrInviteInvalidID              = &AppError{Code: "INVITE_INVALID_ID", Message: "inviteID must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrInviteInvalidExpiration      = &AppError{Code: "INVITE_INVALID_EXPIRATION", Message: "expires_at must be a future timestamp", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrInviteInvalidMaxUses         = &AppError{Code: "INVITE_INVALID_MAX_USES", Message: "max_uses must be positive and cannot be lower than the invite's current usage count", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrInviteNoFieldsToUpdate       = &AppError{Code: "INVITE_NO_FIELDS_TO_UPDATE", Message: "include expires_at or max_uses in the request body", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrInviteInvalidPasswordFormat  = &AppError{Code: "INVITE_INVALID_PASSWORD_FORMAT", Message: "invite password must be between 8 and 72 bytes", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrInviteJoinPayload            = &AppError{Code: "INVITE_JOIN_PAYLOAD_INVALID", Message: "join request must include the invite password", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+
+	// Invite
+	ErrInviteNotFound              = &AppError{Code: "INVITE_NOT_FOUND", Message: "group invite not found", HTTPStatus: http.StatusNotFound, Err: ErrDomainInviteNotFound}
+	ErrInviteExpired               = &AppError{Code: "INVITE_EXPIRED", Message: "group invite has expired", HTTPStatus: http.StatusGone, Err: ErrDomainInviteExpired}
+	ErrInviteRevoked               = &AppError{Code: "INVITE_DEACTIVATED", Message: "group invite has been deactivated", HTTPStatus: http.StatusGone, Err: ErrDomainInviteRevoked}
+	ErrInviteUsesExhausted         = &AppError{Code: "INVITE_USES_EXHAUSTED", Message: "group invite has reached its usage limit", HTTPStatus: http.StatusGone, Err: ErrDomainInviteUsesExhausted}
+	ErrInvitePasswordInvalid       = &AppError{Code: "INVITE_PASSWORD_INVALID", Message: "invite password is incorrect", HTTPStatus: http.StatusUnauthorized, Err: ErrDomainInvitePasswordInvalid}
+	ErrGroupActiveInviteExists     = &AppError{Code: "GROUP_ACTIVE_INVITE_EXISTS", Message: "this group already has an active invite link; deactivate it or wait until it expires or reaches its usage limit before creating another", HTTPStatus: http.StatusConflict, Err: ErrDomainGroupActiveInviteExists}
+	ErrInviteInvalidPayload        = &AppError{Code: "INVITE_INVALID_PAYLOAD", Message: "invite data is invalid: provide a password of 8–72 bytes, a future expires_at timestamp, and a positive max_uses value when supplied", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrInviteInvalidID             = &AppError{Code: "INVITE_INVALID_ID", Message: "inviteID must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrInviteInvalidExpiration     = &AppError{Code: "INVITE_INVALID_EXPIRATION", Message: "expires_at must be a future timestamp", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrInviteInvalidMaxUses        = &AppError{Code: "INVITE_INVALID_MAX_USES", Message: "max_uses must be positive and cannot be lower than the invite's current usage count", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrInviteNoFieldsToUpdate      = &AppError{Code: "INVITE_NO_FIELDS_TO_UPDATE", Message: "include expires_at or max_uses in the request body", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrInviteInvalidPasswordFormat = &AppError{Code: "INVITE_INVALID_PASSWORD_FORMAT", Message: "invite password must be between 8 and 72 bytes", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrInviteJoinPayload           = &AppError{Code: "INVITE_JOIN_PAYLOAD_INVALID", Message: "join request must include the invite password", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrDirectInvitePending         = &AppError{Code: "DIRECT_INVITE_PENDING", Message: "a direct group invitation is already pending", HTTPStatus: http.StatusConflict, Err: ErrDomainDirectInvitePending}
+	ErrDirectInviteCooldown        = &AppError{Code: "DIRECT_INVITE_COOLDOWN", Message: "you cannot invite this friend again yet", HTTPStatus: http.StatusTooManyRequests, Err: ErrDomainDirectInviteCooldown}
+	ErrDirectInviteNotPending      = &AppError{Code: "DIRECT_INVITE_NOT_PENDING", Message: "this invitation has already been answered", HTTPStatus: http.StatusConflict, Err: ErrDomainDirectInviteNotPending}
+	ErrDirectInviteForbidden       = &AppError{Code: "DIRECT_INVITE_FORBIDDEN", Message: "only the group owner may send direct invitations", HTTPStatus: http.StatusForbidden, Err: ErrDomainGroupOwnerRequired}
+	ErrDirectInviteNotFound        = &AppError{Code: "DIRECT_INVITE_NOT_FOUND", Message: "direct group invitation not found", HTTPStatus: http.StatusNotFound, Err: ErrDomainInviteNotFound}
+	ErrDirectInviteNotFriend       = &AppError{Code: "DIRECT_INVITE_NOT_FRIEND", Message: "recipient must be your friend", HTTPStatus: http.StatusForbidden, Err: ErrDomainFriendshipForbidden}
+	ErrDirectInviteInvalidPayload  = &AppError{Code: "DIRECT_INVITE_INVALID_PAYLOAD", Message: "group_id and one or more positive user_ids are required", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrDirectInviteInvalidResponse = &AppError{Code: "DIRECT_INVITE_INVALID_RESPONSE", Message: "response must be ACCEPTED or REJECTED", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 )
 
 var (

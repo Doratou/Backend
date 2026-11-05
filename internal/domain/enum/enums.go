@@ -35,6 +35,14 @@ const (
 	GroupMemberRoleMember GroupMemberRole = "MEMBER"
 )
 
+type DirectInviteStatus string
+
+const (
+	DirectInviteStatusPending  DirectInviteStatus = "PENDING"
+	DirectInviteStatusAccepted DirectInviteStatus = "ACCEPTED"
+	DirectInviteStatusRejected DirectInviteStatus = "REJECTED"
+)
+
 type AttachmentType string
 
 const (

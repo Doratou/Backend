@@ -21,11 +21,5 @@ func RegisterGroupRoutes(rg *gin.RouterGroup, groupHandler *handler.GroupHandler
 		groups.DELETE("/:groupID/members/:memberID", authMiddleware, groupHandler.RemoveMember)
 		groups.DELETE("/:groupID/leave", authMiddleware, groupHandler.LeaveGroup)
 		groups.POST("/:groupID/transfer-ownership", authMiddleware, groupHandler.TransferOwnership)
-		groups.POST("/:groupID/invites", authMiddleware, groupHandler.CreateInvite)
-		groups.GET("/:groupID/invites", authMiddleware, groupHandler.ListInvites)
-		groups.DELETE("/:groupID/invites/:inviteID", authMiddleware, groupHandler.DeactivateInvite)
-		groups.PATCH("/:groupID/invites/:inviteID/password", authMiddleware, groupHandler.ChangeInvitePassword)
-		groups.PATCH("/:groupID/invites/:inviteID", authMiddleware, groupHandler.UpdateInvite)
-		groups.POST("/invites/:token/join", authMiddleware, groupHandler.JoinGroupByInvite)
 	}
 }

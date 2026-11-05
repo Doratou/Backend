@@ -16,12 +16,6 @@ type GroupService interface {
 	RemoveMember(ctx context.Context, userID int64, role enum.UserRole, groupID, memberID int64) error
 	LeaveGroup(ctx context.Context, userID, groupID int64) error
 	TransferOwnership(ctx context.Context, userID int64, role enum.UserRole, groupID, newOwnerID int64) error
-	CreateInvite(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.CreateGroupInviteRequest) (*dto.GroupInviteResponse, error)
-	DeactivateInvite(ctx context.Context, userID int64, role enum.UserRole, groupID, inviteID int64) error
-	ChangeInvitePassword(ctx context.Context, userID int64, role enum.UserRole, groupID, inviteID int64, password string) error
-	UpdateInvite(ctx context.Context, userID int64, role enum.UserRole, groupID, inviteID int64, req dto.UpdateGroupInviteRequest) (*dto.GroupInviteResponse, error)
-	JoinGroupByInvite(ctx context.Context, userID int64, token, password string) (*dto.GroupResponse, error)
-	ListInvites(ctx context.Context, userID int64, role enum.UserRole, groupID int64) ([]dto.GroupInviteResponse, error)
 	Update(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.UpdateGroupRequest) (*dto.GroupResponse, error)
 	ChangeCover(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error
 	Archive(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error

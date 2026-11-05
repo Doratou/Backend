@@ -87,6 +87,7 @@ func main() {
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
 	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
+	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
 	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
@@ -160,17 +161,20 @@ func main() {
 		},
 		cfg.Constant,
 	)
-	groupService := service.NewGroupService(groupRepo, passwordHasher, cfg.Environment.Invite.SecretKey)
+	groupService := service.NewGroupService(groupRepo)
+	inviteService := service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
 
 	// 7. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
 	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
+	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
 		AuthHandler:       authHandler,
 		CaptchaHandler:    captchaHandler,
 		GroupHandler:      groupHandler,
+		InviteHandler:     inviteHandler,
 		FriendshipHandler: friendshipHandler,
 		CaptchaService:    captchaService,
 		CaptchaEnabled:    cfg.Environment.Captcha.Enabled,

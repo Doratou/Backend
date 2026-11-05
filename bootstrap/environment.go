@@ -84,7 +84,8 @@ type HttpServer struct {
 }
 
 type InvitationConfig struct {
-	SecretKey string `mapstructure:"INVITE_ENCRYPTION_SECRET"`
+	SecretKey                  string        `mapstructure:"INVITE_ENCRYPTION_SECRET"`
+	DirectInviteRejectCooldown time.Duration `mapstructure:"GROUP_DIRECT_INVITE_REJECT_COOLDOWN"`
 }
 
 func NewEnvironment() (*Environment, error) {
