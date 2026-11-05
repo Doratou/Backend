@@ -1,0 +1,82 @@
+meta {
+  name: 11. Batch Upload Attachments (Protected)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/batch/upload
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  files: @file()
+  type: GALLERY_IMAGE
+  is_public: true
+}
+
+docs {
+  # Batch Upload Attachments (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/batch/upload`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Uploads multiple files concurrently in a single multipart HTTP request. The backend validates each file independently (MIME sniffing and size limits), hashes the content, extracts dimensions for images, and persists metadata. Adopts the **Partial Success Pattern**: if one file is invalid, valid files are still saved successfully and failures are reported in the response.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `multipart/form-data` |
+
+  ### Form Data
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `files` | `file[]` | Yes | Multiple binary media files |
+  | `type` | `string` | No | Default attachment type (e.g. `GALLERY_IMAGE`) |
+  | `group_id` | `int64` | No | Associated squad/group ID |
+  | `expense_id` | `int64` | No | Associated expense ID |
+  | `is_public` | `boolean` | No | Public accessibility override |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "success_count": 2,
+      "failure_count": 0,
+      "items": [
+        {
+          "id": 10,
+          "original_filename": "photo1.jpg",
+          "object_key": "attachments/gallery_image/2026/11/abc1_photo1.jpg",
+          "mime_type": "image/jpeg",
+          "file_size_bytes": 1048576,
+          "is_public": true,
+          "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/gallery_image/2026/11/abc1_photo1.jpg"
+        }
+      ],
+      "failures": []
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — No files provided or malformed multipart form
+  * `401 Unauthorized` — Missing or invalid token
+}

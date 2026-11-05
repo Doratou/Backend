@@ -1,0 +1,83 @@
+meta {
+  name: 12. Batch Presigned Upload URLs (Protected)
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/batch/presigned-upload
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "filename": "gallery_1.jpg",
+        "type": "GALLERY_IMAGE",
+        "file_size_bytes": 1048576,
+        "mime_type": "image/jpeg",
+        "is_public": true
+      },
+      {
+        "filename": "gallery_2.jpg",
+        "type": "GALLERY_IMAGE",
+        "file_size_bytes": 2097152,
+        "mime_type": "image/jpeg",
+        "is_public": true
+      }
+    ]
+  }
+}
+
+docs {
+  # Batch Presigned Upload URLs (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/batch/presigned-upload`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Generates a list of temporary presigned PUT URLs enabling clients to upload multiple files directly and concurrently to RustFS / S3 storage.
+
+  ## Request
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `items` | `array` | Yes | List of files to get presigned upload URLs for (1 to 50 items) |
+  | `items[].filename` | `string` | Yes | File name |
+  | `items[].type` | `string` | Yes | Attachment type |
+  | `items[].file_size_bytes` | `int64` | Yes | File size |
+  | `items[].mime_type` | `string` | Yes | MIME type |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "filename": "gallery_1.jpg",
+          "upload_url": "http://127.0.0.1:9000/doratou-storage/attachments/gallery_image/2026/11/abc1_gallery_1.jpg?...",
+          "object_key": "attachments/gallery_image/2026/11/abc1_gallery_1.jpg",
+          "expires_in_seconds": 900
+        }
+      ]
+    }
+  }
+  ```
+}

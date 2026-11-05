@@ -17,13 +17,36 @@ func RegisterAttachmentRoutes(
 
 	attachments := rg.Group("/attachments")
 	{
-		// Public read & access endpoints
+		// 1. Batch / Bulk routes (Registered first to avoid :id collisions)
+		batch := attachments.Group("/batch")
+		{
+			// Public batch read/download endpoints
+			batch.POST("/urls", attachmentHandler.GetBatchURLs)
+			batch.POST("/download", attachmentHandler.DownloadZipStream)
+
+			// Protected batch endpoints
+			if authMiddleware != nil {
+				batch.POST("/upload", authMiddleware, attachmentHandler.UploadBatch)
+				batch.POST("/presigned-upload", authMiddleware, attachmentHandler.CreatePresignedUploadBatch)
+				batch.POST("/confirm-upload", authMiddleware, attachmentHandler.ConfirmPresignedUploadBatch)
+				batch.PATCH("", authMiddleware, attachmentHandler.UpdateBatch)
+				batch.DELETE("", authMiddleware, attachmentHandler.DeleteBatch)
+			} else {
+				batch.POST("/upload", attachmentHandler.UploadBatch)
+				batch.POST("/presigned-upload", attachmentHandler.CreatePresignedUploadBatch)
+				batch.POST("/confirm-upload", attachmentHandler.ConfirmPresignedUploadBatch)
+				batch.PATCH("", attachmentHandler.UpdateBatch)
+				batch.DELETE("", attachmentHandler.DeleteBatch)
+			}
+		}
+
+		// 2. Single-item endpoints
 		attachments.GET("", attachmentHandler.List)
 		attachments.GET("/:id", attachmentHandler.GetByID)
 		attachments.GET("/:id/url", attachmentHandler.GetURL)
 		attachments.GET("/:id/download", attachmentHandler.DownloadStream)
 
-		// Protected endpoints (require valid access token)
+		// Protected single-item endpoints (require valid access token)
 		if authMiddleware != nil {
 			attachments.POST("/upload", authMiddleware, attachmentHandler.Upload)
 			attachments.POST("/presigned-upload", authMiddleware, attachmentHandler.CreatePresignedUpload)

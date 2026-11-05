@@ -5,10 +5,12 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
+	"github.com/Doratou/Backend/internal/domain/enum"
 	"github.com/Doratou/Backend/internal/domain/exception"
 	"github.com/Doratou/Backend/internal/domain/tokencontext"
 	"github.com/gin-gonic/gin"
@@ -234,5 +236,207 @@ func (h *AttachmentHandler) Delete(c *gin.Context) {
 
 	success(c, http.StatusOK, gin.H{
 		"message": "attachment deleted successfully",
+	})
+}
+
+// --- Batch / Bulk Handlers ---
+
+// UploadBatch handles POST /api/v1/attachments/batch/upload (Protected)
+func (h *AttachmentHandler) UploadBatch(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, fmt.Errorf("invalid multipart form: %w", err)))
+		return
+	}
+
+	files := form.File["files"]
+	if len(files) == 0 {
+		files = form.File["file"]
+	}
+	if len(files) == 0 {
+		fail(c, exception.Wrap(exception.ErrBadRequest, fmt.Errorf("at least one file in 'files' or 'file' is required")))
+		return
+	}
+
+	typeStr := c.PostForm("type")
+	if typeStr == "" {
+		typeStr = string(enum.AttachmentTypeGalleryImage)
+	}
+	attType := enum.AttachmentType(typeStr)
+
+	var groupID, expenseID *int64
+	if gStr := c.PostForm("group_id"); gStr != "" {
+		if gid, err := strconv.ParseInt(gStr, 10, 64); err == nil {
+			groupID = &gid
+		}
+	}
+	if eStr := c.PostForm("expense_id"); eStr != "" {
+		if eid, err := strconv.ParseInt(eStr, 10, 64); err == nil {
+			expenseID = &eid
+		}
+	}
+
+	var isPublic *bool
+	if pStr := c.PostForm("is_public"); pStr != "" {
+		pVal := strings.EqualFold(pStr, "true") || pStr == "1"
+		isPublic = &pVal
+	}
+
+	res, err := h.attachmentService.UploadBatch(c.Request.Context(), userID, files, attType, groupID, expenseID, isPublic)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusCreated, res)
+}
+
+// CreatePresignedUploadBatch handles POST /api/v1/attachments/batch/presigned-upload (Protected)
+func (h *AttachmentHandler) CreatePresignedUploadBatch(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
+	var req dto.BatchPresignedUploadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	res, err := h.attachmentService.CreatePresignedUploadBatch(c.Request.Context(), userID, req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}
+
+// ConfirmPresignedUploadBatch handles POST /api/v1/attachments/batch/confirm-upload (Protected)
+func (h *AttachmentHandler) ConfirmPresignedUploadBatch(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
+	var req dto.BatchConfirmUploadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	res, err := h.attachmentService.ConfirmPresignedUploadBatch(c.Request.Context(), userID, req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusCreated, res)
+}
+
+// GetBatchURLs handles POST /api/v1/attachments/batch/urls
+func (h *AttachmentHandler) GetBatchURLs(c *gin.Context) {
+	var req dto.BatchGetURLsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	var expiry time.Duration
+	if expiryStr := c.Query("expiry"); expiryStr != "" {
+		if d, err := time.ParseDuration(expiryStr); err == nil && d > 0 {
+			expiry = d
+		}
+	}
+
+	res, err := h.attachmentService.GetBatchURLs(c.Request.Context(), req.IDs, expiry)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}
+
+// DownloadZipStream handles POST /api/v1/attachments/batch/download
+func (h *AttachmentHandler) DownloadZipStream(c *gin.Context) {
+	var req dto.BatchDownloadZipRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	archiveName := req.ArchiveName
+	if archiveName == "" {
+		archiveName = "attachments_archive.zip"
+	}
+	if !strings.HasSuffix(strings.ToLower(archiveName), ".zip") {
+		archiveName += ".zip"
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", archiveName))
+	c.Header("Content-Type", "application/zip")
+
+	if err := h.attachmentService.DownloadZipStream(c.Request.Context(), req.IDs, c.Writer); err != nil {
+		// Response streaming may already have started; log if unable to write header
+		return
+	}
+}
+
+// UpdateBatch handles PATCH /api/v1/attachments/batch (Protected)
+func (h *AttachmentHandler) UpdateBatch(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
+	var req dto.BatchUpdateAttachmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	if err := h.attachmentService.UpdateBatch(c.Request.Context(), userID, req); err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, gin.H{
+		"message": "attachments updated successfully",
+	})
+}
+
+// DeleteBatch handles DELETE /api/v1/attachments/batch (Protected)
+func (h *AttachmentHandler) DeleteBatch(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
+	var req dto.BatchDeleteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	hardDelete := c.Query("hard") == "true"
+	if err := h.attachmentService.DeleteBatch(c.Request.Context(), userID, req.IDs, hardDelete); err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, gin.H{
+		"message": "attachments deleted successfully",
 	})
 }

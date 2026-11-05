@@ -1,0 +1,48 @@
+meta {
+  name: 15. Batch Download ZIP Stream
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/batch/download
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ids": [1, 2],
+    "archive_name": "squad_gallery.zip"
+  }
+}
+
+docs {
+  # Batch Download ZIP Stream
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/batch/download`
+  **Auth:** None (Public)
+
+  ## Description
+
+  Streams a compressed `.zip` archive on the fly containing all requested attachments. The server streams files directly from RustFS into the zip stream without accumulating the whole archive in server RAM.
+
+  ## Request
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `ids` | `int64[]` | Yes | List of attachment IDs to package into ZIP |
+  | `archive_name` | `string` | No | Custom zip file name (default: `attachments_archive.zip`) |
+
+  ## Response
+
+  **`200 OK`**
+  Binary zip archive stream (`Content-Type: application/zip`).
+}
