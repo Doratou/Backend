@@ -147,7 +147,7 @@ var (
 	ErrGroupNoFieldsToUpdate        = &AppError{Code: "GROUP_NO_FIELDS_TO_UPDATE", Message: "include title or description in the request body", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidID               = &AppError{Code: "GROUP_INVALID_ID", Message: "groupID must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidMemberID         = &AppError{Code: "GROUP_INVALID_MEMBER_ID", Message: "memberID must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrGroupInvalidPagination       = &AppError{Code: "GROUP_INVALID_PAGINATION", Message: "limit must be an integer from 1 to 100 and offset must be a non-negative integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrGroupInvalidPagination       = &AppError{Code: "GROUP_INVALID_PAGINATION", Message: "page must be a positive integer and limit must be an integer from 1 to 100", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidStatus           = &AppError{Code: "GROUP_INVALID_STATUS", Message: "status must be ACTIVE or INACTIVE", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidTransferOwner    = &AppError{Code: "GROUP_INVALID_TRANSFER_OWNER", Message: "new_owner_id must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrAlreadyGroupMember           = &AppError{Code: "ALREADY_GROUP_MEMBER", Message: "you are already an active member of this group", HTTPStatus: http.StatusConflict, Err: ErrDomainAlreadyGroupMember}
