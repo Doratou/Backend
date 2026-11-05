@@ -17,6 +17,7 @@ type Dependencies struct {
 	CaptchaHandler    *handler.CaptchaHandler
 	FriendshipHandler *handler.FriendshipHandler
 	GroupHandler      *handler.GroupHandler
+	PollHandler       *handler.PollHandler
 	CaptchaService    adapter.CaptchaService
 	CaptchaEnabled    bool
 	TokenMaker        jwt.TokenMaker
@@ -51,6 +52,9 @@ func New(deps Dependencies) *gin.Engine {
 		RegisterFriendshipRoutes(v1, deps.FriendshipHandler, authMiddleware)
 	}
 	RegisterGroupRoutes(v1, deps.GroupHandler, authMiddleware)
+	if deps.PollHandler != nil {
+		RegisterPollRoutes(v1, deps.PollHandler, authMiddleware)
+	}
 
 	return engine
 }

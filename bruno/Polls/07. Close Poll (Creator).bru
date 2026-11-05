@@ -1,0 +1,102 @@
+meta {
+  name: 07. Close Poll (Creator)
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/groups/{{pollGroupId}}/polls/{{pollId}}/close
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Close Poll (Creator)
+
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/groups/:groupID/polls/:pollID/close`
+  **Auth:** Required
+
+  ## Description
+
+  Closes an ACTIVE poll by setting status=INACTIVE and recording closed_at. Only its creator, while still an active group member with an active account, may close it. The group owner and system administrators have no override unless they are also this poll's creator.
+
+  Closed polls reject adding, changing and withdrawing votes. Results remain readable. Repeating Close as the creator returns POLL_CLOSED. A different member gets POLL_CREATOR_REQUIRED even if the poll is already closed. There is no reopen endpoint.
+
+  The group must be ACTIVE. Leaving the group does not automatically close a creator's polls; a departed creator has no access. If that same membership is later reactivated, creator permissions return.
+
+  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; Bruno variable `pollGroupId` |
+  | `pollID` | `integer` | Yes | Positive BIGINT poll ID in this group; Bruno variable `pollId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 701,
+      "status": "INACTIVE",
+      "closed_at": "2026-11-05T10:15:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the same envelope as the existing Auth and Friendships endpoints. Internal causes are not exposed.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, JSON payload, required field, value type, filter or pagination. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, malformed, not an access token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 403 | `POLL_FORBIDDEN` | `only active group members can access this poll` | The user has no active membership in this group or has left it. |
+  | 403 | `POLL_CREATOR_REQUIRED` | `only the poll creator can perform this action` | The active member is not the poll creator. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 404 | `POLL_NOT_FOUND` | `poll not found` | The poll does not exist, is soft-deleted, or belongs to another group. |
+  | 409 | `POLL_CLOSED` | `poll is closed and cannot accept vote changes` | The poll is already closed. |
+  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is inactive; closing is frozen. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
+
+  **Example: 403**
+
+  ```json
+  {
+    "success": false,
+    "code": "POLL_CREATOR_REQUIRED",
+    "error": "only the poll creator can perform this action"
+  }
+  ```
+}

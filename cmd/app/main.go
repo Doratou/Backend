@@ -87,6 +87,7 @@ func main() {
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
 	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
+	pollRepo := postgresRepo.NewPollRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
 	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
@@ -161,17 +162,20 @@ func main() {
 		cfg.Constant,
 	)
 	groupService := service.NewGroupService(groupRepo, passwordHasher, cfg.Environment.Invite.SecretKey)
+	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
 
 	// 7. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
 	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
+	pollHandler := handler.NewPollHandler(pollService)
 	engine := router.New(router.Dependencies{
 		AuthHandler:       authHandler,
 		CaptchaHandler:    captchaHandler,
 		GroupHandler:      groupHandler,
 		FriendshipHandler: friendshipHandler,
+		PollHandler:       pollHandler,
 		CaptchaService:    captchaService,
 		CaptchaEnabled:    cfg.Environment.Captcha.Enabled,
 		TokenMaker:        jwtMaker,

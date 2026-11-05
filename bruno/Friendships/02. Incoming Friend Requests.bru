@@ -35,7 +35,7 @@ docs {
 
   Lists non-deleted PENDING friend requests received by the authenticated user. Results are ordered by latest request time descending, then ID descending (`requested_at DESC, id DESC`). Accepted, rejected, and soft-deleted records are excluded.
 
-  Use the recipient's token. To accept or reject a selected request, use that item's `id`, not either user's ID. Reading this list does not automatically save `friendRequestId`; copy the selected ID into the action URL or set the variable manually. Send Friend Request saves it only after a successful send in the same Bruno session.
+  Use the recipient's token. To accept or reject a selected request, set `friendRequestId` manually in the Local environment to that item's `id`, not either user's ID, then save the environment. Neither this list nor Send Friend Request automatically changes that variable.
 
   Each item's `created_at` represents the latest request time (`requested_at` in the database), not the original row creation time. An allowed resend updates this timestamp and preserves the relationship ID.
 

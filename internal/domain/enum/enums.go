@@ -59,3 +59,17 @@ const (
 	FriendshipStatusAccepted FriendshipStatus = "ACCEPTED"
 	FriendshipStatusRejected FriendshipStatus = "REJECTED"
 )
+
+type PollStatus string
+
+const (
+	PollStatusActive   PollStatus = "ACTIVE"
+	PollStatusInactive PollStatus = "INACTIVE"
+)
+
+type PollVisibility string
+
+const (
+	PollVisibilityPublic  PollVisibility = "PUBLIC"
+	PollVisibilityPrivate PollVisibility = "PRIVATE"
+)
