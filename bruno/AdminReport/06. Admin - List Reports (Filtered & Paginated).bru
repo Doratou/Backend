@@ -1,0 +1,74 @@
+meta {
+  name: 06. Admin - List Reports (Filtered & Paginated)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/reports?page=1&limit=20&status=PENDING&order_by=created_at&order_desc=true
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+  status: PENDING
+  order_by: created_at
+  order_desc: true
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - List Reports (Filtered & Paginated)
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/admin/reports`
+  **Auth:** Required (Admin Access Token)
+
+  ## Description
+  Retrieves a comprehensive paginated list of reports across the platform with dynamic filtering capabilities for administration.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Query Parameters
+  | Parameter | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Page number (default: `1`) |
+  | `limit` | `integer` | No | Items per page (default: `20`, max `100`) |
+  | `status` | `string` | No | Filter by status (`PENDING`, `UNDER_REVIEW`, `RESOLVED`, `REJECTED`, `DISMISSED`) |
+  | `reason` | `string` | No | Filter by reason (`SPAM`, `HARASSMENT`, etc.) |
+  | `reporter_user_id` | `int64` | No | Filter by reporter user ID |
+  | `reported_user_id` | `int64` | No | Filter by reported user ID |
+  | `reported_group_id` | `int64` | No | Filter by reported group ID |
+  | `search` | `string` | No | Text search across description and response |
+  | `order_by` | `string` | No | Sort column (`created_at`, `id`, `status`, `reason`, `updated_at`) |
+  | `order_desc` | `boolean` | No | Sort order (default: `true`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [],
+      "total": 0,
+      "page": 1,
+      "limit": 20,
+      "total_pages": 0
+    }
+  }
+  ```
+}

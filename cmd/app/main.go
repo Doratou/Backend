@@ -85,6 +85,7 @@ func main() {
 
 	// 4. Repositories
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
+	adminReportRepo := postgresRepo.NewAdminReportRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
 	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
@@ -148,16 +149,24 @@ func main() {
 		cfg.Constant,
 	)
 
+	adminReportService := service.NewAdminReportService(
+		adminReportRepo,
+		userRepo,
+	)
+
 	// 7. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
+	adminReportHandler := handler.NewAdminReportHandler(adminReportService)
+
 	engine := router.New(router.Dependencies{
-		AuthHandler:    authHandler,
-		CaptchaHandler: captchaHandler,
-		CaptchaService: captchaService,
-		CaptchaEnabled: cfg.Environment.Captcha.Enabled,
-		TokenMaker:     jwtMaker,
-		TokenRepo:      tokenRepo,
+		AuthHandler:        authHandler,
+		CaptchaHandler:     captchaHandler,
+		AdminReportHandler: adminReportHandler,
+		CaptchaService:     captchaService,
+		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
+		TokenMaker:         jwtMaker,
+		TokenRepo:          tokenRepo,
 	})
 
 	// 8. HTTP Server Lifecycle & Graceful Shutdown

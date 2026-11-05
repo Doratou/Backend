@@ -1,0 +1,55 @@
+meta {
+  name: 03. Get Report By ID (Protected)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/reports/1
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Report By ID (Protected)
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/reports/:id`
+  **Auth:** Required (User or Admin Access Token)
+
+  ## Description
+  Retrieves a single report by its ID. Users may only view reports they submitted. Admins may view any report.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "reporter_user_id": 1,
+      "reported_user_id": 2,
+      "reason": "HARASSMENT",
+      "description": "User is sending offensive and harassing messages repeatedly.",
+      "status": "PENDING",
+      "created_at": "2026-11-02T19:00:00Z",
+      "updated_at": "2026-11-02T19:00:00Z"
+    }
+  }
+  ```
+}
