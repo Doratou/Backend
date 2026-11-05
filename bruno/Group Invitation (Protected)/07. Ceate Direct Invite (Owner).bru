@@ -1,0 +1,16 @@
+meta {
+  name: 07. Ceate Direct Invite (Owner)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/invites/direct
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  forwardAuthorizationHeader: false
+}

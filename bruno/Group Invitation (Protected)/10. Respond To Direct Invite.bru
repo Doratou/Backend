@@ -1,0 +1,16 @@
+meta {
+  name: 10. Respond To Direct Invite
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/invites/direct/{{inviteId}}/respond
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  forwardAuthorizationHeader: false
+}

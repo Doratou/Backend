@@ -1,11 +1,11 @@
 meta {
-  name: 06. Jooin Group
+  name: 06. Jooin Group With Link
   type: http
   seq: 6
 }
 
 post {
-  url: {{baseUrl}}/api/v1/groups/invites/{{inviteToken}}/join
+  url: {{baseUrl}}/api/v1/invites/links/{{inviteToken}}/join
   body: json
   auth: inherit
 }
