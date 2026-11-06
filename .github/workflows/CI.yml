@@ -112,3 +112,60 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/doratou/migration:latest
             ${{ env.REGISTRY }}/doratou/migration:${{ github.sha }}
+
+  update-gitops:
+    name: Update GitOps Repository
+    runs-on: ubuntu-latest
+
+    needs:
+      - build
+      - build-migration
+
+    if: github.event_name == 'push'
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout DevOps Repository
+        uses: actions/checkout@v4
+        with:
+          repository: Doratou/Devops
+          ref: main
+          token: ${{ secrets.DEVOPS_REPO_TOKEN }}
+          path: devops
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Update Backend and Migration Image Tags
+        working-directory: devops
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          yq -i '
+            .backend.image.tag = strenv(IMAGE_TAG) |
+            .migration.image.tag = strenv(IMAGE_TAG)
+          ' helm/app/values.yaml
+
+      - name: Commit and Push GitOps Changes
+        working-directory: devops
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add helm/app/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "No changes detected."
+            exit 0
+          fi
+
+          git commit -m "chore(gitops): update backend and migration to ${IMAGE_TAG:0:7}"
+
+          git push origin main
