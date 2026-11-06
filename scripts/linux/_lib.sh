@@ -44,12 +44,14 @@ db_container() {
 run_migrate() {
   command -v goose >/dev/null 2>&1 || die "goose is not installed or not in PATH."
   [ -d "$MIGRATIONS_DIR" ] || die "Migrations folder not found: $MIGRATIONS_DIR"
-  local user pass name port url
+  local user pass name host port ssl url
   user="$(env_get PDB_USER admin)"
   pass="$(env_get PDB_PASSWORD admin)"
   name="$(env_get PDB_DB_NAME doratou)"
+  host="$(env_get PDB_HOST 127.0.0.1)"
   port="$(env_get PDB_PORT 5432)"
-  url="postgres://${user}:${pass}@127.0.0.1:${port}/${name}?sslmode=disable"
+  ssl="$(env_get PDB_SSL_MODE disable)"
+  url="postgres://${user}:${pass}@${host}:${port}/${name}?sslmode=${ssl}"
   goose -dir "$MIGRATIONS_DIR" postgres "$url" "$@"
 }
 
