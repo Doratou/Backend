@@ -57,6 +57,9 @@ var (
 	ErrDomainTokenNotFound       = errors.New("token session not found or revoked")
 	ErrDomainMissingToken        = errors.New("missing authorization token")
 	ErrDomainRefreshTokenInvalid = errors.New("invalid or expired refresh token")
+	ErrDomainOAuthStateInvalid   = errors.New("oauth state is invalid or expired")
+	ErrDomainOAuthOnlyAccount    = errors.New("this account uses social login; set a password in profile settings")
+	ErrDomainOAuthEmailUnverified = errors.New("google account email is not verified")
 
 	ErrDomainOTPInvalid           = errors.New("otp code invalid or expired")
 	ErrDomainOTPNotFound          = errors.New("otp code not found or expired")
@@ -135,6 +138,9 @@ var (
 	ErrOTPUnsupportedType    = &AppError{Code: "OTP_UNSUPPORTED_TYPE", Message: "unsupported verification type", HTTPStatus: http.StatusBadRequest, Err: ErrDomainOTPUnsupportedType}
 	ErrEmptyEmailPhone       = &AppError{Code: "EMPTY_PHONE_EMAIL", Message: "at least one of email or phone must be provided", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrUnverifiedCredentials = &AppError{Code: "NOT_VERIFIED_CREDENTIALS", Message: "at least one credential (email or phone) must be verified via OTP", HTTPStatus: http.StatusForbidden, Err: ErrDomainUnverifiedCredential}
+	ErrOAuthStateInvalid     = &AppError{Code: "OAUTH_STATE_INVALID", Message: "oauth state is missing or expired", HTTPStatus: http.StatusBadRequest, Err: ErrDomainOAuthStateInvalid}
+	ErrOAuthOnlyAccount      = &AppError{Code: "OAUTH_ONLY_ACCOUNT", Message: "this account uses social login; set a password in profile settings", HTTPStatus: http.StatusBadRequest, Err: ErrDomainOAuthOnlyAccount}
+	ErrOAuthEmailUnverified  = &AppError{Code: "OAUTH_EMAIL_UNVERIFIED", Message: "google account email is not verified", HTTPStatus: http.StatusForbidden, Err: ErrDomainOAuthEmailUnverified}
 	ErrRateLimitExceeded     = &AppError{Code: "RATE_LIMIT_EXCEEDED", Message: "too many requests, please try again later", HTTPStatus: http.StatusTooManyRequests, Err: ErrDomainRateLimitExceeded}
 
 	// Attachment
