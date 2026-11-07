@@ -15,6 +15,7 @@ import (
 	"github.com/Doratou/Backend/bootstrap"
 	"github.com/Doratou/Backend/internal/application/service"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
+	emailInfra "github.com/Doratou/Backend/internal/infrastructure/email"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	postgresRepo "github.com/Doratou/Backend/internal/infrastructure/repository/postgres"
@@ -115,10 +116,19 @@ func main() {
 		SMTPHost: cfg.Environment.Email.SMTPHost,
 		SMTPPort: cfg.Environment.Email.SMTPPort,
 	})
+	emailRenderer, err := emailInfra.NewOTPEmailRenderer(cfg.Environment.Email.FontBaseURL)
+	if err != nil {
+		log.Fatalf("failed to initialize OTP email template: %v", err)
+	}
+	emailFontFiles, err := emailInfra.OTPEmailFontFiles()
+	if err != nil {
+		log.Fatalf("failed to initialize OTP email fonts: %v", err)
+	}
 	otpService := service.NewOTPService(
 		otpRepo,
 		redisTrxManager,
 		emailSender,
+		emailRenderer,
 		service.OTPServiceConfig{
 			TTL:                  cfg.Environment.OTP.TTL,
 			VerifiedTTL:          cfg.Environment.OTP.VerifiedTTL,
@@ -184,6 +194,7 @@ func main() {
 		CaptchaEnabled:    cfg.Environment.Captcha.Enabled,
 		TokenMaker:        jwtMaker,
 		TokenRepo:         tokenRepo,
+		EmailFontFiles:    emailFontFiles,
 	})
 
 	// 8. HTTP Server Lifecycle & Graceful Shutdown
