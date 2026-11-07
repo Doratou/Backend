@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strconv"
@@ -16,9 +17,17 @@ type EmailConfig struct {
 }
 
 type SendOptions struct {
-	To        []string
-	Subject   string
-	PlainBody string
+	To                []string
+	Subject           string
+	PlainBody         string
+	HTMLBody          string
+	InlineAttachments []InlineAttachment
+}
+
+type InlineAttachment struct {
+	Name      string
+	ContentID string
+	Data      []byte
 }
 
 type Sender interface {
@@ -43,6 +52,14 @@ func (m *mailer) Send(ctx context.Context, opts SendOptions) error {
 	}
 	message.Subject(opts.Subject)
 	message.SetBodyString(mail.TypeTextPlain, opts.PlainBody)
+	if opts.HTMLBody != "" {
+		message.AddAlternativeString(mail.TypeTextHTML, opts.HTMLBody)
+	}
+	for _, attachment := range opts.InlineAttachments {
+		if err := message.EmbedReader(attachment.Name, bytes.NewReader(attachment.Data), mail.WithFileContentID("<"+attachment.ContentID+">")); err != nil {
+			return fmt.Errorf("failed to embed inline email attachment: %w", err)
+		}
+	}
 
 	port, err := strconv.Atoi(m.cfg.SMTPPort)
 	if err != nil {

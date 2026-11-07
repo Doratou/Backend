@@ -31,6 +31,7 @@ type EmailConfig struct {
 	SMTPPort                string `mapstructure:"SMTP_HOST_PORT"`
 	DeliveryEnabled         bool   `mapstructure:"EMAIL_DELIVERY_ENABLED"`
 	DeliveryMode            string `mapstructure:"EMAIL_DELIVERY_MODE"`
+	FontBaseURL             string `mapstructure:"EMAIL_FONT_BASE_URL"`
 }
 
 type CaptchaConfig struct {
