@@ -1,22 +1,19 @@
-.PHONY: up down run stop
+.PHONY: up down run stop migrate-up migrate-down db-reset
 
-RUN_DIR := /tmp/doratou-$(shell id -u)-$(shell pwd | cksum | cut -d' ' -f1)
+# Pick the script folder that matches the OS.
+#   Windows     -> scripts/windows/<target>.ps1
+#   Linux/macOS -> scripts/linux/<target>.sh
+ifeq ($(OS),Windows_NT)
+  SCRIPT_DIR := scripts/windows
+  EXT := ps1
+  RUNNER := powershell -NoProfile -ExecutionPolicy Bypass -File
+else
+  SCRIPT_DIR := scripts/linux
+  EXT := sh
+  RUNNER := bash
+endif
 
-up:
-	docker compose up -d --wait
-
-down:
-	docker compose down
-
-run:
-	@mkdir -p "$(RUN_DIR)"
-	@if [ -f "$(RUN_DIR)/app.pid" ] && kill -0 "$$(cat "$(RUN_DIR)/app.pid")" 2>/dev/null; then echo "Application is already running"; exit 1; fi
-	go build -o "$(RUN_DIR)/app" ./cmd/app
-	@echo $$$$ > "$(RUN_DIR)/app.pid"; exec "$(RUN_DIR)/app"
-
-stop:
-	@if [ -f "$(RUN_DIR)/app.pid" ]; then \
-		pid=$$(cat "$(RUN_DIR)/app.pid"); \
-		if [ "$$(readlink "/proc/$$pid/exe")" = "$$(realpath "$(RUN_DIR)/app")" ]; then kill "$$pid"; fi; \
-		rm -f "$(RUN_DIR)/app.pid"; \
-	fi
+# Each target runs the script with the same name.
+# Examples:  make up | make migrate-down STEPS=2 | make db-reset YES=1
+up down run stop migrate-up migrate-down db-reset fmt:
+	@$(RUNNER) $(SCRIPT_DIR)/$@.$(EXT)

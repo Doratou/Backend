@@ -1,0 +1,48 @@
+meta {
+  name: 05. Cancel My Report (User - Protected)
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/reports/1
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Cancel My Report (Protected)
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/reports/:id`
+  **Auth:** Required (User Access Token)
+
+  ## Description
+  Allows the reporting user to cancel and withdraw their submitted report, provided it is still in `PENDING` status.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "report cancelled successfully"
+    }
+  }
+  ```
+}

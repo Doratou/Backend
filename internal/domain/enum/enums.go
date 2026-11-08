@@ -14,6 +14,35 @@ const (
 	UserStatusInactive UserStatus = "INACTIVE"
 )
 
+type GroupStatus string
+
+const (
+	GroupStatusActive   GroupStatus = "ACTIVE"
+	GroupStatusInactive GroupStatus = "INACTIVE"
+)
+
+type GroupMemberStatus string
+
+const (
+	GroupMemberStatusActive   GroupMemberStatus = "ACTIVE"
+	GroupMemberStatusInactive GroupMemberStatus = "INACTIVE"
+)
+
+type GroupMemberRole string
+
+const (
+	GroupMemberRoleOwner  GroupMemberRole = "OWNER"
+	GroupMemberRoleMember GroupMemberRole = "MEMBER"
+)
+
+type DirectInviteStatus string
+
+const (
+	DirectInviteStatusPending  DirectInviteStatus = "PENDING"
+	DirectInviteStatusAccepted DirectInviteStatus = "ACCEPTED"
+	DirectInviteStatusRejected DirectInviteStatus = "REJECTED"
+)
+
 type AttachmentType string
 
 const (
@@ -30,4 +59,74 @@ type OTPType string
 const (
 	OTPTypeEmail OTPType = "email"
 	OTPTypePhone OTPType = "phone"
+)
+
+type ReportReason string
+
+const (
+	ReportReasonSpam                 ReportReason = "SPAM"
+	ReportReasonHarassment           ReportReason = "HARASSMENT"
+	ReportReasonInappropriateContent ReportReason = "INAPPROPRIATE_CONTENT"
+	ReportReasonFraud                ReportReason = "FRAUD"
+	ReportReasonPrivacyViolation     ReportReason = "PRIVACY_VIOLATION"
+	ReportReasonOther                ReportReason = "OTHER"
+)
+
+func (r ReportReason) IsValid() bool {
+	switch r {
+	case ReportReasonSpam,
+		ReportReasonHarassment,
+		ReportReasonInappropriateContent,
+		ReportReasonFraud,
+		ReportReasonPrivacyViolation,
+		ReportReasonOther:
+		return true
+	default:
+		return false
+	}
+}
+
+type ReportStatus string
+
+const (
+	ReportStatusPending     ReportStatus = "PENDING"
+	ReportStatusUnderReview ReportStatus = "UNDER_REVIEW"
+	ReportStatusResolved    ReportStatus = "RESOLVED"
+	ReportStatusRejected    ReportStatus = "REJECTED"
+	ReportStatusDismissed   ReportStatus = "DISMISSED"
+)
+
+func (s ReportStatus) IsValid() bool {
+	switch s {
+	case ReportStatusPending,
+		ReportStatusUnderReview,
+		ReportStatusResolved,
+		ReportStatusRejected,
+		ReportStatusDismissed:
+		return true
+	default:
+		return false
+	}
+}
+
+type FriendshipStatus string
+
+const (
+	FriendshipStatusPending  FriendshipStatus = "PENDING"
+	FriendshipStatusAccepted FriendshipStatus = "ACCEPTED"
+	FriendshipStatusRejected FriendshipStatus = "REJECTED"
+)
+
+type PollStatus string
+
+const (
+	PollStatusActive   PollStatus = "ACTIVE"
+	PollStatusInactive PollStatus = "INACTIVE"
+)
+
+type PollVisibility string
+
+const (
+	PollVisibilityPublic  PollVisibility = "PUBLIC"
+	PollVisibilityPrivate PollVisibility = "PRIVATE"
 )

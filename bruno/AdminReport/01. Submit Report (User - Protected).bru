@@ -1,0 +1,72 @@
+meta {
+  name: 01. Submit Report (User - Protected)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/reports
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "reported_user_id": 2,
+    "reason": "HARASSMENT",
+    "description": "User is sending offensive and harassing messages repeatedly."
+  }
+}
+
+docs {
+  # Submit Report (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/reports`
+  **Auth:** Required (User Access Token)
+
+  ## Description
+  Submits a moderation report against an offensive user (`reported_user_id`) or an abusive group (`reported_group_id`). At least one of them must be specified.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `reported_user_id` | `int64` | Conditional | User ID to report |
+  | `reported_group_id` | `int64` | Conditional | Group ID to report |
+  | `reason` | `string` | Yes | `SPAM`, `HARASSMENT`, `INAPPROPRIATE_CONTENT`, `FRAUD`, `PRIVACY_VIOLATION`, `OTHER` |
+  | `description` | `string` | Yes | Detailed report explanation (5 - 3000 chars) |
+
+  ## Response
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "reporter_user_id": 1,
+      "reported_user_id": 2,
+      "reason": "HARASSMENT",
+      "description": "User is sending offensive and harassing messages repeatedly.",
+      "status": "PENDING",
+      "created_at": "2026-11-02T19:00:00Z",
+      "updated_at": "2026-11-02T19:00:00Z"
+    }
+  }
+  ```
+}

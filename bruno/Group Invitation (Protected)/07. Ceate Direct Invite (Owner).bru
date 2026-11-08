@@ -1,0 +1,86 @@
+meta {
+  name: 07. Ceate Direct Invite (Owner)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/invites/direct
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "group_id": 1,
+    "user_ids": [2, 3]
+  }
+}
+
+vars:pre-request {
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzOTkzNzAzLCJpYXQiOjE3OTM5MDczMDMsImp0aSI6IjRjYmE4MDRiLTQyZjQtNGZhOS05OTMxLWU4YjBhMDFmN2ZhZiJ9.a27SvHzCkr6ds0yYjZ3KCvhMN4A780vgcDv2v7d4ta4
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Auth
+
+  `POST /api/v1/invites/direct` — Group owner; Bearer access token required.
+
+  ## Description
+
+  Sends a direct invitation to one or more accepted friends. The request is limited to 100 recipient IDs. Each recipient is processed independently, so an unsuccessful recipient appears in the response with its own `error` while the request can still return `200 OK`.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <access-token>` for the group owner. |
+  | `Content-Type` | `string` | Yes | `application/json`. |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `group_id` | `integer` | Yes | Positive ID of an active group owned by the authenticated user. |
+  | `user_ids` | `integer[]` | Yes | 1–100 positive IDs of accepted friends. Duplicate IDs are reported as per-recipient errors. |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {"user_id": 2, "success": true, "invite": {"id": 12, "status": "PENDING", "created_at": "2026-11-06T10:00:00Z"}},
+        {"user_id": 3, "success": false, "error": {"code": "DIRECT_INVITE_NOT_FRIEND", "message": "recipient must be your friend"}}
+      ],
+      "total": 2
+    }
+  }
+  ```
+
+  Per-recipient errors can include `DIRECT_INVITE_SELF`, `DIRECT_INVITE_NOT_FRIEND`, `USER_INACTIVE`, `DIRECT_INVITE_PENDING`, `DIRECT_INVITE_COOLDOWN`, `ALREADY_GROUP_MEMBER`, `DUPLICATE_RECIPIENT`, and `INTERNAL_SERVER_ERROR`.
+
+  ## Errors
+
+  - `400 DIRECT_INVITE_INVALID_PAYLOAD` — `group_id` or `user_ids` is missing, invalid, or has more than 100 entries.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `403 DIRECT_INVITE_FORBIDDEN` — Requester is not the group owner or has a role that cannot send direct invites.
+  - `404 GROUP_NOT_FOUND` — Group does not exist or was deleted.
+  - `409 GROUP_INACTIVE` — Group is inactive.
+  - `500 INTERNAL_SERVER_ERROR` — The group could not be checked or the request could not be processed.
+}

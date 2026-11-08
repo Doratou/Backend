@@ -1,0 +1,90 @@
+meta {
+  name: 09. Get All Groups (Admin)
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/admin?page=1&limit=20
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+vars:pre-request {
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzODE1NTUxLCJpYXQiOjE3OTM3MjkxNTEsImp0aSI6IjM2YmQ3YjRiLWEwYzItNDVkYS1iZTUyLWM0ZGFhZjI1MGJkMyJ9.KmveVQWn-yPCk2GQ8tsjjd6W4LEAUuLw5zuOCKL32yk
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Auth
+
+  `GET /api/v1/groups/admin` — Site admin only; Bearer access token required.
+
+  ## Description
+
+  Returns all non-deleted groups, with optional status filtering and pagination.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <admin-access-token>` |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | 1-based page number; defaults to 1. |
+  | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20. |
+  | `status` | `string` | No | `ACTIVE` or `INACTIVE`. |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 42,
+          "title": "Weekend trip",
+          "created_by_user_id": 7,
+          "status": "ACTIVE",
+          "is_premium": false,
+          "created_at": "2026-11-04T10:00:00Z",
+          "updated_at": "2026-11-04T10:00:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  ## Errors
+
+  - `400 GROUP_INVALID_PAGINATION` — Invalid `page` or `limit` (including page/offset overflow).
+  - `400 GROUP_INVALID_STATUS` — Status is not `ACTIVE` or `INACTIVE`.
+  - `401 MISSING_TOKEN` — Access token is missing or invalid.
+  - `403 GROUP_FORBIDDEN` — Requester is not a site admin.
+}

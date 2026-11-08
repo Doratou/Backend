@@ -1,0 +1,55 @@
+meta {
+  name: 07. Admin - Get Report Statistics
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/reports/stats
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - Get Report Statistics
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/admin/reports/stats`
+  **Auth:** Required (Admin Access Token)
+
+  ## Description
+  Returns high-level aggregated moderation metrics for the admin dashboard, including breakdown of report counts across all statuses.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "total_reports": 42,
+      "by_status": {
+        "PENDING": 12,
+        "UNDER_REVIEW": 5,
+        "RESOLVED": 20,
+        "REJECTED": 3,
+        "DISMISSED": 2
+      }
+    }
+  }
+  ```
+}

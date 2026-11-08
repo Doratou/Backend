@@ -1,0 +1,24 @@
+meta {
+  name: Friendships
+  seq: 4
+}
+
+auth {
+  mode: none
+}
+
+script:pre-request {
+  bru.deleteVar("receiver_user_id");
+  bru.deleteVar("friendRequestId");
+  bru.deleteVar("friendshipId");
+}
+
+docs {
+  # Friendships
+
+  Configure receiver_user_id, friendRequestId and friendshipId manually in the Variables tab of the selected Local environment, then save the environment before sending a request. These fields start empty so you can enter the actual IDs from your own database and responses.
+
+  receiver_user_id identifies the other user when sending a request. friendRequestId is data.id from Send Friend Request or an item's id from Incoming or Outgoing Friend Requests. friendshipId is data.id from Accept Friend Request or an item's friendship_id from List Friends.
+
+  Responses do not automatically populate or overwrite these identifiers. The folder pre-request script clears legacy runtime values so the manually configured environment values are used. Authentication continues to use token populated by Login or Refresh Token.
+}

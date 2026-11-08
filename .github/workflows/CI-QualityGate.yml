@@ -1,0 +1,76 @@
+name: Doratou Backend Quality Gates
+
+on:
+  workflow_call:
+
+env:
+  GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+jobs:
+  go-quality:
+    name: Go format, vet, tests, and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          files="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$files" ]; then
+            echo "These Go files need gofmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Vet Go packages
+        run: go vet ./...
+
+      - name: Run Go tests with coverage
+        run: go test ./... -coverprofile=coverage.out
+
+      - name: Build application
+        run: go build ./cmd/app
+
+
+  gitleaks:
+    name: Secret scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy-config:
+    name: Repository security scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Scan repository files, dependencies, and configurations
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            aquasec/trivy:0.76.1 \
+            fs \
+            --scanners vuln,misconfig,secret \
+            --exit-code 1 \
+            --severity CRITICAL,HIGH \
+            --skip-dirs .git \
+            --skip-files docker/Dockerfile \
+            /workspace

@@ -1,0 +1,65 @@
+meta {
+  name: 09. Admin - Review and Resolve Report
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/api/v1/admin/reports/1/review
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "status": "RESOLVED",
+    "response": "The reported user has been investigated and issued a temporary warning."
+  }
+}
+
+docs {
+  # Admin - Review and Resolve Report
+
+  **Method:** `PUT`
+  **Endpoint:** `/api/v1/admin/reports/:id/review`
+  **Auth:** Required (Admin Access Token)
+
+  ## Description
+  Allows an administrator to review, submit an official response note, update the report status, and automatically timestamp resolution.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Body
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `status` | `string` | Yes | `UNDER_REVIEW`, `RESOLVED`, `REJECTED`, or `DISMISSED` |
+  | `response` | `string` | Yes | Official moderator action/response notes (2 - 3000 chars) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "status": "RESOLVED",
+      "reviewed_by_user_id": 99,
+      "response": "The reported user has been investigated and issued a temporary warning.",
+      "resolved_at": "2026-11-02T19:30:00Z"
+    }
+  }
+  ```
+}
