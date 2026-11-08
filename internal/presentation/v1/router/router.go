@@ -14,19 +14,18 @@ import (
 
 // Dependencies bundles all handlers and presentation dependencies needed to wire routes.
 type Dependencies struct {
-
-	AuthHandler       *handler.AuthHandler
-	CaptchaHandler    *handler.CaptchaHandler
-  AdminReportHandler *handler.AdminReportHandler
-	FriendshipHandler *handler.FriendshipHandler
-	GroupHandler      *handler.GroupHandler
-	PollHandler       *handler.PollHandler
-	InviteHandler     *handler.InviteHandler
-	CaptchaService    adapter.CaptchaService
-	CaptchaEnabled    bool
-	TokenMaker        jwt.TokenMaker
-	TokenRepo         cache.AuthnTokenRepository
-	EmailFontFiles    fs.FS
+	AuthHandler        *handler.AuthHandler
+	CaptchaHandler     *handler.CaptchaHandler
+	AdminReportHandler *handler.AdminReportHandler
+	FriendshipHandler  *handler.FriendshipHandler
+	GroupHandler       *handler.GroupHandler
+	PollHandler        *handler.PollHandler
+	InviteHandler      *handler.InviteHandler
+	CaptchaService     adapter.CaptchaService
+	CaptchaEnabled     bool
+	TokenMaker         jwt.TokenMaker
+	TokenRepo          cache.AuthnTokenRepository
+	EmailFontFiles     fs.FS
 }
 
 // New builds the fully configured Gin engine with global middlewares and versioned routes.
@@ -57,6 +56,7 @@ func New(deps Dependencies) *gin.Engine {
 	RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware, captchaMiddleware)
 	RegisterCaptchaRoutes(v1, deps.CaptchaHandler)
 	RegisterAdminReportRoutes(v1, deps.AdminReportHandler, authMiddleware)
+	
 	if deps.FriendshipHandler != nil {
 		RegisterFriendshipRoutes(v1, deps.FriendshipHandler, authMiddleware)
 	}

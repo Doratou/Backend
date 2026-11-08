@@ -192,18 +192,18 @@ func main() {
 	pollHandler := handler.NewPollHandler(pollService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
-		AuthHandler:       authHandler,
-		CaptchaHandler:    captchaHandler,
-    		AdminReportHandler: adminReportHandler,
-		GroupHandler:      groupHandler,
-		InviteHandler:     inviteHandler,
-		FriendshipHandler: friendshipHandler,
-		PollHandler:       pollHandler,
-		CaptchaService:    captchaService,
-		CaptchaEnabled:    cfg.Environment.Captcha.Enabled,
-		TokenMaker:        jwtMaker,
-		TokenRepo:         tokenRepo,
-		EmailFontFiles:    emailFontFiles,
+		AuthHandler:        authHandler,
+		CaptchaHandler:     captchaHandler,
+		AdminReportHandler: adminReportHandler,
+		GroupHandler:       groupHandler,
+		InviteHandler:      inviteHandler,
+		FriendshipHandler:  friendshipHandler,
+		PollHandler:        pollHandler,
+		CaptchaService:     captchaService,
+		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
+		TokenMaker:         jwtMaker,
+		TokenRepo:          tokenRepo,
+		EmailFontFiles:     emailFontFiles,
 	})
 
 	// 8. HTTP Server Lifecycle & Graceful Shutdown
