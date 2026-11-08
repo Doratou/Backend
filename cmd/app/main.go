@@ -15,6 +15,7 @@ import (
 	"github.com/Doratou/Backend/bootstrap"
 	"github.com/Doratou/Backend/internal/application/service"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
+	emailInfra "github.com/Doratou/Backend/internal/infrastructure/email"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	postgresRepo "github.com/Doratou/Backend/internal/infrastructure/repository/postgres"
@@ -86,6 +87,10 @@ func main() {
 	// 4. Repositories
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
 	adminReportRepo := postgresRepo.NewAdminReportRepository(postgresDB)
+	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
+	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
+	pollRepo := postgresRepo.NewPollRepository(postgresDB)
+	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
 	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
@@ -112,15 +117,25 @@ func main() {
 		SMTPHost: cfg.Environment.Email.SMTPHost,
 		SMTPPort: cfg.Environment.Email.SMTPPort,
 	})
+	emailRenderer, err := emailInfra.NewOTPEmailRenderer(cfg.Environment.Email.FontBaseURL)
+	if err != nil {
+		log.Fatalf("failed to initialize OTP email template: %v", err)
+	}
+	emailFontFiles, err := emailInfra.OTPEmailFontFiles()
+	if err != nil {
+		log.Fatalf("failed to initialize OTP email fonts: %v", err)
+	}
 	otpService := service.NewOTPService(
 		otpRepo,
 		redisTrxManager,
 		emailSender,
+		emailRenderer,
 		service.OTPServiceConfig{
-			TTL:               cfg.Environment.OTP.TTL,
-			VerifiedTTL:       cfg.Environment.OTP.VerifiedTTL,
-			Digits:            cfg.Environment.OTP.Digits,
-			EmailDeliveryMode: cfg.Environment.Email.DeliveryMode,
+			TTL:                  cfg.Environment.OTP.TTL,
+			VerifiedTTL:          cfg.Environment.OTP.VerifiedTTL,
+			Digits:               cfg.Environment.OTP.Digits,
+			EmailDeliveryEnabled: cfg.Environment.Email.DeliveryEnabled,
+			EmailDeliveryMode:    cfg.Environment.Email.DeliveryMode,
 		},
 		cfg.Constant,
 	)
@@ -140,6 +155,16 @@ func main() {
 		cfg.Constant,
 	)
 
+	friendshipService := service.NewFriendshipService(
+		friendshipRepo,
+		userRepo,
+		dbTrxManager,
+		service.FriendshipServiceConfig{
+			RequestCooldown: cfg.Environment.Friendship.RequestCooldown,
+		},
+		cfg.Constant,
+	)
+
 	captchaService := service.NewCaptchaService(
 		captchaRepo,
 		captchaMan,
@@ -148,6 +173,9 @@ func main() {
 		},
 		cfg.Constant,
 	)
+	groupService := service.NewGroupService(groupRepo)
+	inviteService := service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
+	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
 
 	adminReportService := service.NewAdminReportService(
 		adminReportRepo,
@@ -159,14 +187,23 @@ func main() {
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
 	adminReportHandler := handler.NewAdminReportHandler(adminReportService)
 
+	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
+	groupHandler := handler.NewGroupHandler(groupService)
+	pollHandler := handler.NewPollHandler(pollService)
+	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
-		AuthHandler:        authHandler,
-		CaptchaHandler:     captchaHandler,
-		AdminReportHandler: adminReportHandler,
-		CaptchaService:     captchaService,
-		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
-		TokenMaker:         jwtMaker,
-		TokenRepo:          tokenRepo,
+		AuthHandler:       authHandler,
+		CaptchaHandler:    captchaHandler,
+    		AdminReportHandler: adminReportHandler,
+		GroupHandler:      groupHandler,
+		InviteHandler:     inviteHandler,
+		FriendshipHandler: friendshipHandler,
+		PollHandler:       pollHandler,
+		CaptchaService:    captchaService,
+		CaptchaEnabled:    cfg.Environment.Captcha.Enabled,
+		TokenMaker:        jwtMaker,
+		TokenRepo:         tokenRepo,
+		EmailFontFiles:    emailFontFiles,
 	})
 
 	// 8. HTTP Server Lifecycle & Graceful Shutdown

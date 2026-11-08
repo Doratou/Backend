@@ -1,0 +1,79 @@
+name: Doratou Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/ci
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: doratou/backend
+
+jobs:
+  quality-gates:
+    name: Run backend quality gates
+    uses: ./.github/workflows/CI-QualityGate.yml
+    secrets: inherit
+    permissions:
+      contents: read
+
+  build:
+    name: Build and publish backend image
+    runs-on: ubuntu-latest
+    needs: quality-gates
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image tags
+        id: image
+        shell: bash
+        run: |
+          branch="${GITHUB_REF_NAME,,}"
+          branch="$(echo "$branch" | sed -E 's/[^a-z0-9_.-]+/-/g; s/^[.-]+//; s/[.-]+$//')"
+
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            branch_tag="latest"
+          elif [ "$GITHUB_REF_NAME" = "develop" ]; then
+            branch_tag="develop"
+          else
+            branch_tag="$branch"
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "${REGISTRY}/${IMAGE_NAME}:${branch_tag}"
+            echo "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image.outputs.tags }}

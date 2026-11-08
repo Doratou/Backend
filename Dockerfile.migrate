@@ -1,0 +1,22 @@
+# Build from the repository root:
+# docker build -f Dockerfile.migrate -t doratou-migrate:local .
+FROM golang:1.26-alpine AS goose-builder
+
+RUN go install github.com/pressly/goose/v3/cmd/goose@v3.29.0
+
+FROM alpine:3.22
+
+RUN apk add --no-cache bash make ca-certificates \
+    && addgroup -S migrate \
+    && adduser -S -G migrate migrate
+
+WORKDIR /app
+
+COPY --from=goose-builder /go/bin/goose /usr/local/bin/goose
+COPY Makefile ./Makefile
+COPY scripts/linux/ ./scripts/linux/
+COPY migrations/ ./migrations/
+
+USER migrate
+
+CMD ["make", "migrate-up"]

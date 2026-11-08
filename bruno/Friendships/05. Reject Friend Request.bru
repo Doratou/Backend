@@ -1,0 +1,98 @@
+meta {
+  name: 05. Reject Friend Request
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/friendships/requests/{{friendRequestId}}/reject
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Reject Friend Request
+
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/friendships/requests/:id/reject`
+  **Auth:** Required
+
+  ## Description
+
+  Rejects a PENDING friend request. Only the current recipient may perform this action. The status becomes REJECTED and `responded_at` is set to the rejection time. The request disappears from both pending lists. The same row remains non-deleted with REJECTED status; no accepted friendship is created.
+
+  Use the recipient's token and the selected pending request's ID. This action is an alternative to Accept or Cancel. Repeating Reject as the recipient returns `409 FRIENDSHIP_INVALID_STATUS`.
+
+  The same sender must wait `FRIENDSHIP_REQUEST_COOLDOWN` from `responded_at` before sending again (24 hours by default). An allowed resend updates this same record and ID, resets `responded_at` to null, updates the request time, and restores PENDING. The previous recipient may initiate a reverse request without this sender cooldown.
+
+  The cooldown error is `429 FRIEND_REQUEST_COOLDOWN` on Send Friend Request. Reject itself does not enforce the resend cooldown.
+
+  The authenticated account must be ACTIVE. For an existing non-deleted record, the actor's permission is checked before the relationship status. An unauthorized actor receives `403 FRIENDSHIP_FORBIDDEN` even if the request is no longer PENDING. A currently canceled or removed record returns `404 FRIENDSHIP_NOT_FOUND`. An allowed resend restores the same ID with the latest direction and state; refresh the request list before acting on a saved ID.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Recipient's Bearer access token (`Bearer <token>`) |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `integer` | Yes | Positive BIGINT ID of the pending request (`friendRequestId`), not a user ID |
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 501,
+      "status": "REJECTED",
+      "responded_at": "2026-10-29T10:05:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  Each error returns the HTTP status below and the JSON envelope shown in the example. The `code` and `error` strings match the backend definitions. Internal database and Redis details are not returned.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | The path ID is non-numeric, non-positive, or outside the BIGINT range. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing, empty, or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The access token is malformed or invalid, or a refresh token was supplied. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token has expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 403 | `FRIENDSHIP_FORBIDDEN` | `you are not allowed to perform this friendship operation` | The authenticated user is not the current recipient. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated user does not exist or has been soft-deleted. |
+  | 404 | `FRIENDSHIP_NOT_FOUND` | `friendship not found` | The relationship ID does not exist or is currently soft-deleted. |
+  | 409 | `FRIENDSHIP_INVALID_STATUS` | `friendship status does not allow this operation` | The existing relationship is not PENDING, or its state changes before the write. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Redis blacklist lookup, database access, or a transaction fails. |
+
+  **Example: 409 Conflict**
+
+  ```json
+  {
+    "success": false,
+    "code": "FRIENDSHIP_INVALID_STATUS",
+    "error": "friendship status does not allow this operation"
+  }
+  ```
+}

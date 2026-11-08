@@ -1,0 +1,36 @@
+meta {
+  name: Polls
+  seq: 6
+}
+
+auth {
+  mode: none
+}
+
+script:pre-request {
+  bru.deleteVar("pollGroupId");
+  bru.deleteVar("pollId");
+  bru.deleteVar("pollOptionId");
+}
+
+docs {
+  # Polls
+
+  Run project migrations with `go run ./cmd/migrate up` before testing. This includes `20261105014613_create_polls_tables.sql`.
+
+  In the Local environment set pollGroupId manually to a group you belong to, pollId to data.id from Create Poll or a selected poll, and pollOptionId to an options[].id from Create Poll or Get Poll. Save the environment before sending a request. The example IDs are placeholders, not seeded records. Login through Auth to populate token. No poll response automatically populates or changes these identifiers. The folder pre-request script clears legacy runtime poll identifiers so the manually configured Local values are used.
+
+  All eight endpoints require an ACTIVE account and ACTIVE group membership. Only the poll creator may close or delete; group owners and system administrators have no override. If the creator leaves, the poll stays open and other active members can continue participating.
+
+  PUBLIC lets active members of this group see who chose each option through List Poll Voters. PRIVATE returns aggregate results and each caller's own choice without revealing other voters, even to the creator. Member identifiers remain stored in the database to enforce one vote per membership.
+
+  Results are visible from the start, including before voting and after closing. Options and visibility cannot be edited. An active member can change or withdraw their own vote while the poll is open.
+
+  INACTIVE groups freeze creation, voting, vote changes, withdrawal, closing and deletion. Lists and results remain readable. is_frozen is computed from group status; polls keep their own status. Reactivating a group enables previously open polls again; closed polls stay closed.
+
+  For a manual scenario: create a poll as member A; login as member B and vote; inspect Get Poll and List Poll Voters as A; change or withdraw B's vote; close as A; check that B can still read but cannot vote. Create a separate PRIVATE poll and confirm List Poll Voters returns POLL_PRIVATE for both A and B. Delete only after completing the other checks.
+
+  Login replaces token while manually configured environment IDs remain unchanged. Update and save pollGroupId, pollId and pollOptionId when changing groups or choosing a different poll. Closing and deleting are separate actions: closed polls retain readable history, while deletion soft-deletes the entire poll aggregate.
+
+  An inactive group is checked before a write operation loads its poll; a write can return POLL_GROUP_INACTIVE before poll-specific state or creator errors. Malformed HTTP input and authentication are validated first.
+}

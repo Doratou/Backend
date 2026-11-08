@@ -8,14 +8,20 @@ import (
 )
 
 type Environment struct {
-	DataBase   DataBase      `mapstructure:",squash"`
-	Redis      Redis         `mapstructure:",squash"`
-	HttpServer HttpServer    `mapstructure:",squash"`
-	JWT        JWTConfig     `mapstructure:",squash"`
-	OTP        OTPConfig     `mapstructure:",squash"`
-	Seed       SeedConfig    `mapstructure:",squash"`
-	Captcha    CaptchaConfig `mapstructure:",squash"`
-	Email      EmailConfig   `mapstructure:",squash"`
+	DataBase   DataBase         `mapstructure:",squash"`
+	Redis      Redis            `mapstructure:",squash"`
+	HttpServer HttpServer       `mapstructure:",squash"`
+	JWT        JWTConfig        `mapstructure:",squash"`
+	OTP        OTPConfig        `mapstructure:",squash"`
+	Seed       SeedConfig       `mapstructure:",squash"`
+	Captcha    CaptchaConfig    `mapstructure:",squash"`
+	Email      EmailConfig      `mapstructure:",squash"`
+	Invite     InvitationConfig `mapstructure:",squash"`
+	Friendship FriendshipConfig `mapstructure:",squash"`
+}
+
+type FriendshipConfig struct {
+	RequestCooldown time.Duration `mapstructure:"FRIENDSHIP_REQUEST_COOLDOWN"`
 }
 
 type EmailConfig struct {
@@ -23,7 +29,9 @@ type EmailConfig struct {
 	DoratouEmailAppPassword string `mapstructure:"DORATOU_EMAIL_APP_PASSWORD" json:"-"`
 	SMTPHost                string `mapstructure:"SMTP_HOST"`
 	SMTPPort                string `mapstructure:"SMTP_HOST_PORT"`
+	DeliveryEnabled         bool   `mapstructure:"EMAIL_DELIVERY_ENABLED"`
 	DeliveryMode            string `mapstructure:"EMAIL_DELIVERY_MODE"`
+	FontBaseURL             string `mapstructure:"EMAIL_FONT_BASE_URL"`
 }
 
 type CaptchaConfig struct {
@@ -74,6 +82,11 @@ type Redis struct {
 type HttpServer struct {
 	Domain string `mapstructure:"HTTP_DOMAIN"`
 	Port   string `mapstructure:"HTTP_PORT"`
+}
+
+type InvitationConfig struct {
+	SecretKey                  string        `mapstructure:"INVITE_ENCRYPTION_SECRET"`
+	DirectInviteRejectCooldown time.Duration `mapstructure:"GROUP_DIRECT_INVITE_REJECT_COOLDOWN"`
 }
 
 func NewEnvironment() (*Environment, error) {
