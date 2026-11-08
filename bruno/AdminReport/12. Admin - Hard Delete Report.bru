@@ -1,0 +1,48 @@
+meta {
+  name: 12. Admin - Hard Delete Report
+  type: http
+  seq: 12
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/reports/1/hard
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - Hard Delete Report
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/admin/reports/:id/hard`
+  **Auth:** Required (Admin Access Token)
+
+  ## Description
+  Permanently and irreversibly removes the report record from the database.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "report permanently deleted"
+    }
+  }
+  ```
+}

@@ -1,0 +1,63 @@
+meta {
+  name: 02. List My Reports (User - Protected)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/reports/my?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List My Reports (Protected)
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/reports/my`
+  **Auth:** Required (User Access Token)
+
+  ## Description
+  Returns a paginated list of all reports submitted by the currently authenticated user.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Query Parameters
+  | Parameter | Type | Required | Default | Description |
+  | --- | --- | --- | --- | --- |
+  | `page` | `integer` | No | `1` | Page number |
+  | `limit` | `integer` | No | `20` | Items per page (max 100) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [],
+      "total": 0,
+      "page": 1,
+      "limit": 20,
+      "total_pages": 0
+    }
+  }
+  ```
+}

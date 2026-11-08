@@ -86,6 +86,7 @@ func main() {
 
 	// 4. Repositories
 	userRepo := postgresRepo.NewUserRepository(postgresDB)
+	adminReportRepo := postgresRepo.NewAdminReportRepository(postgresDB)
 	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	pollRepo := postgresRepo.NewPollRepository(postgresDB)
@@ -176,9 +177,16 @@ func main() {
 	inviteService := service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
 	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
 
+	adminReportService := service.NewAdminReportService(
+		adminReportRepo,
+		userRepo,
+	)
+
 	// 7. Presentation Handlers & Routers
 	authHandler := handler.NewAuthHandler(authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
+	adminReportHandler := handler.NewAdminReportHandler(adminReportService)
+
 	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
 	pollHandler := handler.NewPollHandler(pollService)
@@ -186,6 +194,7 @@ func main() {
 	engine := router.New(router.Dependencies{
 		AuthHandler:       authHandler,
 		CaptchaHandler:    captchaHandler,
+    		AdminReportHandler: adminReportHandler,
 		GroupHandler:      groupHandler,
 		InviteHandler:     inviteHandler,
 		FriendshipHandler: friendshipHandler,

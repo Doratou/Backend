@@ -1,0 +1,48 @@
+meta {
+  name: 11. Admin - Restore Report
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/reports/1/restore
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - Restore Report
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/admin/reports/:id/restore`
+  **Auth:** Required (Admin Access Token)
+
+  ## Description
+  Restores a previously soft-deleted report record by clearing `deleted_at`.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "report restored successfully"
+    }
+  }
+  ```
+}

@@ -14,8 +14,10 @@ import (
 
 // Dependencies bundles all handlers and presentation dependencies needed to wire routes.
 type Dependencies struct {
+
 	AuthHandler       *handler.AuthHandler
 	CaptchaHandler    *handler.CaptchaHandler
+  AdminReportHandler *handler.AdminReportHandler
 	FriendshipHandler *handler.FriendshipHandler
 	GroupHandler      *handler.GroupHandler
 	PollHandler       *handler.PollHandler
@@ -54,6 +56,7 @@ func New(deps Dependencies) *gin.Engine {
 	v1 := engine.Group("/api/v1")
 	RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware, captchaMiddleware)
 	RegisterCaptchaRoutes(v1, deps.CaptchaHandler)
+	RegisterAdminReportRoutes(v1, deps.AdminReportHandler, authMiddleware)
 	if deps.FriendshipHandler != nil {
 		RegisterFriendshipRoutes(v1, deps.FriendshipHandler, authMiddleware)
 	}

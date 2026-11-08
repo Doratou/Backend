@@ -1,0 +1,48 @@
+meta {
+  name: 10. Admin - Soft Delete Report
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/admin/reports/1
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - Soft Delete Report
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/admin/reports/:id`
+  **Auth:** Required (Admin Access Token)
+
+  ## Description
+  Performs a soft delete on the report record, setting `deleted_at`.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "report soft deleted successfully"
+    }
+  }
+  ```
+}

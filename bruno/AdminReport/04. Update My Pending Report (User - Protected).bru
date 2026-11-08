@@ -1,0 +1,62 @@
+meta {
+  name: 04. Update My Pending Report (User - Protected)
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/reports/1
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "description": "Updated report description with additional context regarding harassment."
+  }
+}
+
+docs {
+  # Update My Pending Report (Protected)
+
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/reports/:id`
+  **Auth:** Required (User Access Token)
+
+  ## Description
+  Allows the reporting user to update the reason or description of their submitted report, provided it is still in `PENDING` status.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Body
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `reason` | `string` | No | New report reason |
+  | `description` | `string` | No | Updated description (5 - 3000 chars) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "status": "PENDING",
+      "description": "Updated report description with additional context regarding harassment."
+    }
+  }
+  ```
+}
