@@ -80,7 +80,7 @@ type ReportListResponse struct {
 
 // ReportStatsResponse holds summary statistics for reports on the admin moderation dashboard.
 type ReportStatsResponse struct {
-	TotalReports int64                      `json:"total_reports"`
+	TotalReports int64                       `json:"total_reports"`
 	ByStatus     map[enum.ReportStatus]int64 `json:"by_status"`
 }
 

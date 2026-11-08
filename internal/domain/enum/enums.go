@@ -108,7 +108,6 @@ func (s ReportStatus) IsValid() bool {
 	}
 }
 
-
 type FriendshipStatus string
 
 const (
