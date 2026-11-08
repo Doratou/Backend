@@ -101,6 +101,15 @@ type AuthResponse struct {
 	ExpiresAt             time.Time    `json:"expires_at"`
 }
 
+type OAuthLoginURLResponse struct {
+	URL string `json:"url"`
+}
+
+type GoogleCallbackRequest struct {
+	Code  string `form:"code" json:"code" binding:"required"`
+	State string `form:"state" json:"state" binding:"required"`
+}
+
 // ToUserResponse converts a domain User entity into a UserResponse DTO.
 func ToUserResponse(user *entity.User) UserResponse {
 	return UserResponse{
