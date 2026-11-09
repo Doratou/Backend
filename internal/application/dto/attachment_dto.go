@@ -155,31 +155,54 @@ type AttachmentFilterRequest struct {
 	UploadedByUserID *int64               `form:"uploaded_by_user_id"`
 	IsPublic         *bool                `form:"is_public"`
 	Search           string               `form:"search"`
+	IncludeRelations bool                 `form:"include_relations"`
 	Page             int                  `form:"page,default=1"`
 	PageSize         int                  `form:"page_size,default=20"`
 }
 
+// AttachmentUserSummary provides basic information about the user who uploaded the attachment.
+type AttachmentUserSummary struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// AttachmentGroupSummary provides basic information about the group associated with the attachment.
+type AttachmentGroupSummary struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+}
+
+// AttachmentExpenseSummary provides basic information about the expense associated with the attachment.
+type AttachmentExpenseSummary struct {
+	ID               int64  `json:"id"`
+	Title            string `json:"title"`
+	TotalAmountToman int64  `json:"total_amount_toman"`
+}
+
 // AttachmentResponse provides full attachment details and an access URL.
 type AttachmentResponse struct {
-	ID                 int64               `json:"id"`
-	UploadedByUserID   *int64              `json:"uploaded_by_user_id,omitempty"`
-	GroupID            *int64              `json:"group_id,omitempty"`
-	ExpenseID          *int64              `json:"expense_id,omitempty"`
-	Type               enum.AttachmentType `json:"type"`
-	OriginalFilename   *string             `json:"original_filename,omitempty"`
-	ObjectKey          string              `json:"object_key"`
-	ThumbnailObjectKey *string             `json:"thumbnail_object_key,omitempty"`
-	MimeType           *string             `json:"mime_type,omitempty"`
-	FileSizeBytes      *int64              `json:"file_size_bytes,omitempty"`
-	FileHash           *string             `json:"file_hash,omitempty"`
-	Width              *int                `json:"width,omitempty"`
-	Height             *int                `json:"height,omitempty"`
-	DurationSeconds    *int                `json:"duration_seconds,omitempty"`
-	IsPublic           bool                `json:"is_public"`
-	AccessURL          string              `json:"access_url"`
-	UploadedAt         *time.Time          `json:"uploaded_at,omitempty"`
-	CreatedAt          time.Time           `json:"created_at"`
-	UpdatedAt          time.Time           `json:"updated_at"`
+	ID                 int64                     `json:"id"`
+	UploadedByUserID   *int64                    `json:"uploaded_by_user_id,omitempty"`
+	UploadedByUser     *AttachmentUserSummary    `json:"uploaded_by_user,omitempty"`
+	GroupID            *int64                    `json:"group_id,omitempty"`
+	Group              *AttachmentGroupSummary   `json:"group,omitempty"`
+	ExpenseID          *int64                    `json:"expense_id,omitempty"`
+	Expense            *AttachmentExpenseSummary `json:"expense,omitempty"`
+	Type               enum.AttachmentType       `json:"type"`
+	OriginalFilename   *string                   `json:"original_filename,omitempty"`
+	ObjectKey          string                    `json:"object_key"`
+	ThumbnailObjectKey *string                   `json:"thumbnail_object_key,omitempty"`
+	MimeType           *string                   `json:"mime_type,omitempty"`
+	FileSizeBytes      *int64                    `json:"file_size_bytes,omitempty"`
+	FileHash           *string                   `json:"file_hash,omitempty"`
+	Width              *int                      `json:"width,omitempty"`
+	Height             *int                      `json:"height,omitempty"`
+	DurationSeconds    *int                      `json:"duration_seconds,omitempty"`
+	IsPublic           bool                      `json:"is_public"`
+	AccessURL          string                    `json:"access_url"`
+	UploadedAt         *time.Time                `json:"uploaded_at,omitempty"`
+	CreatedAt          time.Time                 `json:"created_at"`
+	UpdatedAt          time.Time                 `json:"updated_at"`
 }
 
 // AttachmentListResponse encapsulates paginated attachment items.
@@ -204,11 +227,39 @@ func ToAttachmentResponse(entity *entity.Attachment, accessURL string) *Attachme
 		return nil
 	}
 
+	var userSummary *AttachmentUserSummary
+	if entity.UploadedByUser != nil {
+		userSummary = &AttachmentUserSummary{
+			ID:   entity.UploadedByUser.ID,
+			Name: entity.UploadedByUser.Name,
+		}
+	}
+
+	var groupSummary *AttachmentGroupSummary
+	if entity.Group != nil {
+		groupSummary = &AttachmentGroupSummary{
+			ID:    entity.Group.ID,
+			Title: entity.Group.Title,
+		}
+	}
+
+	var expenseSummary *AttachmentExpenseSummary
+	if entity.Expense != nil {
+		expenseSummary = &AttachmentExpenseSummary{
+			ID:               entity.Expense.ID,
+			Title:            entity.Expense.Title,
+			TotalAmountToman: entity.Expense.TotalAmountToman,
+		}
+	}
+
 	return &AttachmentResponse{
 		ID:                 entity.ID,
 		UploadedByUserID:   entity.UploadedByUserID,
+		UploadedByUser:     userSummary,
 		GroupID:            entity.GroupID,
+		Group:              groupSummary,
 		ExpenseID:          entity.ExpenseID,
+		Expense:            expenseSummary,
 		Type:               entity.Type,
 		OriginalFilename:   entity.OriginalFilename,
 		ObjectKey:          *entity.ObjectKey,

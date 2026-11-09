@@ -26,6 +26,15 @@ type AttachmentService interface {
 	// GetByID retrieves attachment metadata and generates an active access URL.
 	GetByID(ctx context.Context, id int64) (*dto.AttachmentResponse, error)
 
+	// GetByIDWithRelations retrieves attachment metadata with associated User, Group, and Expense preloaded.
+	GetByIDWithRelations(ctx context.Context, id int64) (*dto.AttachmentResponse, error)
+
+	// GetByGroup retrieves attachments associated with a specific group, with optional type filtering.
+	GetByGroup(ctx context.Context, groupID int64, attType *enum.AttachmentType, page, pageSize int) (*dto.AttachmentListResponse, error)
+
+	// GetByExpense retrieves attachments tied to a specific expense.
+	GetByExpense(ctx context.Context, expenseID int64) ([]*dto.AttachmentResponse, error)
+
 	// GetByObjectKey retrieves attachment metadata by its object storage key.
 	GetByObjectKey(ctx context.Context, objectKey string) (*dto.AttachmentResponse, error)
 

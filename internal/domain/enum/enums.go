@@ -130,3 +130,11 @@ const (
 	PollVisibilityPublic  PollVisibility = "PUBLIC"
 	PollVisibilityPrivate PollVisibility = "PRIVATE"
 )
+
+type ExpenseType string
+
+const (
+	ExpenseTypeNormal  ExpenseType = "NORMAL"
+	ExpenseTypePremium ExpenseType = "PREMIUM"
+)
+

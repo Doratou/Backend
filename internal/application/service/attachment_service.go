@@ -449,6 +449,17 @@ func (s *attachmentService) GetByID(ctx context.Context, id int64) (*dto.Attachm
 	return dto.ToAttachmentResponse(attachment, accessURL), nil
 }
 
+// GetByIDWithRelations retrieves attachment metadata with associated User, Group, and Expense preloaded.
+func (s *attachmentService) GetByIDWithRelations(ctx context.Context, id int64) (*dto.AttachmentResponse, error) {
+	attachment, err := s.attachmentRepo.FindByIDWithRelations(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	accessURL, _ := s.buildAccessURL(ctx, *attachment.ObjectKey, attachment.IsPublic)
+	return dto.ToAttachmentResponse(attachment, accessURL), nil
+}
+
 // GetByObjectKey retrieves attachment metadata by object storage key.
 func (s *attachmentService) GetByObjectKey(ctx context.Context, objectKey string) (*dto.AttachmentResponse, error) {
 	attachment, err := s.attachmentRepo.FindByObjectKey(ctx, objectKey)
@@ -469,6 +480,7 @@ func (s *attachmentService) List(ctx context.Context, filter dto.AttachmentFilte
 		Type:             filter.Type,
 		IsPublic:         filter.IsPublic,
 		Search:           filter.Search,
+		PreloadRelations: filter.IncludeRelations,
 	}
 
 	repoPagination := domain_db.Pagination{
@@ -505,6 +517,33 @@ func (s *attachmentService) List(ctx context.Context, filter dto.AttachmentFilte
 		PageSize:   pageSize,
 		TotalPages: totalPages,
 	}, nil
+}
+
+// GetByGroup retrieves attachments associated with a specific group, with optional type filtering.
+func (s *attachmentService) GetByGroup(ctx context.Context, groupID int64, attType *enum.AttachmentType, page, pageSize int) (*dto.AttachmentListResponse, error) {
+	filter := dto.AttachmentFilterRequest{
+		GroupID:          &groupID,
+		Type:             attType,
+		IncludeRelations: true,
+		Page:             page,
+		PageSize:         pageSize,
+	}
+	return s.List(ctx, filter)
+}
+
+// GetByExpense retrieves attachments tied to a specific expense.
+func (s *attachmentService) GetByExpense(ctx context.Context, expenseID int64) ([]*dto.AttachmentResponse, error) {
+	attachments, err := s.attachmentRepo.FindByExpense(ctx, expenseID)
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([]*dto.AttachmentResponse, len(attachments))
+	for i, att := range attachments {
+		accessURL, _ := s.buildAccessURL(ctx, *att.ObjectKey, att.IsPublic)
+		responses[i] = dto.ToAttachmentResponse(att, accessURL)
+	}
+	return responses, nil
 }
 
 // GetBatchURLs generates active access URLs for multiple attachment IDs.

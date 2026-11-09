@@ -15,6 +15,7 @@ type AttachmentFilter struct {
 	Type             *enum.AttachmentType
 	IsPublic         *bool
 	Search           string
+	PreloadRelations bool
 }
 
 // Pagination defines page and limit parameters.
@@ -34,6 +35,9 @@ type AttachmentRepository interface {
 	// FindByID retrieves an attachment by primary key.
 	FindByID(ctx context.Context, id int64) (*entity.Attachment, error)
 
+	// FindByIDWithRelations retrieves an attachment by primary key with relations preloaded.
+	FindByIDWithRelations(ctx context.Context, id int64) (*entity.Attachment, error)
+
 	// FindByIDs retrieves multiple attachments by primary keys.
 	FindByIDs(ctx context.Context, ids []int64) ([]*entity.Attachment, error)
 
@@ -48,6 +52,9 @@ type AttachmentRepository interface {
 
 	// FindByGroup lists attachments associated with a specific group.
 	FindByGroup(ctx context.Context, groupID int64, limit, offset int) ([]*entity.Attachment, error)
+
+	// FindByGroupAndType lists attachments for a group filtered by type (e.g. gallery images/videos).
+	FindByGroupAndType(ctx context.Context, groupID int64, attachmentType enum.AttachmentType, limit, offset int) ([]*entity.Attachment, error)
 
 	// FindByExpense lists attachments tied to an expense receipt.
 	FindByExpense(ctx context.Context, expenseID int64) ([]*entity.Attachment, error)

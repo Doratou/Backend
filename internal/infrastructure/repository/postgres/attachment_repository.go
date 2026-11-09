@@ -57,6 +57,24 @@ func (r *attachmentRepository) FindByID(ctx context.Context, id int64) (*entity.
 	return &attachment, nil
 }
 
+func (r *attachmentRepository) FindByIDWithRelations(ctx context.Context, id int64) (*entity.Attachment, error) {
+	var attachment entity.Attachment
+	db := r.getDB(ctx)
+
+	err := db.Preload("UploadedByUser.AvatarAttachment").
+		Preload("Group").
+		Preload("Expense").
+		Where("id = ?", id).
+		First(&attachment).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.ErrAttachmentNotFound
+		}
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return &attachment, nil
+}
+
 func (r *attachmentRepository) FindByIDs(ctx context.Context, ids []int64) ([]*entity.Attachment, error) {
 	if len(ids) == 0 {
 		return []*entity.Attachment{}, nil
@@ -130,6 +148,22 @@ func (r *attachmentRepository) FindByGroup(ctx context.Context, groupID int64, l
 	return attachments, nil
 }
 
+func (r *attachmentRepository) FindByGroupAndType(ctx context.Context, groupID int64, attachmentType enum.AttachmentType, limit, offset int) ([]*entity.Attachment, error) {
+	var attachments []*entity.Attachment
+	db := r.getDB(ctx).Where("group_id = ? AND type = ?", groupID, attachmentType).Order("id DESC")
+	if limit > 0 {
+		db = db.Limit(limit)
+	}
+	if offset > 0 {
+		db = db.Offset(offset)
+	}
+
+	if err := db.Find(&attachments).Error; err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return attachments, nil
+}
+
 func (r *attachmentRepository) FindByExpense(ctx context.Context, expenseID int64) ([]*entity.Attachment, error) {
 	var attachments []*entity.Attachment
 	db := r.getDB(ctx).Where("expense_id = ?", expenseID).Order("id DESC")
@@ -158,6 +192,10 @@ func (r *attachmentRepository) FindByType(ctx context.Context, attachmentType en
 
 func (r *attachmentRepository) List(ctx context.Context, filter domain_repo.AttachmentFilter, pagination domain_repo.Pagination) ([]*entity.Attachment, int64, error) {
 	db := r.getDB(ctx).Model(&entity.Attachment{})
+
+	if filter.PreloadRelations {
+		db = db.Preload("UploadedByUser.AvatarAttachment").Preload("Group").Preload("Expense")
+	}
 
 	if filter.UploadedByUserID != nil {
 		db = db.Where("uploaded_by_user_id = ?", *filter.UploadedByUserID)

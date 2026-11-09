@@ -20,6 +20,7 @@ type User struct {
 	Wallet             int64           `gorm:"column:wallet;not null;default:0" json:"wallet"`
 	TelegramChatID     *int64          `gorm:"column:telegram_chat_id" json:"telegram_chat_id,omitempty"`
 	TelegramUserID     *int64          `gorm:"column:telegram_user_id" json:"telegram_user_id,omitempty"`
+	UploadedAttachments []Attachment   `gorm:"foreignKey:UploadedByUserID" json:"uploaded_attachments,omitempty"`
 }
 
 func (User) TableName() string {
