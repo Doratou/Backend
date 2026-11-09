@@ -109,7 +109,67 @@ func (h *AttachmentHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	res, err := h.attachmentService.GetByID(c.Request.Context(), id)
+	includeRelations := c.Query("include_relations") == "true"
+	var res *dto.AttachmentResponse
+	if includeRelations {
+		res, err = h.attachmentService.GetByIDWithRelations(c.Request.Context(), id)
+	} else {
+		res, err = h.attachmentService.GetByID(c.Request.Context(), id)
+	}
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}
+
+// GetByGroup handles GET /api/v1/attachments/group/:group_id
+func (h *AttachmentHandler) GetByGroup(c *gin.Context) {
+	groupID, err := parseIDParam(c, "group_id")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	var attType *enum.AttachmentType
+	if t := c.Query("type"); t != "" {
+		parsed := enum.AttachmentType(t)
+		attType = &parsed
+	}
+
+	page := 1
+	if pStr := c.Query("page"); pStr != "" {
+		if p, err := strconv.Atoi(pStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	pageSize := 20
+	if psStr := c.Query("page_size"); psStr != "" {
+		if ps, err := strconv.Atoi(psStr); err == nil && ps > 0 {
+			pageSize = ps
+		}
+	}
+
+	res, err := h.attachmentService.GetByGroup(c.Request.Context(), groupID, attType, page, pageSize)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}
+
+// GetByExpense handles GET /api/v1/attachments/expense/:expense_id
+func (h *AttachmentHandler) GetByExpense(c *gin.Context) {
+	expenseID, err := parseIDParam(c, "expense_id")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	res, err := h.attachmentService.GetByExpense(c.Request.Context(), expenseID)
 	if err != nil {
 		fail(c, err)
 		return

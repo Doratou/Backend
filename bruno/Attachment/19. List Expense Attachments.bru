@@ -1,0 +1,54 @@
+meta {
+  name: 19. List Expense Attachments
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/api/v1/attachments/expense/1
+  body: none
+  auth: none
+}
+
+docs {
+  # List Expense Attachments
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/attachments/expense/:expense_id`
+  **Auth:** None (Public)
+
+  ## Description
+
+  Retrieves all attachments tied to a specific expense (such as receipt images, PDF invoices, and payment confirmations).
+
+  ## Request
+
+  ### URL Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `expense_id` | `int64` | Yes | Target expense ID |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": 12,
+        "uploaded_by_user_id": 1,
+        "expense_id": 1,
+        "type": "EXPENSE_RECEIPT",
+        "original_filename": "supermarket_receipt.jpg",
+        "object_key": "attachments/expense_receipt/2026/11/supermarket_receipt.jpg",
+        "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/expense_receipt/2026/11/supermarket_receipt.jpg?...",
+        "is_public": false,
+        "created_at": "2026-11-09T17:00:00Z",
+        "updated_at": "2026-11-09T17:00:00Z"
+      }
+    ]
+  }
+  ```
+}

@@ -30,7 +30,11 @@ func RegisterAttachmentRoutes(
 
 		}
 
-		// 2. Single-item endpoints
+		// 2. Relation query endpoints (Registered before :id to prevent wildcard collisions)
+		attachments.GET("/group/:group_id", attachmentHandler.GetByGroup)
+		attachments.GET("/expense/:expense_id", attachmentHandler.GetByExpense)
+
+		// 3. Single-item endpoints
 		attachments.GET("", attachmentHandler.List)
 		attachments.GET("/:id", attachmentHandler.GetByID)
 		attachments.GET("/:id/url", attachmentHandler.GetURL)
