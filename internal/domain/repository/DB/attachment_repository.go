@@ -2,6 +2,7 @@ package DB
 
 import (
 	"context"
+	"time"
 
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
@@ -85,6 +86,9 @@ type AttachmentRepository interface {
 
 	// ExistsByID checks if an attachment exists.
 	ExistsByID(ctx context.Context, id int64) (bool, error)
+
+	// FindUnclaimedAttachments returns attachments that are not linked to any group, expense, or user avatar and older than the threshold.
+	FindUnclaimedAttachments(ctx context.Context, olderThan time.Duration, limit int) ([]*entity.Attachment, error)
 
 	// Count returns the total number of non-deleted attachments.
 	Count(ctx context.Context) (int64, error)

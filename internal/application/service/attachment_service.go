@@ -38,6 +38,7 @@ type AttachmentServiceConfig struct {
 
 type attachmentService struct {
 	attachmentRepo domain_db.AttachmentRepository
+	groupRepo      domain_db.GroupRepository
 	storageRepo    domain_storage.StorageRepository
 	cfg            AttachmentServiceConfig
 	consts         *bootstrap.Constant
@@ -45,6 +46,7 @@ type attachmentService struct {
 
 func NewAttachmentService(
 	attachmentRepo domain_db.AttachmentRepository,
+	groupRepo domain_db.GroupRepository,
 	storageRepo domain_storage.StorageRepository,
 	cfg AttachmentServiceConfig,
 	consts *bootstrap.Constant,
@@ -57,6 +59,7 @@ func NewAttachmentService(
 
 	return &attachmentService{
 		attachmentRepo: attachmentRepo,
+		groupRepo:      groupRepo,
 		storageRepo:    storageRepo,
 		cfg:            cfg,
 		consts:         consts,
@@ -85,6 +88,11 @@ func (s *attachmentService) Upload(ctx context.Context, userID int64, fileHeader
 
 	// 2. Validate MIME type and file size against limits
 	if err := s.validateFile(req.Type, fileHeader.Size, detectedMime); err != nil {
+		return nil, err
+	}
+
+	// 2.1 Validate group context and membership
+	if err := s.validateGroupContext(ctx, userID, req.GroupID, req.Type); err != nil {
 		return nil, err
 	}
 
@@ -164,6 +172,10 @@ func (s *attachmentService) UploadBatch(
 ) (*dto.BatchUploadResponse, error) {
 	if len(files) == 0 {
 		return nil, exception.Wrap(exception.ErrBadRequest, fmt.Errorf("no files provided for batch upload"))
+	}
+
+	if err := s.validateGroupContext(ctx, userID, groupID, defaultType); err != nil {
+		return nil, err
 	}
 
 	var (
@@ -306,6 +318,10 @@ func (s *attachmentService) CreatePresignedUpload(ctx context.Context, userID in
 		return nil, err
 	}
 
+	if err := s.validateGroupContext(ctx, userID, req.GroupID, req.Type); err != nil {
+		return nil, err
+	}
+
 	objectKey := s.generateObjectKey(req.Type, req.Filename)
 	uploadURL, err := s.storageRepo.GetPresignedUploadURL(ctx, objectKey, s.cfg.DefaultPresignedTTL)
 	if err != nil {
@@ -325,6 +341,10 @@ func (s *attachmentService) CreatePresignedUploadBatch(ctx context.Context, user
 
 	for _, item := range req.Items {
 		if err := s.validateFile(item.Type, item.FileSizeBytes, item.MimeType); err != nil {
+			return nil, err
+		}
+
+		if err := s.validateGroupContext(ctx, userID, item.GroupID, item.Type); err != nil {
 			return nil, err
 		}
 
@@ -349,6 +369,10 @@ func (s *attachmentService) CreatePresignedUploadBatch(ctx context.Context, user
 
 // ConfirmPresignedUpload registers the metadata in Postgres after client completes direct upload to RustFS.
 func (s *attachmentService) ConfirmPresignedUpload(ctx context.Context, userID int64, req dto.ConfirmPresignedUploadRequest) (*dto.AttachmentResponse, error) {
+	if err := s.validateGroupContext(ctx, userID, req.GroupID, req.Type); err != nil {
+		return nil, err
+	}
+
 	stat, err := s.storageRepo.StatObject(ctx, req.ObjectKey)
 	if err != nil {
 		return nil, exception.Wrap(exception.ErrAttachmentNotFound, fmt.Errorf("uploaded file not found in storage: %w", err))
@@ -390,6 +414,14 @@ func (s *attachmentService) ConfirmPresignedUploadBatch(ctx context.Context, use
 
 	now := time.Now().UTC()
 	for _, item := range req.Items {
+		if err := s.validateGroupContext(ctx, userID, item.GroupID, item.Type); err != nil {
+			failures = append(failures, dto.BatchUploadItemFailure{
+				Filename: item.OriginalFilename,
+				Error:    err.Error(),
+			})
+			continue
+		}
+
 		stat, err := s.storageRepo.StatObject(ctx, item.ObjectKey)
 		if err != nil {
 			failures = append(failures, dto.BatchUploadItemFailure{
@@ -438,10 +470,14 @@ func (s *attachmentService) ConfirmPresignedUploadBatch(ctx context.Context, use
 	}, nil
 }
 
-// GetByID retrieves attachment metadata and generates an access URL.
-func (s *attachmentService) GetByID(ctx context.Context, id int64) (*dto.AttachmentResponse, error) {
+// GetByID retrieves attachment metadata and generates an access URL, checking permissions for private files.
+func (s *attachmentService) GetByID(ctx context.Context, id int64, requestingUserID *int64) (*dto.AttachmentResponse, error) {
 	attachment, err := s.attachmentRepo.FindByID(ctx, id)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := s.validateAttachmentAccess(ctx, attachment, requestingUserID); err != nil {
 		return nil, err
 	}
 
@@ -450,9 +486,13 @@ func (s *attachmentService) GetByID(ctx context.Context, id int64) (*dto.Attachm
 }
 
 // GetByIDWithRelations retrieves attachment metadata with associated User, Group, and Expense preloaded.
-func (s *attachmentService) GetByIDWithRelations(ctx context.Context, id int64) (*dto.AttachmentResponse, error) {
+func (s *attachmentService) GetByIDWithRelations(ctx context.Context, id int64, requestingUserID *int64) (*dto.AttachmentResponse, error) {
 	attachment, err := s.attachmentRepo.FindByIDWithRelations(ctx, id)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := s.validateAttachmentAccess(ctx, attachment, requestingUserID); err != nil {
 		return nil, err
 	}
 
@@ -519,8 +559,16 @@ func (s *attachmentService) List(ctx context.Context, filter dto.AttachmentFilte
 	}, nil
 }
 
-// GetByGroup retrieves attachments associated with a specific group, with optional type filtering.
-func (s *attachmentService) GetByGroup(ctx context.Context, groupID int64, attType *enum.AttachmentType, page, pageSize int) (*dto.AttachmentListResponse, error) {
+// GetByGroup retrieves attachments associated with a specific group, ensuring caller is an active member.
+func (s *attachmentService) GetByGroup(ctx context.Context, groupID int64, requestingUserID int64, attType *enum.AttachmentType, page, pageSize int) (*dto.AttachmentListResponse, error) {
+	isMember, err := s.groupRepo.IsActiveMember(ctx, groupID, requestingUserID)
+	if err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	if !isMember {
+		return nil, exception.ErrGroupForbidden
+	}
+
 	filter := dto.AttachmentFilterRequest{
 		GroupID:          &groupID,
 		Type:             attType,
@@ -531,11 +579,17 @@ func (s *attachmentService) GetByGroup(ctx context.Context, groupID int64, attTy
 	return s.List(ctx, filter)
 }
 
-// GetByExpense retrieves attachments tied to a specific expense.
-func (s *attachmentService) GetByExpense(ctx context.Context, expenseID int64) ([]*dto.AttachmentResponse, error) {
+// GetByExpense retrieves attachments tied to a specific expense, enforcing access permissions.
+func (s *attachmentService) GetByExpense(ctx context.Context, expenseID int64, requestingUserID int64) ([]*dto.AttachmentResponse, error) {
 	attachments, err := s.attachmentRepo.FindByExpense(ctx, expenseID)
 	if err != nil {
 		return nil, err
+	}
+
+	for _, att := range attachments {
+		if err := s.validateAttachmentAccess(ctx, att, &requestingUserID); err != nil {
+			return nil, err
+		}
 	}
 
 	responses := make([]*dto.AttachmentResponse, len(attachments))
@@ -664,92 +718,16 @@ func (s *attachmentService) DownloadZipStream(ctx context.Context, ids []int64, 
 	return zipWriter.Flush()
 }
 
-// Update modifies metadata fields of an existing attachment.
-func (s *attachmentService) Update(ctx context.Context, userID int64, id int64, req dto.UpdateAttachmentRequest) (*dto.AttachmentResponse, error) {
-	attachment, err := s.attachmentRepo.FindByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// Ownership check
-	if attachment.UploadedByUserID != nil && *attachment.UploadedByUserID != userID {
-		return nil, exception.ErrAttachmentForbidden
-	}
-
-	if req.OriginalFilename != nil {
-		attachment.OriginalFilename = req.OriginalFilename
-	}
-	if req.GroupID != nil {
-		attachment.GroupID = req.GroupID
-	}
-	if req.ExpenseID != nil {
-		attachment.ExpenseID = req.ExpenseID
-	}
-	if req.Type != nil {
-		attachment.Type = *req.Type
-	}
-	if req.IsPublic != nil {
-		attachment.IsPublic = *req.IsPublic
-	}
-
-	if err := s.attachmentRepo.Update(ctx, attachment); err != nil {
-		return nil, err
-	}
-
-	accessURL, _ := s.buildAccessURL(ctx, *attachment.ObjectKey, attachment.IsPublic)
-	return dto.ToAttachmentResponse(attachment, accessURL), nil
-}
-
-// UpdateBatch updates common metadata fields for multiple attachments owned by the user.
-func (s *attachmentService) UpdateBatch(ctx context.Context, userID int64, req dto.BatchUpdateAttachmentRequest) error {
-	if len(req.IDs) == 0 {
-		return nil
-	}
-
-	attachments, err := s.attachmentRepo.FindByIDs(ctx, req.IDs)
-	if err != nil {
-		return err
-	}
-	if len(attachments) == 0 {
-		return exception.ErrAttachmentNotFound
-	}
-
-	for _, att := range attachments {
-		if att.UploadedByUserID != nil && *att.UploadedByUserID != userID {
-			return exception.ErrAttachmentForbidden
-		}
-	}
-
-	updates := make(map[string]any)
-	if req.OriginalFilename != nil {
-		updates["original_filename"] = *req.OriginalFilename
-	}
-	if req.GroupID != nil {
-		updates["group_id"] = *req.GroupID
-	}
-	if req.ExpenseID != nil {
-		updates["expense_id"] = *req.ExpenseID
-	}
-	if req.Type != nil {
-		updates["type"] = *req.Type
-	}
-	if req.IsPublic != nil {
-		updates["is_public"] = *req.IsPublic
-	}
-
-	return s.attachmentRepo.UpdateBatch(ctx, req.IDs, updates)
-}
-
 // Delete removes the attachment metadata, optionally hard-deleting the underlying storage object.
+// Enforces dual-ownership: permitted for uploader OR group owner (moderation).
 func (s *attachmentService) Delete(ctx context.Context, userID int64, id int64, hardDelete bool) error {
 	attachment, err := s.attachmentRepo.FindByID(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	// Ownership check
-	if attachment.UploadedByUserID != nil && *attachment.UploadedByUserID != userID {
-		return exception.ErrAttachmentForbidden
+	if err := s.validateDeletePermission(ctx, attachment, userID); err != nil {
+		return err
 	}
 
 	if hardDelete {
@@ -765,7 +743,7 @@ func (s *attachmentService) Delete(ctx context.Context, userID int64, id int64, 
 	return s.attachmentRepo.DeleteByID(ctx, id)
 }
 
-// DeleteBatch deletes multiple attachments (soft or hard).
+// DeleteBatch deletes multiple attachments (soft or hard, with group owner moderation support).
 func (s *attachmentService) DeleteBatch(ctx context.Context, userID int64, ids []int64, hardDelete bool) error {
 	if len(ids) == 0 {
 		return nil
@@ -780,8 +758,8 @@ func (s *attachmentService) DeleteBatch(ctx context.Context, userID int64, ids [
 	}
 
 	for _, att := range attachments {
-		if att.UploadedByUserID != nil && *att.UploadedByUserID != userID {
-			return exception.ErrAttachmentForbidden
+		if err := s.validateDeletePermission(ctx, att, userID); err != nil {
+			return err
 		}
 	}
 
@@ -804,28 +782,14 @@ func (s *attachmentService) DeleteBatch(ctx context.Context, userID int64, ids [
 	return s.attachmentRepo.DeleteByIDs(ctx, ids)
 }
 
-// GetFreshAccessURL generates an updated direct or presigned URL.
-func (s *attachmentService) GetFreshAccessURL(ctx context.Context, id int64, expiry time.Duration) (string, error) {
+// DownloadStream streams the object from storage for direct HTTP proxy download, checking access rights for private files.
+func (s *attachmentService) DownloadStream(ctx context.Context, id int64, requestingUserID *int64) (io.ReadCloser, *dto.FileStreamMeta, error) {
 	attachment, err := s.attachmentRepo.FindByID(ctx, id)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
-	if expiry <= 0 {
-		expiry = s.cfg.DefaultPresignedTTL
-	}
-
-	if attachment.IsPublic {
-		return fmt.Sprintf("%s/%s", strings.TrimRight(s.cfg.PublicURLPrefix, "/"), *attachment.ObjectKey), nil
-	}
-
-	return s.storageRepo.GetPresignedURL(ctx, *attachment.ObjectKey, expiry)
-}
-
-// DownloadStream streams the object from storage for direct HTTP proxy download.
-func (s *attachmentService) DownloadStream(ctx context.Context, id int64) (io.ReadCloser, *dto.FileStreamMeta, error) {
-	attachment, err := s.attachmentRepo.FindByID(ctx, id)
-	if err != nil {
+	if err := s.validateAttachmentAccess(ctx, attachment, requestingUserID); err != nil {
 		return nil, nil, err
 	}
 
@@ -936,4 +900,71 @@ func (s *attachmentService) buildAccessURL(ctx context.Context, objectKey string
 		return fmt.Sprintf("%s/%s", prefix, objectKey), nil
 	}
 	return s.storageRepo.GetPresignedURL(ctx, objectKey, s.cfg.DefaultPresignedTTL)
+}
+
+func (s *attachmentService) validateGroupContext(ctx context.Context, userID int64, groupID *int64, attType enum.AttachmentType) error {
+	if groupID == nil {
+		return nil
+	}
+
+	group, _, err := s.groupRepo.FindByID(ctx, *groupID)
+	if err != nil {
+		return err
+	}
+	if group.Status != enum.GroupStatusActive {
+		return exception.ErrGroupInvalidStatus
+	}
+
+	isMember, err := s.groupRepo.IsActiveMember(ctx, *groupID, userID)
+	if err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+	if !isMember {
+		return exception.ErrGroupForbidden
+	}
+
+	if attType == enum.AttachmentTypeGroupCover && group.CreatedByUserID != userID {
+		return exception.ErrGroupForbidden
+	}
+
+	return nil
+}
+
+func (s *attachmentService) validateAttachmentAccess(ctx context.Context, att *entity.Attachment, callerUserID *int64) error {
+	if att.IsPublic {
+		return nil
+	}
+
+	if callerUserID == nil {
+		return exception.ErrAttachmentForbidden
+	}
+
+	if att.UploadedByUserID != nil && *att.UploadedByUserID == *callerUserID {
+		return nil
+	}
+
+	if att.GroupID != nil {
+		isMember, err := s.groupRepo.IsActiveMember(ctx, *att.GroupID, *callerUserID)
+		if err == nil && isMember {
+			return nil
+		}
+	}
+
+	return exception.ErrAttachmentForbidden
+}
+
+func (s *attachmentService) validateDeletePermission(ctx context.Context, att *entity.Attachment, userID int64) error {
+	if att.UploadedByUserID != nil && *att.UploadedByUserID == userID {
+		return nil
+	}
+
+	if att.GroupID != nil {
+		if group, _, err := s.groupRepo.FindByID(ctx, *att.GroupID); err == nil && group != nil {
+			if group.CreatedByUserID == userID {
+				return nil // Group owner has moderation rights to delete squad attachments
+			}
+		}
+	}
+
+	return exception.ErrAttachmentForbidden
 }

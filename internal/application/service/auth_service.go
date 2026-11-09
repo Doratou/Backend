@@ -29,19 +29,21 @@ type AuthServiceConfig struct {
 }
 
 type authService struct {
-	userRepo   domain_db.UserRepository
-	otpService adapter.OTPService
-	tokenRepo  cache.AuthnTokenRepository
-	dbTrx      database.TrxManager
-	redisTrx   redisInfra.TrxManager
-	jwtMaker   jwt.TokenMaker
-	hasher     hasher.Hasher
-	randomEng  *random.RandomGeneratorEngine
-	cfg        AuthServiceConfig
+	userRepo       domain_db.UserRepository
+	attachmentRepo domain_db.AttachmentRepository
+	otpService     adapter.OTPService
+	tokenRepo      cache.AuthnTokenRepository
+	dbTrx          database.TrxManager
+	redisTrx       redisInfra.TrxManager
+	jwtMaker       jwt.TokenMaker
+	hasher         hasher.Hasher
+	randomEng      *random.RandomGeneratorEngine
+	cfg            AuthServiceConfig
 }
 
 func NewAuthService(
 	userRepo domain_db.UserRepository,
+	attachmentRepo domain_db.AttachmentRepository,
 	otpService adapter.OTPService,
 	tokenRepo cache.AuthnTokenRepository,
 	dbTrx database.TrxManager,
@@ -62,15 +64,16 @@ func NewAuthService(
 		cfg.RefreshTokenTTL = defaultTTL
 	}
 	return &authService{
-		userRepo:   userRepo,
-		otpService: otpService,
-		tokenRepo:  tokenRepo,
-		dbTrx:      dbTrx,
-		redisTrx:   redisTrx,
-		jwtMaker:   jwtMaker,
-		hasher:     hasher,
-		randomEng:  random.NewRandomGeneratorEngine(),
-		cfg:        cfg,
+		userRepo:       userRepo,
+		attachmentRepo: attachmentRepo,
+		otpService:     otpService,
+		tokenRepo:      tokenRepo,
+		dbTrx:          dbTrx,
+		redisTrx:       redisTrx,
+		jwtMaker:       jwtMaker,
+		hasher:         hasher,
+		randomEng:      random.NewRandomGeneratorEngine(),
+		cfg:            cfg,
 	}
 }
 
@@ -492,4 +495,29 @@ func (s *authService) ResetPassword(ctx context.Context, req dto.ResetPasswordRe
 	_ = s.tokenRepo.DeleteUserRefreshSessions(ctx, strconv.FormatInt(user.ID, 10))
 
 	return nil
+}
+
+func (s *authService) UpdateAvatar(ctx context.Context, userID int64, avatarAttachmentID int64) (*dto.UserResponse, error) {
+	att, err := s.attachmentRepo.FindByID(ctx, avatarAttachmentID)
+	if err != nil {
+		return nil, err
+	}
+	if att.Type != enum.AttachmentTypeProfileImage {
+		return nil, exception.ErrInvalidFileType
+	}
+	if att.UploadedByUserID == nil || *att.UploadedByUserID != userID {
+		return nil, exception.ErrAttachmentForbidden
+	}
+
+	if err := s.userRepo.UpdateAvatar(ctx, userID, avatarAttachmentID); err != nil {
+		return nil, err
+	}
+
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	res := dto.ToUserResponse(user)
+	return &res, nil
 }

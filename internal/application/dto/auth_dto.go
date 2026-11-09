@@ -60,6 +60,10 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required,min=6,max=100"`
 }
 
+type UpdateAvatarRequest struct {
+	AvatarAttachmentID int64 `json:"avatar_attachment_id" binding:"required,gt=0"`
+}
+
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }

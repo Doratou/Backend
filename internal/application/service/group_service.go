@@ -12,17 +12,33 @@ import (
 )
 
 type groupService struct {
-	groups domainrepo.GroupRepository
+	groups         domainrepo.GroupRepository
+	attachmentRepo domainrepo.AttachmentRepository
 }
 
-func NewGroupService(groups domainrepo.GroupRepository) *groupService {
-	return &groupService{groups: groups}
+func NewGroupService(groups domainrepo.GroupRepository, attachmentRepo domainrepo.AttachmentRepository) *groupService {
+	return &groupService{groups: groups, attachmentRepo: attachmentRepo}
 }
 
 func (s *groupService) Create(ctx context.Context, userID int64, req dto.CreateGroupRequest) (*dto.GroupResponse, error) {
-	group := &entity.Group{Title: req.Title, Description: req.Description, CreatedByUserID: userID,
-		Status: enum.GroupStatusActive}
-	// TODO: Connect the group cover upload/attachment service when it is implemented.
+	group := &entity.Group{
+		Title:             req.Title,
+		Description:       req.Description,
+		CreatedByUserID:   userID,
+		CoverAttachmentID: req.CoverAttachmentID,
+		Status:            enum.GroupStatusActive,
+	}
+
+	if req.CoverAttachmentID != nil {
+		att, err := s.attachmentRepo.FindByID(ctx, *req.CoverAttachmentID)
+		if err != nil {
+			return nil, err
+		}
+		if att.Type != enum.AttachmentTypeGroupCover {
+			return nil, exception.ErrInvalidFileType
+		}
+	}
+
 	if err := s.groups.CreateWithOwner(ctx, group); err != nil {
 		return nil, err
 	}
@@ -87,7 +103,7 @@ func (s *groupService) ownedGroup(ctx context.Context, userID int64, role enum.U
 }
 
 func (s *groupService) Update(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.UpdateGroupRequest) (*dto.GroupResponse, error) {
-	if req.Title == nil && req.Description == nil {
+	if req.Title == nil && req.Description == nil && req.CoverAttachmentID == nil {
 		return nil, exception.ErrGroupNoFieldsToUpdate
 	}
 	group, err := s.ownedGroup(ctx, userID, role, groupID)
@@ -100,6 +116,16 @@ func (s *groupService) Update(ctx context.Context, userID int64, role enum.UserR
 	if req.Description != nil {
 		group.Description = req.Description
 	}
+	if req.CoverAttachmentID != nil {
+		att, err := s.attachmentRepo.FindByID(ctx, *req.CoverAttachmentID)
+		if err != nil {
+			return nil, err
+		}
+		if att.Type != enum.AttachmentTypeGroupCover {
+			return nil, exception.ErrInvalidFileType
+		}
+		group.CoverAttachmentID = req.CoverAttachmentID
+	}
 	if err := s.groups.Update(ctx, group); err != nil {
 		return nil, err
 	}
@@ -111,12 +137,31 @@ func (s *groupService) Update(ctx context.Context, userID int64, role enum.UserR
 	return &result, nil
 }
 
-func (s *groupService) ChangeCover(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error {
-	if _, err := s.ownedGroup(ctx, userID, role, groupID); err != nil {
-		return err
+func (s *groupService) ChangeCover(ctx context.Context, userID int64, role enum.UserRole, groupID int64, coverAttachmentID int64) (*dto.GroupResponse, error) {
+	group, err := s.ownedGroup(ctx, userID, role, groupID)
+	if err != nil {
+		return nil, err
 	}
-	// TODO: Implement cover image changes when the attachment service is available.
-	return nil
+
+	att, err := s.attachmentRepo.FindByID(ctx, coverAttachmentID)
+	if err != nil {
+		return nil, err
+	}
+	if att.Type != enum.AttachmentTypeGroupCover {
+		return nil, exception.ErrInvalidFileType
+	}
+
+	group.CoverAttachmentID = &coverAttachmentID
+	if err := s.groups.Update(ctx, group); err != nil {
+		return nil, err
+	}
+
+	updated, count, err := s.groups.FindByID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	result := toGroupResponse(updated, count)
+	return &result, nil
 }
 
 func (s *groupService) Archive(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error {

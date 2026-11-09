@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
@@ -314,6 +315,25 @@ func (r *attachmentRepository) ExistsByID(ctx context.Context, id int64) (bool, 
 		return false, exception.Wrap(exception.ErrInternal, err)
 	}
 	return count > 0, nil
+}
+
+func (r *attachmentRepository) FindUnclaimedAttachments(ctx context.Context, olderThan time.Duration, limit int) ([]*entity.Attachment, error) {
+	cutoff := time.Now().UTC().Add(-olderThan)
+	var attachments []*entity.Attachment
+
+	db := r.getDB(ctx).
+		Where("group_id IS NULL AND expense_id IS NULL AND created_at < ?", cutoff).
+		Where("id NOT IN (SELECT avatar_attachment_id FROM users WHERE avatar_attachment_id IS NOT NULL AND deleted_at IS NULL)").
+		Where("id NOT IN (SELECT cover_attachment_id FROM groups WHERE cover_attachment_id IS NOT NULL AND deleted_at IS NULL)")
+
+	if limit > 0 {
+		db = db.Limit(limit)
+	}
+
+	if err := db.Order("id ASC").Find(&attachments).Error; err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return attachments, nil
 }
 
 func (r *attachmentRepository) Count(ctx context.Context) (int64, error) {

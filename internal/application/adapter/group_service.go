@@ -17,7 +17,7 @@ type GroupService interface {
 	LeaveGroup(ctx context.Context, userID, groupID int64) error
 	TransferOwnership(ctx context.Context, userID int64, role enum.UserRole, groupID, newOwnerID int64) error
 	Update(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.UpdateGroupRequest) (*dto.GroupResponse, error)
-	ChangeCover(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error
+	ChangeCover(ctx context.Context, userID int64, role enum.UserRole, groupID int64, coverAttachmentID int64) (*dto.GroupResponse, error)
 	Archive(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error
 	Delete(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error
 	Clone(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.CloneGroupRequest) (*dto.GroupResponse, error)
