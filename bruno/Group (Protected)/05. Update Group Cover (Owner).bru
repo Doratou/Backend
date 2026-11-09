@@ -6,12 +6,19 @@ meta {
 
 patch {
   url: {{baseUrl}}/api/v1/groups/{{groupId}}/cover
-  body: none
+  body: json
   auth: inherit
 }
 
 headers {
   Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "cover_attachment_id": 1
+  }
 }
 
 vars:pre-request {
@@ -32,7 +39,7 @@ docs {
 
   ## Description
 
-  Checks access for a cover update. Cover upload is not implemented yet; this endpoint currently returns a success message without changing the cover.
+  Updates the group's cover image by linking an existing valid attachment of type `GROUP_COVER`.
 
   ## Request
 
@@ -47,18 +54,17 @@ docs {
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | `Bearer <access-token>` |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  ```json
+  {
+    "cover_attachment_id": 1
+  }
+  ```
 
   ## Response
 
-  **`200 OK`**
-  ```json
-  {"success": true, "data": {"message": "group cover update is not implemented yet"}}
-  ```
-
-  ## Errors
-
-  - `400 GROUP_INVALID_ID` — `groupID` is not a positive integer.
-  - `401 MISSING_TOKEN` — Access token is missing or invalid.
-  - `403 GROUP_FORBIDDEN` — Requester is neither the owner nor an admin.
-  - `404 GROUP_NOT_FOUND` — Group does not exist or was deleted.
+  Returns the updated group details (`dto.GroupResponse`) with HTTP 200.
 }
