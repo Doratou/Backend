@@ -19,9 +19,7 @@ func RegisterAdminReportRoutes(
 	// User Reporting Routes (Protected)
 	// =========================================================================
 	reports := rg.Group("/reports")
-	if authMiddleware != nil {
-		reports.Use(authMiddleware)
-	}
+	reports.Use(authMiddleware)
 	{
 		reports.POST("", reportHandler.SubmitReport)
 		reports.GET("/my", reportHandler.ListMyReports)
@@ -36,9 +34,7 @@ func RegisterAdminReportRoutes(
 	// when RBAC is introduced to strictly guard admin-only access.
 	// =========================================================================
 	adminReports := rg.Group("/admin/reports")
-	if authMiddleware != nil {
-		adminReports.Use(authMiddleware)
-	}
+	adminReports.Use(authMiddleware)
 	{
 		adminReports.GET("", reportHandler.AdminListReports)
 		adminReports.GET("/stats", reportHandler.AdminGetStats)

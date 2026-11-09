@@ -35,21 +35,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
   rustfs:
     image: rustfs/rustfs:latest
     pull_policy: missing
     container_name: doratou-rustfs
     restart: unless-stopped
     environment:
-      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY_ID:RUSTFS_ACCESS_KEY_ID is required}
-      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_ACCESS_KEY:RUSTFS_SECRET_ACCESS_KEY is required}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY_ID:?RUSTFS_ACCESS_KEY_ID is required}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_ACCESS_KEY:?RUSTFS_SECRET_ACCESS_KEY is required}
       RUSTFS_ADDRESS: "0.0.0.0:9000"
       RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
       RUSTFS_CONSOLE_ENABLE: "true"
     ports:
-      - "127.0.0.1:${RUSTFS_API_PORT:RUSTFS_API_PORT is required}:9000"
-      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:RUSTFS_CONSOLE_PORT is required}:9001"
+      - "127.0.0.1:${RUSTFS_API_PORT:-9000}:9000"
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9001}:9001"
     volumes:
       - rustfsdata:/data
     healthcheck:
@@ -62,6 +61,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+
 
 volumes:
   pgdata:

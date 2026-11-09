@@ -66,4 +66,7 @@ type AdminReportRepository interface {
 
 	// ExistsByID checks if a report exists by ID.
 	ExistsByID(ctx context.Context, id int64) (bool, error)
+
+	// Checks if a report exists & not solved yet by ID.
+	NotSolvedByID(ctx context.Context, id int64) (bool, error)
 }

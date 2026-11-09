@@ -11,9 +11,6 @@ func RegisterAttachmentRoutes(
 	attachmentHandler *handler.AttachmentHandler,
 	authMiddleware gin.HandlerFunc,
 ) {
-	if attachmentHandler == nil {
-		return
-	}
 
 	attachments := rg.Group("/attachments")
 	{
@@ -25,19 +22,12 @@ func RegisterAttachmentRoutes(
 			batch.POST("/download", attachmentHandler.DownloadZipStream)
 
 			// Protected batch endpoints
-			if authMiddleware != nil {
-				batch.POST("/upload", authMiddleware, attachmentHandler.UploadBatch)
-				batch.POST("/presigned-upload", authMiddleware, attachmentHandler.CreatePresignedUploadBatch)
-				batch.POST("/confirm-upload", authMiddleware, attachmentHandler.ConfirmPresignedUploadBatch)
-				batch.PATCH("", authMiddleware, attachmentHandler.UpdateBatch)
-				batch.DELETE("", authMiddleware, attachmentHandler.DeleteBatch)
-			} else {
-				batch.POST("/upload", attachmentHandler.UploadBatch)
-				batch.POST("/presigned-upload", attachmentHandler.CreatePresignedUploadBatch)
-				batch.POST("/confirm-upload", attachmentHandler.ConfirmPresignedUploadBatch)
-				batch.PATCH("", attachmentHandler.UpdateBatch)
-				batch.DELETE("", attachmentHandler.DeleteBatch)
-			}
+			batch.POST("/upload", authMiddleware, attachmentHandler.UploadBatch)
+			batch.POST("/presigned-upload", authMiddleware, attachmentHandler.CreatePresignedUploadBatch)
+			batch.POST("/confirm-upload", authMiddleware, attachmentHandler.ConfirmPresignedUploadBatch)
+			batch.PATCH("", authMiddleware, attachmentHandler.UpdateBatch)
+			batch.DELETE("", authMiddleware, attachmentHandler.DeleteBatch)
+
 		}
 
 		// 2. Single-item endpoints
@@ -47,18 +37,11 @@ func RegisterAttachmentRoutes(
 		attachments.GET("/:id/download", attachmentHandler.DownloadStream)
 
 		// Protected single-item endpoints (require valid access token)
-		if authMiddleware != nil {
-			attachments.POST("/upload", authMiddleware, attachmentHandler.Upload)
-			attachments.POST("/presigned-upload", authMiddleware, attachmentHandler.CreatePresignedUpload)
-			attachments.POST("/confirm-upload", authMiddleware, attachmentHandler.ConfirmPresignedUpload)
-			attachments.PATCH("/:id", authMiddleware, attachmentHandler.Update)
-			attachments.DELETE("/:id", authMiddleware, attachmentHandler.Delete)
-		} else {
-			attachments.POST("/upload", attachmentHandler.Upload)
-			attachments.POST("/presigned-upload", attachmentHandler.CreatePresignedUpload)
-			attachments.POST("/confirm-upload", attachmentHandler.ConfirmPresignedUpload)
-			attachments.PATCH("/:id", attachmentHandler.Update)
-			attachments.DELETE("/:id", attachmentHandler.Delete)
-		}
+		attachments.POST("/upload", authMiddleware, attachmentHandler.Upload)
+		attachments.POST("/presigned-upload", authMiddleware, attachmentHandler.CreatePresignedUpload)
+		attachments.POST("/confirm-upload", authMiddleware, attachmentHandler.ConfirmPresignedUpload)
+		attachments.PATCH("/:id", authMiddleware, attachmentHandler.Update)
+		attachments.DELETE("/:id", authMiddleware, attachmentHandler.Delete)
+
 	}
 }

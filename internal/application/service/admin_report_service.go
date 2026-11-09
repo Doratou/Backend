@@ -227,7 +227,7 @@ func (s *adminReportService) ReviewReport(ctx context.Context, id int64, reviewe
 		return nil, exception.ErrInvalidReportStatus
 	}
 
-	exists, err := s.adminReportRepo.ExistsByID(ctx, id)
+	exists, err := s.adminReportRepo.NotSolvedByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}

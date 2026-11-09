@@ -20,21 +20,21 @@ auth:bearer {
 
 docs {
   # Admin - Get Report Details
-
+  
   **Method:** `GET`
   **Endpoint:** `/api/v1/admin/reports/:id`
   **Auth:** Required (Admin Access Token)
-
+  
   ## Description
   Retrieves comprehensive report details by ID including populated reporter, reported user, and reviewing admin profile information.
-
+  
   ## Request
-
+  
   ### Headers
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
-
+  
   ## Response
   **`200 OK`**
   ```json
