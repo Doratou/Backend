@@ -1,6 +1,8 @@
 package router
 
 import (
+	"github.com/Doratou/Backend/internal/domain/enum"
+	"github.com/Doratou/Backend/internal/presentation/middleware"
 	"github.com/Doratou/Backend/internal/presentation/v1/handler"
 	"github.com/gin-gonic/gin"
 )
@@ -29,12 +31,10 @@ func RegisterAdminReportRoutes(
 	}
 
 	// =========================================================================
-	// Admin Moderation Routes
-	// TODO: Attach RBAC middleware here (e.g. middleware.RequireRole(enum.UserRoleAdmin))
-	// when RBAC is introduced to strictly guard admin-only access.
+	// Admin Moderation Routes (Protected by Auth and RBAC: ADMIN only)
 	// =========================================================================
 	adminReports := rg.Group("/admin/reports")
-	adminReports.Use(authMiddleware)
+	adminReports.Use(authMiddleware, middleware.RequireRole(enum.UserRoleAdmin))
 	{
 		adminReports.GET("", reportHandler.AdminListReports)
 		adminReports.GET("/stats", reportHandler.AdminGetStats)
