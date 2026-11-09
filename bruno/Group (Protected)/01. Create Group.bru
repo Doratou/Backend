@@ -7,11 +7,15 @@ meta {
 post {
   url: {{baseUrl}}/api/v1/groups/
   body: json
-  auth: inherit
+  auth: bearer
 }
 
 headers {
   Authorization: Bearer  {{accessToken}}
+}
+
+auth:bearer {
+  token: {{token}}
 }
 
 body:json {

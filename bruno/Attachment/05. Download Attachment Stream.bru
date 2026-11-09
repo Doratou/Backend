@@ -10,12 +10,16 @@ get {
   auth: none
 }
 
+headers {
+  ~Authorization: Bearer {{token}}
+}
+
 docs {
   # Download Attachment Stream
 
   **Method:** `GET`
   **Endpoint:** `/api/v1/attachments/:id/download`
-  **Auth:** None (Public)
+  **Auth:** Optional (`OptionalAuth` middleware). Public attachments require no auth; private attachments require Bearer token of uploader or group member.
 
   ## Description
 
@@ -23,19 +27,15 @@ docs {
 
   ## Request
 
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Optional | Bearer access token (required for private files) |
+
   ### URL Parameters
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `id` | `int64` | Yes | Attachment ID |
-
-  ## Response
-
-  **`200 OK`**
-  Binary stream with appropriate file download headers.
-
-  ## Errors
-
-  * `404 Not Found` — Attachment does not exist
-  * `503 Service Unavailable` — RustFS / S3 storage is unreachable
 }

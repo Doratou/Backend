@@ -7,14 +7,22 @@ meta {
 post {
   url: {{baseUrl}}/api/v1/attachments/batch/urls?expiry=1h
   body: json
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
 }
 
 params:query {
   expiry: 1h
+  ~expiry: 30m
+  ~expiry: 2h
+  ~expiry: 24h
 }
 
 headers {
+  Authorization: Bearer {{token}}
   Content-Type: application/json
 }
 
@@ -29,44 +37,9 @@ docs {
 
   **Method:** `POST`
   **Endpoint:** `/api/v1/attachments/batch/urls`
-  **Auth:** None (Public)
+  **Auth:** Required (Bearer Token)
 
   ## Description
 
   Fetches active access URLs for a list of attachment IDs concurrently. For private files, generates freshly signed presigned GET URLs with the specified expiration. For public files, returns direct public URLs.
-
-  ## Request
-
-  ### Query Parameters
-
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `expiry` | `string` | No | Expiry duration for private URLs (e.g. `30m`, `1h`) |
-
-  ### Body
-
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `ids` | `int64[]` | Yes | List of attachment IDs |
-
-  ## Response
-
-  **`200 OK`**
-  ```json
-  {
-    "success": true,
-    "data": {
-      "items": [
-        {
-          "id": 1,
-          "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/profile_image/2026/11/avatar.png"
-        },
-        {
-          "id": 2,
-          "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/expense_receipt/2026/11/receipt.jpg?..."
-        }
-      ]
-    }
-  }
-  ```
 }

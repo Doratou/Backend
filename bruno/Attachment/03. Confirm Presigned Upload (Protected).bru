@@ -15,6 +15,7 @@ auth:bearer {
 }
 
 headers {
+  Authorization: Bearer {{token}}
   Content-Type: application/json
 }
 
@@ -23,7 +24,13 @@ body:json {
     "object_key": "{{presignedObjectKey}}",
     "original_filename": "squad_cover.jpg",
     "type": "GROUP_COVER",
+    // "type": "PROFILE_IMAGE",
+    // "type": "GALLERY_IMAGE",
+    // "type": "EXPENSE_RECEIPT",
+    // "group_id": 1,
+    // "expense_id": 1,
     "is_public": true
+    // "is_public": false
   }
 }
 
@@ -51,36 +58,10 @@ docs {
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `object_key` | `string` | Yes | Object storage key returned by `presigned-upload` |
-  | `original_filename` | `string` | Yes | Original file name |
+  | `object_key` | `string` | Yes | RustFS object key received during presign |
+  | `original_filename` | `string` | Yes | Human-readable original filename |
   | `type` | `string` | Yes | Attachment type |
   | `group_id` | `int64` | No | Associated squad/group ID |
   | `expense_id` | `int64` | No | Associated expense ID |
-  | `is_public` | `boolean` | No | Public accessibility flag |
-
-  ## Response
-
-  **`201 Created`**
-  ```json
-  {
-    "success": true,
-    "data": {
-      "id": 2,
-      "uploaded_by_user_id": 1,
-      "type": "GROUP_COVER",
-      "original_filename": "squad_cover.jpg",
-      "object_key": "attachments/group_cover/2026/11/abc123_squad_cover.jpg",
-      "mime_type": "image/jpeg",
-      "file_size_bytes": 2097152,
-      "is_public": true,
-      "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/group_cover/2026/11/abc123_squad_cover.jpg"
-    }
-  }
-  ```
-
-  ## Errors
-
-  * `400 Bad Request` — Missing required fields
-  * `401 Unauthorized` — Missing or invalid Bearer token
-  * `404 Not Found` — Object does not exist in storage (upload failed or wrong key)
+  | `is_public` | `boolean` | No | Whether the file is public |
 }

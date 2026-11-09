@@ -15,6 +15,7 @@ auth:bearer {
 }
 
 headers {
+  Authorization: Bearer {{token}}
   Content-Type: application/json
 }
 
@@ -25,7 +26,13 @@ body:json {
         "object_key": "attachments/gallery_image/2026/11/abc1_gallery_1.jpg",
         "original_filename": "gallery_1.jpg",
         "type": "GALLERY_IMAGE",
+        // "type": "PROFILE_IMAGE",
+        // "type": "GROUP_COVER",
+        // "type": "EXPENSE_RECEIPT",
+        // "group_id": 1,
+        // "expense_id": 1,
         "is_public": true
+        // "is_public": false
       }
     ]
   }
@@ -41,36 +48,4 @@ docs {
   ## Description
 
   Confirms multiple direct client uploads. Verifies each object in storage, queries file sizes and ETags, and inserts all records in PostgreSQL.
-
-  ## Request
-
-  ### Body
-
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `items` | `array` | Yes | List of confirmed uploaded items |
-  | `items[].object_key` | `string` | Yes | Storage key returned from presigned upload |
-  | `items[].original_filename` | `string` | Yes | File name |
-  | `items[].type` | `string` | Yes | Attachment type |
-
-  ## Response
-
-  **`201 Created`**
-  ```json
-  {
-    "success": true,
-    "data": {
-      "success_count": 1,
-      "failure_count": 0,
-      "items": [
-        {
-          "id": 11,
-          "original_filename": "gallery_1.jpg",
-          "object_key": "attachments/gallery_image/2026/11/abc1_gallery_1.jpg",
-          "is_public": true
-        }
-      ]
-    }
-  }
-  ```
 }

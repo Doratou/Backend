@@ -12,6 +12,7 @@ delete {
 
 params:query {
   ~hard: true
+  ~hard: false
 }
 
 auth:bearer {
@@ -19,6 +20,7 @@ auth:bearer {
 }
 
 headers {
+  Authorization: Bearer {{token}}
   Content-Type: application/json
 }
 
@@ -38,30 +40,4 @@ docs {
   ## Description
 
   Deletes multiple attachments in bulk. By default performs a soft delete. When `?hard=true` is passed, permanently purges metadata from PostgreSQL and bulk-deletes the physical file objects from RustFS / S3 storage in a single network operation.
-
-  ## Request
-
-  ### Query Parameters
-
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `hard` | `boolean` | No | If `true`, permanently deletes objects from RustFS |
-
-  ### Body
-
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `ids` | `int64[]` | Yes | List of attachment IDs to delete |
-
-  ## Response
-
-  **`200 OK`**
-  ```json
-  {
-    "success": true,
-    "data": {
-      "message": "attachments deleted successfully"
-    }
-  }
-  ```
 }

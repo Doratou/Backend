@@ -15,6 +15,7 @@ auth:bearer {
 }
 
 headers {
+  Authorization: Bearer {{token}}
   Content-Type: application/json
 }
 
@@ -22,9 +23,15 @@ body:json {
   {
     "filename": "squad_cover.jpg",
     "type": "GROUP_COVER",
+    // "type": "PROFILE_IMAGE",
+    // "type": "GALLERY_IMAGE",
+    // "type": "EXPENSE_RECEIPT",
     "file_size_bytes": 2097152,
     "mime_type": "image/jpeg",
+    // "group_id": 1,
+    // "expense_id": 1,
     "is_public": true
+    // "is_public": false
   }
 }
 
@@ -57,29 +64,11 @@ docs {
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `filename` | `string` | Yes | Name of the file |
-  | `type` | `string` | Yes | Attachment type (e.g. `GROUP_COVER`) |
+  | `filename` | `string` | Yes | Original file name including extension |
+  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`) |
   | `file_size_bytes` | `int64` | Yes | Expected file size in bytes |
-  | `mime_type` | `string` | Yes | MIME type of the file |
-  | `is_public` | `boolean` | No | Whether the file should be publicly accessible |
-
-  ## Response
-
-  **`200 OK`**
-  ```json
-  {
-    "success": true,
-    "data": {
-      "upload_url": "http://127.0.0.1:9000/doratou-storage/attachments/group_cover/2026/11/abc123_squad_cover.jpg?X-Amz-Algorithm=...",
-      "object_key": "attachments/group_cover/2026/11/abc123_squad_cover.jpg",
-      "expires_in_seconds": 900
-    }
-  }
-  ```
-
-  ## Errors
-
-  * `400 Bad Request` — Invalid file type, missing required fields
-  * `401 Unauthorized` — Missing or invalid Bearer token
-  * `413 Payload Too Large` — File size exceeds limit
+  | `mime_type` | `string` | Yes | Declared MIME type |
+  | `group_id` | `int64` | No | Associated squad/group ID |
+  | `expense_id` | `int64` | No | Associated expense ID |
+  | `is_public` | `boolean` | No | Whether the object should be public |
 }

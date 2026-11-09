@@ -14,10 +14,21 @@ auth:bearer {
   token: {{token}}
 }
 
+headers {
+  Authorization: Bearer {{token}}
+}
+
 body:multipart-form {
   files: @file()
   type: GALLERY_IMAGE
+  ~type: PROFILE_IMAGE
+  ~type: GROUP_COVER
+  ~type: EXPENSE_RECEIPT
+  ~type: ATTACHMENT
+  ~group_id: 1
+  ~expense_id: 1
   is_public: true
+  ~is_public: false
 }
 
 docs {
@@ -45,38 +56,8 @@ docs {
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `files` | `file[]` | Yes | Multiple binary media files |
-  | `type` | `string` | No | Default attachment type (e.g. `GALLERY_IMAGE`) |
-  | `group_id` | `int64` | No | Associated squad/group ID |
+  | `type` | `string` | Yes | Attachment type (`GALLERY_IMAGE`, `GROUP_COVER`, `PROFILE_IMAGE`, `EXPENSE_RECEIPT`) |
+  | `group_id` | `int64` | No | Associated squad/group ID (required when uploading for a group or gallery) |
   | `expense_id` | `int64` | No | Associated expense ID |
-  | `is_public` | `boolean` | No | Public accessibility override |
-
-  ## Response
-
-  **`201 Created`**
-  ```json
-  {
-    "success": true,
-    "data": {
-      "success_count": 2,
-      "failure_count": 0,
-      "items": [
-        {
-          "id": 10,
-          "original_filename": "photo1.jpg",
-          "object_key": "attachments/gallery_image/2026/11/abc1_photo1.jpg",
-          "mime_type": "image/jpeg",
-          "file_size_bytes": 1048576,
-          "is_public": true,
-          "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/gallery_image/2026/11/abc1_photo1.jpg"
-        }
-      ],
-      "failures": []
-    }
-  }
-  ```
-
-  ## Errors
-
-  * `400 Bad Request` — No files provided or malformed multipart form
-  * `401 Unauthorized` — Missing or invalid token
+  | `is_public` | `boolean` | No | Whether files are public |
 }

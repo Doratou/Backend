@@ -15,6 +15,7 @@ auth:bearer {
 }
 
 headers {
+  Authorization: Bearer {{token}}
   Content-Type: application/json
 }
 
@@ -24,16 +25,26 @@ body:json {
       {
         "filename": "gallery_1.jpg",
         "type": "GALLERY_IMAGE",
+        // "type": "PROFILE_IMAGE",
+        // "type": "GROUP_COVER",
+        // "type": "EXPENSE_RECEIPT",
         "file_size_bytes": 1048576,
         "mime_type": "image/jpeg",
+        // "group_id": 1,
+        // "expense_id": 1,
         "is_public": true
+        // "is_public": false
       },
       {
-        "filename": "gallery_2.jpg",
-        "type": "GALLERY_IMAGE",
-        "file_size_bytes": 2097152,
-        "mime_type": "image/jpeg",
-        "is_public": true
+        "filename": "receipt_1.pdf",
+        "type": "EXPENSE_RECEIPT",
+        // "type": "GALLERY_IMAGE",
+        "file_size_bytes": 524288,
+        "mime_type": "application/pdf",
+        // "group_id": 1,
+        // "expense_id": 1,
+        "is_public": false
+        // "is_public": true
       }
     ]
   }
@@ -48,36 +59,5 @@ docs {
 
   ## Description
 
-  Generates a list of temporary presigned PUT URLs enabling clients to upload multiple files directly and concurrently to RustFS / S3 storage.
-
-  ## Request
-
-  ### Body
-
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `items` | `array` | Yes | List of files to get presigned upload URLs for (1 to 50 items) |
-  | `items[].filename` | `string` | Yes | File name |
-  | `items[].type` | `string` | Yes | Attachment type |
-  | `items[].file_size_bytes` | `int64` | Yes | File size |
-  | `items[].mime_type` | `string` | Yes | MIME type |
-
-  ## Response
-
-  **`200 OK`**
-  ```json
-  {
-    "success": true,
-    "data": {
-      "items": [
-        {
-          "filename": "gallery_1.jpg",
-          "upload_url": "http://127.0.0.1:9000/doratou-storage/attachments/gallery_image/2026/11/abc1_gallery_1.jpg?...",
-          "object_key": "attachments/gallery_image/2026/11/abc1_gallery_1.jpg",
-          "expires_in_seconds": 900
-        }
-      ]
-    }
-  }
-  ```
+  Requests direct upload URLs for multiple files simultaneously (up to 50 items).
 }

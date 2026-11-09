@@ -10,12 +10,21 @@ get {
   auth: none
 }
 
+headers {
+  ~Authorization: Bearer {{token}}
+}
+
+params:query {
+  ~include_relations: true
+  ~include_relations: false
+}
+
 docs {
   # Get Attachment Details
 
   **Method:** `GET`
   **Endpoint:** `/api/v1/attachments/:id`
-  **Auth:** None (Public)
+  **Auth:** Optional (`OptionalAuth` middleware). Public attachments require no auth; private attachments require Bearer token of uploader or group member.
 
   ## Description
 
@@ -23,43 +32,21 @@ docs {
 
   ## Request
 
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Optional | Bearer access token (required for private files) |
+
   ### URL Parameters
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `id` | `int64` | Yes | Attachment ID |
 
-  ## Response
+  ### Query Parameters
 
-  **`200 OK`**
-  ```json
-  {
-    "success": true,
-    "data": {
-      "id": 1,
-      "uploaded_by_user_id": 1,
-      "group_id": null,
-      "expense_id": null,
-      "type": "PROFILE_IMAGE",
-      "original_filename": "avatar.png",
-      "object_key": "attachments/profile_image/2026/11/550e8400_avatar.png",
-      "thumbnail_object_key": null,
-      "mime_type": "image/png",
-      "file_size_bytes": 1048576,
-      "file_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "width": 800,
-      "height": 800,
-      "duration_seconds": null,
-      "is_public": true,
-      "access_url": "http://127.0.0.1:9000/doratou-storage/attachments/profile_image/2026/11/550e8400_avatar.png",
-      "uploaded_at": "2026-11-02T18:00:00Z",
-      "created_at": "2026-11-02T18:00:00Z",
-      "updated_at": "2026-11-02T18:00:00Z"
-    }
-  }
-  ```
-
-  ## Errors
-
-  * `404 Not Found` — Attachment with specified ID does not exist
+  | Parameter | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `include_relations` | `boolean` | No | If `true`, preloads and returns related user, group, and expense details |
 }
