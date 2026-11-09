@@ -109,12 +109,17 @@ func (h *AttachmentHandler) GetByID(c *gin.Context) {
 		return
 	}
 
+	var requestingUserID *int64
+	if uid, ok := tokencontext.GetUserID(c); ok {
+		requestingUserID = &uid
+	}
+
 	includeRelations := c.Query("include_relations") == "true"
 	var res *dto.AttachmentResponse
 	if includeRelations {
-		res, err = h.attachmentService.GetByIDWithRelations(c.Request.Context(), id)
+		res, err = h.attachmentService.GetByIDWithRelations(c.Request.Context(), id, requestingUserID)
 	} else {
-		res, err = h.attachmentService.GetByID(c.Request.Context(), id)
+		res, err = h.attachmentService.GetByID(c.Request.Context(), id, requestingUserID)
 	}
 	if err != nil {
 		fail(c, err)
@@ -124,8 +129,14 @@ func (h *AttachmentHandler) GetByID(c *gin.Context) {
 	success(c, http.StatusOK, res)
 }
 
-// GetByGroup handles GET /api/v1/attachments/group/:group_id
+// GetByGroup handles GET /api/v1/attachments/group/:group_id (Protected)
 func (h *AttachmentHandler) GetByGroup(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
 	groupID, err := parseIDParam(c, "group_id")
 	if err != nil {
 		fail(c, err)
@@ -152,7 +163,7 @@ func (h *AttachmentHandler) GetByGroup(c *gin.Context) {
 		}
 	}
 
-	res, err := h.attachmentService.GetByGroup(c.Request.Context(), groupID, attType, page, pageSize)
+	res, err := h.attachmentService.GetByGroup(c.Request.Context(), groupID, userID, attType, page, pageSize)
 	if err != nil {
 		fail(c, err)
 		return
@@ -161,64 +172,27 @@ func (h *AttachmentHandler) GetByGroup(c *gin.Context) {
 	success(c, http.StatusOK, res)
 }
 
-// GetByExpense handles GET /api/v1/attachments/expense/:expense_id
+// GetByExpense handles GET /api/v1/attachments/expense/:expense_id (Protected)
 func (h *AttachmentHandler) GetByExpense(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
 	expenseID, err := parseIDParam(c, "expense_id")
 	if err != nil {
 		fail(c, err)
 		return
 	}
 
-	res, err := h.attachmentService.GetByExpense(c.Request.Context(), expenseID)
+	res, err := h.attachmentService.GetByExpense(c.Request.Context(), expenseID, userID)
 	if err != nil {
 		fail(c, err)
 		return
 	}
 
 	success(c, http.StatusOK, res)
-}
-
-// List handles GET /api/v1/attachments
-func (h *AttachmentHandler) List(c *gin.Context) {
-	var filter dto.AttachmentFilterRequest
-	if err := c.ShouldBindQuery(&filter); err != nil {
-		fail(c, exception.Wrap(exception.ErrBadRequest, err))
-		return
-	}
-
-	res, err := h.attachmentService.List(c.Request.Context(), filter)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-
-	success(c, http.StatusOK, res)
-}
-
-// GetURL handles GET /api/v1/attachments/:id/url
-func (h *AttachmentHandler) GetURL(c *gin.Context) {
-	id, err := parseIDParam(c, "id")
-	if err != nil {
-		fail(c, err)
-		return
-	}
-
-	var expiry time.Duration
-	if expiryStr := c.Query("expiry"); expiryStr != "" {
-		if d, err := time.ParseDuration(expiryStr); err == nil && d > 0 {
-			expiry = d
-		}
-	}
-
-	url, err := h.attachmentService.GetFreshAccessURL(c.Request.Context(), id, expiry)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-
-	success(c, http.StatusOK, gin.H{
-		"access_url": url,
-	})
 }
 
 // DownloadStream handles GET /api/v1/attachments/:id/download
@@ -229,7 +203,12 @@ func (h *AttachmentHandler) DownloadStream(c *gin.Context) {
 		return
 	}
 
-	rc, meta, err := h.attachmentService.DownloadStream(c.Request.Context(), id)
+	var requestingUserID *int64
+	if uid, ok := tokencontext.GetUserID(c); ok {
+		requestingUserID = &uid
+	}
+
+	rc, meta, err := h.attachmentService.DownloadStream(c.Request.Context(), id, requestingUserID)
 	if err != nil {
 		fail(c, err)
 		return
@@ -243,35 +222,6 @@ func (h *AttachmentHandler) DownloadStream(c *gin.Context) {
 	}
 
 	_, _ = io.Copy(c.Writer, rc)
-}
-
-// Update handles PATCH /api/v1/attachments/:id (Protected)
-func (h *AttachmentHandler) Update(c *gin.Context) {
-	userID, ok := tokencontext.GetUserID(c)
-	if !ok {
-		fail(c, exception.ErrMissingToken)
-		return
-	}
-
-	id, err := parseIDParam(c, "id")
-	if err != nil {
-		fail(c, err)
-		return
-	}
-
-	var req dto.UpdateAttachmentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, exception.Wrap(exception.ErrBadRequest, err))
-		return
-	}
-
-	res, err := h.attachmentService.Update(c.Request.Context(), userID, id, req)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-
-	success(c, http.StatusOK, res)
 }
 
 // Delete handles DELETE /api/v1/attachments/:id (Protected)
@@ -450,30 +400,6 @@ func (h *AttachmentHandler) DownloadZipStream(c *gin.Context) {
 		// Response streaming may already have started; log if unable to write header
 		return
 	}
-}
-
-// UpdateBatch handles PATCH /api/v1/attachments/batch (Protected)
-func (h *AttachmentHandler) UpdateBatch(c *gin.Context) {
-	userID, ok := tokencontext.GetUserID(c)
-	if !ok {
-		fail(c, exception.ErrMissingToken)
-		return
-	}
-
-	var req dto.BatchUpdateAttachmentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, exception.Wrap(exception.ErrBadRequest, err))
-		return
-	}
-
-	if err := h.attachmentService.UpdateBatch(c.Request.Context(), userID, req); err != nil {
-		fail(c, err)
-		return
-	}
-
-	success(c, http.StatusOK, gin.H{
-		"message": "attachments updated successfully",
-	})
 }
 
 // DeleteBatch handles DELETE /api/v1/attachments/batch (Protected)

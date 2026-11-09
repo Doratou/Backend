@@ -163,6 +163,7 @@ func main() {
 
 	authService := service.NewAuthService(
 		userRepo,
+		attachmentRepo,
 		otpService,
 		tokenRepo,
 		dbTrxManager,
@@ -194,7 +195,7 @@ func main() {
 		},
 		cfg.Constant,
 	)
-	groupService := service.NewGroupService(groupRepo)
+	groupService := service.NewGroupService(groupRepo, attachmentRepo)
 	inviteService := service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
 	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
 
@@ -205,6 +206,7 @@ func main() {
 
 	attachmentService := service.NewAttachmentService(
 		attachmentRepo,
+		groupRepo,
 		rustfsStorage,
 		service.AttachmentServiceConfig{
 			PublicURLPrefix:     rustfsEnv.PublicURLPrefix,

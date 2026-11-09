@@ -217,3 +217,26 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		"message": "logged out successfully",
 	})
 }
+
+// UpdateAvatar handles PATCH /api/v1/auth/me/avatar
+func (h *AuthHandler) UpdateAvatar(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
+	var req dto.UpdateAvatarRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	res, err := h.authService.UpdateAvatar(c.Request.Context(), userID, req.AvatarAttachmentID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}

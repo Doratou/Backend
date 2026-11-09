@@ -44,8 +44,10 @@ func New(deps Dependencies) *gin.Engine {
 	})
 
 	var authMiddleware gin.HandlerFunc
+	var optionalAuthMiddleware gin.HandlerFunc
 	if deps.TokenMaker != nil && deps.TokenRepo != nil {
 		authMiddleware = middleware.Auth(deps.TokenMaker, deps.TokenRepo)
+		optionalAuthMiddleware = middleware.OptionalAuth(deps.TokenMaker, deps.TokenRepo)
 	}
 
 	var captchaMiddleware gin.HandlerFunc
@@ -56,7 +58,7 @@ func New(deps Dependencies) *gin.Engine {
 	v1 := engine.Group("/api/v1")
 	RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware, captchaMiddleware)
 	RegisterCaptchaRoutes(v1, deps.CaptchaHandler)
-	RegisterAttachmentRoutes(v1, deps.AttachmentHandler, authMiddleware)
+	RegisterAttachmentRoutes(v1, deps.AttachmentHandler, authMiddleware, optionalAuthMiddleware)
 	RegisterAdminReportRoutes(v1, deps.AdminReportHandler, authMiddleware)
 
 	if deps.FriendshipHandler != nil {
