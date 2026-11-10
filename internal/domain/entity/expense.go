@@ -6,6 +6,9 @@ import (
 	"github.com/Doratou/Backend/internal/domain/enum"
 )
 
+//TODO : just demo for test and dev attachments
+//TODO : need a endpoint-srv-repo line for update(set) expense or setelment or ... image = for now we just save img in storage without add its relations to tables
+
 // Expense represents a shared expenditure record in a group.
 type Expense struct {
 	BaseEntity

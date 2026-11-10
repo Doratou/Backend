@@ -176,6 +176,13 @@ func (r *groupRepository) Update(ctx context.Context, group *entity.Group) error
 	return nil
 }
 
+func (r *groupRepository) UpdateCover(ctx context.Context, group *entity.Group) error {
+	if err := r.getDB(ctx).Model(&entity.Group{}).Where("id = ? AND deleted_at IS NULL", group.ID).Updates(map[string]interface{}{"cover_attachment_id": group.CoverAttachmentID}).Error; err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+	return nil
+}
+
 func (r *groupRepository) SetStatus(ctx context.Context, groupID int64, status enum.GroupStatus) error {
 	updates := map[string]interface{}{"status": status}
 	if status == enum.GroupStatusInactive {

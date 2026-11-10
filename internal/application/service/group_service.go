@@ -152,7 +152,7 @@ func (s *groupService) ChangeCover(ctx context.Context, userID int64, role enum.
 	}
 
 	group.CoverAttachmentID = &coverAttachmentID
-	if err := s.groups.Update(ctx, group); err != nil {
+	if err := s.groups.UpdateCover(ctx, group); err != nil {
 		return nil, err
 	}
 

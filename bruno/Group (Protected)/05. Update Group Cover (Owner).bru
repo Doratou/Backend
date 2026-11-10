@@ -7,7 +7,7 @@ meta {
 patch {
   url: {{baseUrl}}/api/v1/groups/{{groupId}}/cover
   body: json
-  auth: inherit
+  auth: bearer
 }
 
 headers {
@@ -15,9 +15,13 @@ headers {
   Content-Type: application/json
 }
 
+auth:bearer {
+  token: {{token}}
+}
+
 body:json {
   {
-    "cover_attachment_id": 1
+    "cover_attachment_id": 3
   }
 }
 
@@ -34,37 +38,37 @@ settings {
 
 docs {
   ## Method, Endpoint, and Auth
-
+  
   `PATCH /api/v1/groups/:groupID/cover` — Group owner or site admin; Bearer access token required.
-
+  
   ## Description
-
+  
   Updates the group's cover image by linking an existing valid attachment of type `GROUP_COVER`.
-
+  
   ## Request
-
+  
   ### Path Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `groupID` | `integer` | Yes | Positive group ID. |
-
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | `Bearer <access-token>` |
   | `Content-Type` | `string` | Yes | `application/json` |
-
+  
   ### Body
-
+  
   ```json
   {
     "cover_attachment_id": 1
   }
   ```
-
+  
   ## Response
-
+  
   Returns the updated group details (`dto.GroupResponse`) with HTTP 200.
 }

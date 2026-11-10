@@ -10,42 +10,42 @@ get {
   auth: none
 }
 
-headers {
-  ~Authorization: Bearer {{token}}
-}
-
 params:query {
   ~include_relations: true
   ~include_relations: false
 }
 
+headers {
+  ~Authorization: Bearer {{token}}
+}
+
 docs {
   # Get Attachment Details
-
+  
   **Method:** `GET`
   **Endpoint:** `/api/v1/attachments/:id`
   **Auth:** Optional (`OptionalAuth` middleware). Public attachments require no auth; private attachments require Bearer token of uploader or group member.
-
+  
   ## Description
-
+  
   Retrieves detailed metadata for a specific attachment by its primary key ID, including dimensions, file hash, and an active access URL.
-
+  
   ## Request
-
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Optional | Bearer access token (required for private files) |
-
+  
   ### URL Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `id` | `int64` | Yes | Attachment ID |
-
+  
   ### Query Parameters
-
+  
   | Parameter | Type | Required | Description |
   | --- | --- | --- | --- |
   | `include_relations` | `boolean` | No | If `true`, preloads and returns related user, group, and expense details |

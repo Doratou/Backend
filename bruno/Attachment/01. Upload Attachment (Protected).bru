@@ -10,24 +10,25 @@ post {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{token}}
-}
-
 headers {
   Authorization: Bearer {{token}}
 }
 
+auth:bearer {
+  token: {{token}}
+}
+
 body:multipart-form {
-  file: @file()
-  type: PROFILE_IMAGE
+  file: @file(E:\Go\Doratou\ویدیو کوتاه تست 1.mp4) @contentType(video/mp4)
+  group_id: 1
+  is_public: true
+  type: GALLERY_VIDEO
+  ~type: PROFILE_IMAGE
   ~type: GROUP_COVER
   ~type: GALLERY_IMAGE
   ~type: EXPENSE_RECEIPT
-  ~type: ATTACHMENT
-  ~group_id: 1
+  ~type: SETTLEMENT_RECEIPT
   ~expense_id: 1
-  is_public: true
   ~is_public: false
 }
 
@@ -38,31 +39,30 @@ vars:post-response {
 
 docs {
   # Upload Attachment (Protected)
-
-  **Method:** `POST`
-  **Endpoint:** `/api/v1/attachments/upload`
-  **Auth:** Required (Bearer Token)
-
+  
+  **Method:** `POST` **Endpoint:** `/api/v1/attachments/upload` **Auth:** Required (Bearer Token)
+  
   ## Description
-
+  
   Uploads a file directly through the backend server using `multipart/form-data`. The server inspects the binary content for MIME sniffing, validates the file size against configured limits for the attachment type, extracts dimensions if it is an image, generates a SHA-256 hash, stores the object in RustFS / S3, and records metadata in PostgreSQL.
-
+  
   ## Request
-
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
   | `Content-Type` | `string` | Yes | `multipart/form-data` |
-
+  
   ### Form Data
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `file` | `file` | Yes | Binary media file |
-  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`, `ATTACHMENT`) |
+  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`, `SETTLEMENT_RECEIP`,`GALLERY_VIDEO`) |
   | `group_id` | `int64` | No | Associated squad/group ID (required when uploading for a group or group gallery) |
   | `expense_id` | `int64` | No | Associated expense ID (required when uploading expense receipts) |
   | `is_public` | `boolean` | No | Whether the file is publicly readable |
+  
 }

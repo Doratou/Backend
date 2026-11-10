@@ -10,13 +10,13 @@ post {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{token}}
-}
-
 headers {
   Authorization: Bearer {{token}}
   Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
 }
 
 body:json {
@@ -28,7 +28,7 @@ body:json {
     // "type": "EXPENSE_RECEIPT",
     "file_size_bytes": 2097152,
     "mime_type": "image/jpeg",
-    // "group_id": 1,
+    "group_id": 1,
     // "expense_id": 1,
     "is_public": true
     // "is_public": false
@@ -42,26 +42,26 @@ vars:post-response {
 
 docs {
   # Create Presigned Upload URL (Protected)
-
+  
   **Method:** `POST`
   **Endpoint:** `/api/v1/attachments/presigned-upload`
   **Auth:** Required (Bearer Token)
-
+  
   ## Description
-
+  
   Generates a temporary presigned `PUT` URL allowing the client (web or mobile) to upload the file directly to RustFS / S3 storage without routing binary payload through the application server.
-
+  
   ## Request
-
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
   | `Content-Type` | `string` | Yes | `application/json` |
-
+  
   ### Body
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `filename` | `string` | Yes | Original file name including extension |

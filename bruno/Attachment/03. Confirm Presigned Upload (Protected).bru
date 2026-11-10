@@ -10,13 +10,13 @@ post {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{token}}
-}
-
 headers {
   Authorization: Bearer {{token}}
   Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
 }
 
 body:json {
@@ -27,7 +27,7 @@ body:json {
     // "type": "PROFILE_IMAGE",
     // "type": "GALLERY_IMAGE",
     // "type": "EXPENSE_RECEIPT",
-    // "group_id": 1,
+    "group_id": 1,
     // "expense_id": 1,
     "is_public": true
     // "is_public": false
@@ -36,26 +36,26 @@ body:json {
 
 docs {
   # Confirm Presigned Upload (Protected)
-
+  
   **Method:** `POST`
   **Endpoint:** `/api/v1/attachments/confirm-upload`
   **Auth:** Required (Bearer Token)
-
+  
   ## Description
-
+  
   Invoked by the client after completing the direct `PUT` upload to storage. The backend verifies that the object exists in RustFS, queries its exact size and ETag, and registers the metadata record into the PostgreSQL database.
-
+  
   ## Request
-
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
   | `Content-Type` | `string` | Yes | `application/json` |
-
+  
   ### Body
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `object_key` | `string` | Yes | RustFS object key received during presign |
