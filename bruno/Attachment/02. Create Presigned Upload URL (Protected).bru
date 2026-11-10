@@ -1,0 +1,74 @@
+meta {
+  name: 02. Create Presigned Upload URL (Protected)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/presigned-upload
+  body: json
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "filename": "squad_cover.jpg",
+    "type": "GROUP_COVER",
+    // "type": "PROFILE_IMAGE",
+    // "type": "GALLERY_IMAGE",
+    // "type": "EXPENSE_RECEIPT",
+    "file_size_bytes": 2097152,
+    "mime_type": "image/jpeg",
+    "group_id": 1,
+    // "expense_id": 1,
+    "is_public": true
+    // "is_public": false
+  }
+}
+
+vars:post-response {
+  presignedUploadUrl: res.body.data.upload_url
+  presignedObjectKey: res.body.data.object_key
+}
+
+docs {
+  # Create Presigned Upload URL (Protected)
+  
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/presigned-upload`
+  **Auth:** Required (Bearer Token)
+  
+  ## Description
+  
+  Generates a temporary presigned `PUT` URL allowing the client (web or mobile) to upload the file directly to RustFS / S3 storage without routing binary payload through the application server.
+  
+  ## Request
+  
+  ### Headers
+  
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+  
+  ### Body
+  
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `filename` | `string` | Yes | Original file name including extension |
+  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`) |
+  | `file_size_bytes` | `int64` | Yes | Expected file size in bytes |
+  | `mime_type` | `string` | Yes | Declared MIME type |
+  | `group_id` | `int64` | No | Associated squad/group ID |
+  | `expense_id` | `int64` | No | Associated expense ID |
+  | `is_public` | `boolean` | No | Whether the object should be public |
+}

@@ -13,7 +13,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      test:
+        ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -23,7 +24,8 @@ services:
     pull_policy: missing
     environment:
       REDISCLI_AUTH: ${RDB_PASSWORD:?RDB_PASSWORD is required}
-    command: ["/bin/sh", "-c", 'exec redis-server --requirepass "$$REDISCLI_AUTH"']
+    command:
+      ["/bin/sh", "-c", 'exec redis-server --requirepass "$$REDISCLI_AUTH"']
     ports:
       - "127.0.0.1:${RDB_PORT:?RDB_PORT is required}:6379"
     volumes:
@@ -33,7 +35,35 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  rustfs:
+    image: rustfs/rustfs:latest
+    pull_policy: missing
+    container_name: doratou-rustfs
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY_ID:?RUSTFS_ACCESS_KEY_ID is required}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_ACCESS_KEY:?RUSTFS_SECRET_ACCESS_KEY is required}
+      RUSTFS_ADDRESS: "0.0.0.0:9000"
+      RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports:
+      - "127.0.0.1:${RUSTFS_API_PORT:-9000}:9000"
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - rustfsdata:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:9000/minio/health/live || wget -qO- http://localhost:9000/minio/health/live || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
 
 volumes:
   pgdata:
   redisdata:
+  rustfsdata:

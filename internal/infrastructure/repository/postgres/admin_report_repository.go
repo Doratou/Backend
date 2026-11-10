@@ -343,3 +343,16 @@ func (r *adminReportRepository) ExistsByID(ctx context.Context, id int64) (bool,
 	}
 	return count > 0, nil
 }
+
+func (r *adminReportRepository) NotSolvedByID(ctx context.Context, id int64) (bool, error) {
+	db := r.getDB(ctx)
+	var count int64
+	notSolvedStatus := []enum.ReportStatus{enum.ReportStatusPending, enum.ReportStatusUnderReview}
+
+	if err := db.Model(&entity.AdminReport{}).
+		Where("id = ? AND status IN ?", id, notSolvedStatus).
+		Count(&count).Error; err != nil {
+		return false, exception.Wrap(exception.ErrInternal, err)
+	}
+	return count > 0, nil
+}

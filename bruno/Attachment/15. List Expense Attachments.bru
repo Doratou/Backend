@@ -1,0 +1,31 @@
+meta {
+  name: 15. List Expense Attachments
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/api/v1/attachments/expense/1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+docs {
+  # List Expense Attachments
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/attachments/expense/:expense_id`
+  **Auth:** Required (Bearer Token: active squad member or platform admin)
+
+  ## Description
+
+  Retrieves all attachments tied to a specific expense (such as receipt images, PDF invoices, and payment confirmations).
+}

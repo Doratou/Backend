@@ -121,11 +121,17 @@ func (h *GroupHandler) ChangeCover(c *gin.Context) {
 		failLogged(c, err)
 		return
 	}
-	if err := h.service.ChangeCover(c.Request.Context(), userID, role, groupID); err != nil {
+	var req dto.UpdateGroupCoverRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		failLogged(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+	result, err := h.service.ChangeCover(c.Request.Context(), userID, role, groupID, req.CoverAttachmentID)
+	if err != nil {
 		failLogged(c, err)
 		return
 	}
-	success(c, http.StatusOK, gin.H{"message": "group cover update is not implemented yet"})
+	success(c, http.StatusOK, result)
 }
 
 func (h *GroupHandler) Archive(c *gin.Context) {

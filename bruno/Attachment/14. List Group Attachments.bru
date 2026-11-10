@@ -1,0 +1,41 @@
+meta {
+  name: 14. List Group Attachments
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/api/v1/attachments/group/1?page=1&page_size=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+params:query {
+  page: 1
+  page_size: 20
+  ~type: GALLERY_IMAGE
+  ~type: GROUP_COVER
+  ~type: GALLERY_VIDEO
+  ~type: EXPENSE_RECEIPT
+  ~type: ATTACHMENT
+}
+
+docs {
+  # List Group Attachments
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/attachments/group/:group_id`
+  **Auth:** Required (Bearer Token: active squad member or platform admin)
+
+  ## Description
+
+  Retrieves paginated attachments associated with a specific group (such as gallery images, videos, and group cover).
+}

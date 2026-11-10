@@ -5,7 +5,7 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/api/v1/admin/reports/1/review
+  url: {{baseUrl}}/api/v1/admin/reports/10/review
   body: json
   auth: bearer
 }
@@ -27,27 +27,27 @@ body:json {
 
 docs {
   # Admin - Review and Resolve Report
-
+  
   **Method:** `PUT`
   **Endpoint:** `/api/v1/admin/reports/:id/review`
   **Auth:** Required (Admin Access Token)
-
+  
   ## Description
   Allows an administrator to review, submit an official response note, update the report status, and automatically timestamp resolution.
-
+  
   ## Request
-
+  
   ### Headers
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
-
+  
   ### Body
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `status` | `string` | Yes | `UNDER_REVIEW`, `RESOLVED`, `REJECTED`, or `DISMISSED` |
   | `response` | `string` | Yes | Official moderator action/response notes (2 - 3000 chars) |
-
+  
   ## Response
   **`200 OK`**
   ```json

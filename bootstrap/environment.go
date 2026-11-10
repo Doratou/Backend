@@ -8,20 +8,33 @@ import (
 )
 
 type Environment struct {
-	DataBase   DataBase         `mapstructure:",squash"`
-	Redis      Redis            `mapstructure:",squash"`
-	HttpServer HttpServer       `mapstructure:",squash"`
-	JWT        JWTConfig        `mapstructure:",squash"`
-	OTP        OTPConfig        `mapstructure:",squash"`
-	Seed       SeedConfig       `mapstructure:",squash"`
-	Captcha    CaptchaConfig    `mapstructure:",squash"`
-	Email      EmailConfig      `mapstructure:",squash"`
+	DataBase   DataBase      `mapstructure:",squash"`
+	Redis      Redis         `mapstructure:",squash"`
+	HttpServer HttpServer    `mapstructure:",squash"`
+	JWT        JWTConfig     `mapstructure:",squash"`
+	OTP        OTPConfig     `mapstructure:",squash"`
+	Seed       SeedConfig    `mapstructure:",squash"`
+	Captcha    CaptchaConfig `mapstructure:",squash"`
+	Email      EmailConfig   `mapstructure:",squash"`
+
 	Invite     InvitationConfig `mapstructure:",squash"`
 	Friendship FriendshipConfig `mapstructure:",squash"`
+	RustFS     RustFSConfig     `mapstructure:",squash"`
 }
 
 type FriendshipConfig struct {
 	RequestCooldown time.Duration `mapstructure:"FRIENDSHIP_REQUEST_COOLDOWN"`
+}
+
+type RustFSConfig struct {
+	Endpoint        string `mapstructure:"RUSTFS_ENDPOINT"`
+	AccessKeyID     string `mapstructure:"RUSTFS_ACCESS_KEY_ID"`
+	SecretAccessKey string `mapstructure:"RUSTFS_SECRET_ACCESS_KEY" json:"-"`
+	BucketName      string `mapstructure:"RUSTFS_BUCKET_NAME"`
+	UseSSL          bool   `mapstructure:"RUSTFS_USE_SSL"`
+	Region          string `mapstructure:"RUSTFS_REGION"`
+	PublicURLPrefix string `mapstructure:"RUSTFS_PUBLIC_URL_PREFIX"`
+	MaxConcurrency  int    `mapstructure:"RUSTFS_MAX_CONCURRENCY"`
 }
 
 type EmailConfig struct {

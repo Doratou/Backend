@@ -1,0 +1,36 @@
+meta {
+  name: 07. Hard Delete Attachment (Permanent - Protected)
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/attachments/{{attachmentId}}?hard=true
+  body: none
+  auth: bearer
+}
+
+params:query {
+  hard: true
+  ~hard: false
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+docs {
+  # Hard Delete Attachment (Permanent - Protected)
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/attachments/:id?hard=true`
+  **Auth:** Required (Bearer Token: Uploader, Group Owner, or Platform Admin)
+
+  ## Description
+
+  Permanently deletes the attachment record from PostgreSQL and completely removes the physical file object (and any associated thumbnail) from RustFS / S3 storage.
+}

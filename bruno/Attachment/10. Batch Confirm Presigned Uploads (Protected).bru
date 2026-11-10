@@ -1,0 +1,51 @@
+meta {
+  name: 10. Batch Confirm Presigned Uploads (Protected)
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/batch/confirm-upload
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "object_key": "attachments/gallery_image/2026/11/abc1_gallery_1.jpg",
+        "original_filename": "gallery_1.jpg",
+        "type": "GALLERY_IMAGE",
+        // "type": "PROFILE_IMAGE",
+        // "type": "GROUP_COVER",
+        // "type": "EXPENSE_RECEIPT",
+        // "group_id": 1,
+        // "expense_id": 1,
+        "is_public": true
+        // "is_public": false
+      }
+    ]
+  }
+}
+
+docs {
+  # Batch Confirm Presigned Uploads (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/batch/confirm-upload`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Confirms multiple direct client uploads. Verifies each object in storage, queries file sizes and ETags, and inserts all records in PostgreSQL.
+}

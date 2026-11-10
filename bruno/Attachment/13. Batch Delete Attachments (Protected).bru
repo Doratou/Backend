@@ -1,0 +1,43 @@
+meta {
+  name: 13. Batch Delete Attachments (Protected)
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/attachments/batch
+  body: json
+  auth: bearer
+}
+
+params:query {
+  ~hard: true
+  ~hard: false
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ids": [1, 2]
+  }
+}
+
+docs {
+  # Batch Delete Attachments (Protected)
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/attachments/batch`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Deletes multiple attachments in bulk. By default performs a soft delete. When `?hard=true` is passed, permanently purges metadata from PostgreSQL and bulk-deletes the physical file objects from RustFS / S3 storage in a single network operation.
+}

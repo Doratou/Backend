@@ -1,0 +1,41 @@
+meta {
+  name: 05. Download Attachment Stream
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/attachments/{{attachmentId}}/download
+  body: none
+  auth: none
+}
+
+headers {
+  ~Authorization: Bearer {{token}}
+}
+
+docs {
+  # Download Attachment Stream
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/attachments/:id/download`
+  **Auth:** Optional (`OptionalAuth` middleware). Public attachments require no auth; private attachments require Bearer token of uploader or group member.
+
+  ## Description
+
+  Streams the raw file bytes directly from RustFS / S3 storage through the backend server as a file download. Sets the `Content-Disposition: attachment; filename="..."`, `Content-Type`, and `Content-Length` headers properly.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Optional | Bearer access token (required for private files) |
+
+  ### URL Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Attachment ID |
+}
