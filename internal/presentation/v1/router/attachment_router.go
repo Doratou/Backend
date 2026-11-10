@@ -35,7 +35,7 @@ func RegisterAttachmentRoutes(
 
 		// 3. Single-item access endpoints (Public by default, Context Guard enforced for private files)
 		attachments.GET("/:id", optionalAuthMiddleware, attachmentHandler.GetByID)
-		attachments.GET("/:id/download", optionalAuthMiddleware, attachmentHandler.DownloadStream)
+		attachments.GET("/:id/download", optionalAuthMiddleware, attachmentHandler.Download)
 
 		// 4. Protected single-item upload & delete endpoints
 		attachments.POST("/upload", authMiddleware, attachmentHandler.Upload)
