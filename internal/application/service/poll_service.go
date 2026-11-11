@@ -65,9 +65,21 @@ func (s *pollService) List(ctx context.Context, userID, groupID int64, req dto.L
 		if err != nil {
 			return err
 		}
+		var summaries map[int64]domain_db.PollVoteSummary
+		if len(polls) > 0 {
+			pollIDs := make([]int64, 0, len(polls))
+			for _, poll := range polls {
+				pollIDs = append(pollIDs, poll.ID)
+			}
+			summaries, err = s.pollRepo.FindVoteSummaries(trxCtx, group.ID, member.ID, pollIDs)
+			if err != nil {
+				return err
+			}
+		}
 		items := make([]dto.PollListItem, 0, len(polls))
 		for _, poll := range polls {
-			items = append(items, dto.ToPollListItem(poll, group.Status != enum.GroupStatusActive))
+			summary := summaries[poll.ID]
+			items = append(items, dto.ToPollListItem(poll, summary.OptionCounts, summary.MyOptionID, group.Status != enum.GroupStatusActive))
 		}
 		response = dto.PollListResponse{
 			Items: items, Pagination: dto.PollPaginationResponse{Page: page, Limit: limit, Total: total},

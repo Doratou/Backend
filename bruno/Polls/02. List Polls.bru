@@ -35,7 +35,11 @@ docs {
 
   Lists non-deleted polls belonging to this group, ordered by created_at descending, then ID descending. The optional status filter applies to the poll's own ACTIVE/INACTIVE state, independently of the group's status.
 
-  This endpoint returns poll summaries. Use Get Poll for options, live counts and your own vote. It works while the group is inactive and returns is_frozen=true. Empty results return items: []; a page beyond the last page can have a positive total with no items. The list does not overwrite the saved pollId; copy the desired item ID into that variable.
+  Each item includes the same fields as Get Poll: options with id, title and vote_count, total_votes, and my_option_id for the authenticated caller. Cards can display questions, results and the caller's selection without requesting every poll separately. Options are ordered by ID ascending; options without votes have vote_count=0. Polls without votes return total_votes=0 and my_option_id=null.
+
+  Both PUBLIC and PRIVATE polls expose aggregate counts and only the caller's own selection. Other voters' identities are never included in this response. Use List Poll Voters to see identities for PUBLIC polls. Percentages are calculated by the client as vote_count / total_votes * 100; use zero when total_votes is zero.
+
+  It works while the group is inactive and returns is_frozen=true. closed_at is null until closing and contains the actual closing timestamp afterward. Empty results return items: []; a page beyond the last page can have a positive total with no items. The list does not overwrite the saved pollId; copy the desired item ID into that variable.
 
   The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
 
@@ -86,7 +90,21 @@ docs {
           "is_frozen": false,
           "closed_at": null,
           "created_at": "2026-11-05T10:00:00Z",
-          "updated_at": "2026-11-05T10:00:00Z"
+          "updated_at": "2026-11-05T10:00:00Z",
+          "options": [
+            {
+              "id": 901,
+              "title": "Friday",
+              "vote_count": 2
+            },
+            {
+              "id": 902,
+              "title": "Saturday",
+              "vote_count": 1
+            }
+          ],
+          "total_votes": 3,
+          "my_option_id": 901
         }
       ],
       "pagination": {

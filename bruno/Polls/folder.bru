@@ -18,13 +18,15 @@ docs {
 
   Run project migrations with `go run ./cmd/migrate up` before testing. This includes `20261105014613_create_polls_tables.sql`.
 
-  In the Local environment set pollGroupId manually to a group you belong to, pollId to data.id from Create Poll or a selected poll, and pollOptionId to an options[].id from Create Poll or Get Poll. Save the environment before sending a request. The example IDs are placeholders, not seeded records. Login through Auth to populate token. No poll response automatically populates or changes these identifiers. The folder pre-request script clears legacy runtime poll identifiers so the manually configured Local values are used.
+  In the Local environment set pollGroupId manually to a group you belong to, pollId to data.id from Create Poll or a selected poll, and pollOptionId to an options[].id from Create Poll, List Polls or Get Poll. Save the environment before sending a request. The example IDs are placeholders, not seeded records. Login through Auth to populate token. No poll response automatically populates or changes these identifiers. The folder pre-request script clears legacy runtime poll identifiers so the manually configured Local values are used.
 
   All eight endpoints require an ACTIVE account and ACTIVE group membership. Only the poll creator may close or delete; group owners and system administrators have no override. If the creator leaves, the poll stays open and other active members can continue participating.
 
   PUBLIC lets active members of this group see who chose each option through List Poll Voters. PRIVATE returns aggregate results and each caller's own choice without revealing other voters, even to the creator. Member identifiers remain stored in the database to enforce one vote per membership.
 
   Results are visible from the start, including before voting and after closing. Options and visibility cannot be edited. An active member can change or withdraw their own vote while the poll is open.
+
+  List Polls includes options, vote_count per option, total_votes and my_option_id for each item. Get Poll provides the same fields for a single poll. Calculate percentages on the client; all percentages are zero when total_votes=0. Listing PRIVATE polls never exposes other voters' identities.
 
   INACTIVE groups freeze creation, voting, vote changes, withdrawal, closing and deletion. Lists and results remain readable. is_frozen is computed from group status; polls keep their own status. Reactivating a group enables previously open polls again; closed polls stay closed.
 
