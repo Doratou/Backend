@@ -1,0 +1,23 @@
+# Stage 1: Generate API Documentation
+FROM node:24-bookworm-slim AS builder
+
+RUN npm install -g @usebruno/cli
+
+WORKDIR /app
+
+COPY bruno/ ./bruno/
+
+WORKDIR /app/bruno
+
+RUN bru docs generate \
+    --no-git-link \
+    --output /output/index.html
+
+
+# Stage 2: Serve Documentation
+FROM nginxinc/nginx-unprivileged:alpine
+
+COPY --from=builder /output/index.html \
+    /usr/share/nginx/html/index.html
+
+EXPOSE 8080
