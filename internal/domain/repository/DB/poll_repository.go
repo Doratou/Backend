@@ -7,6 +7,11 @@ import (
 	"github.com/Doratou/Backend/internal/domain/enum"
 )
 
+type PollVoteSummary struct {
+	OptionCounts map[int64]int64
+	MyOptionID   *int64
+}
+
 type PollRepository interface {
 	CreateWithOptions(ctx context.Context, poll *entity.Poll) error
 	FindByID(ctx context.Context, groupID, pollID int64) (*entity.Poll, error)
@@ -18,6 +23,7 @@ type PollRepository interface {
 	UpsertVote(ctx context.Context, vote *entity.PollVote) error
 	DeleteVote(ctx context.Context, pollID, memberID int64) error
 	CountVotesByOption(ctx context.Context, pollID int64) (map[int64]int64, error)
+	FindVoteSummaries(ctx context.Context, groupID, memberID int64, pollIDs []int64) (map[int64]PollVoteSummary, error)
 	FindVotesByPollID(ctx context.Context, pollID int64, limit, offset int) ([]*entity.PollVote, int64, error)
 	Close(ctx context.Context, poll *entity.Poll, expectedStatus enum.PollStatus) error
 	DeleteByID(ctx context.Context, groupID, pollID int64) error

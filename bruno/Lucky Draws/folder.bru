@@ -1,0 +1,31 @@
+meta {
+  name: Lucky Draws
+  seq: 7
+}
+
+auth {
+  mode: none
+}
+
+script:pre-request {
+  bru.deleteVar("drawGroupId");
+  bru.deleteVar("drawId");
+}
+
+docs {
+  # Lucky Draws
+
+  Run go run ./cmd/migrate up before testing, including 20261111004824_create_lucky_draws_table.sql.
+
+  Set drawGroupId and drawId manually in your selected environment. Login through Auth to populate token. No draw response automatically changes these identifiers; the pre-request script clears stale runtime overrides so environment values take effect.
+
+  Five endpoints: Create a DRAFT, List draws, Get details, Update a DRAFT, and Run once. Candidates are text/weight values without individual IDs or membership associations. All group members with an ACTIVE account and ACTIVE membership may create and read. Only the creator may update and execute; group owners and admins have no override.
+
+  Candidate counts range from 2 to 100. Titles are unique after trimming and lowercase comparison, and contain at most 255 Unicode characters. Weights must be integers from 1 to 1000000. They are relative, need not add up to 100, and the probability of each candidate is weight / total_weight.
+
+  Every draw starts as DRAFT with a null result. Update may replace title, candidates, or both. Run selects one winner from the saved draft, records completed_at and makes the draw COMPLETED. Repeated or simultaneous Run calls return the same stored result. Completed draws cannot be edited or deleted. There are no reset, rerun, cancellation or deletion routes.
+
+  INACTIVE groups freeze Create, Update and Run, but List and Get remain readable with is_frozen=true. Leaving the group does not remove history; the former creator loses access until active membership is restored.
+
+  Manual scenario: use two active group members A and B. A creates a draft. B reads it but receives DRAW_CREATOR_REQUIRED on Update and Run. A edits weights, then runs. Repeat Run and compare result and completed_at; they must stay identical. Try to edit the completed record and expect DRAW_COMPLETED. Create another draft for freeze, permissions and malformed-input checks. Never run the full folder blindly: requests change state and later edits intentionally fail after execution.
+}
