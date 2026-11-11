@@ -8,6 +8,7 @@ import (
 type User struct {
 	BaseEntity
 	Name                string          `gorm:"column:name;size:100;not null" json:"name"`
+	FriendCode          string          `gorm:"column:friend_code;size:15;not null;uniqueIndex:idx_users_friend_code;default:generate_user_friend_code();<-:create" json:"friend_code"`
 	Email               *string         `gorm:"column:email;size:255;uniqueIndex" json:"email,omitempty"`
 	Phone               *string         `gorm:"column:phone;size:16;uniqueIndex" json:"phone,omitempty"`
 	PasswordHash        string          `gorm:"column:password_hash;not null" json:"-"`
