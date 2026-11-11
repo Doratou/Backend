@@ -20,4 +20,6 @@ FROM nginxinc/nginx-unprivileged:alpine
 COPY --from=builder /output/index.html \
     /usr/share/nginx/html/index.html
 
+USER 101
+
 EXPOSE 8080
