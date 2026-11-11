@@ -103,7 +103,7 @@ func main() {
 
 	// 5.1 Database Seeder (idempotent: seeds regular user & admin user if not present)
 	seedCtx, cancelSeed := context.WithTimeout(context.Background(), 15*time.Second)
-	if err := seed.Run(seedCtx, userRepo, passwordHasher, cfg.Environment.Seed); err != nil {
+	if err := seed.Run(seedCtx, userRepo, groupRepo, inviteRepo, passwordHasher, cfg.Environment.Seed); err != nil {
 		log.Printf("[SEED WARNING] database seeder finished with notice/error: %v", err)
 	}
 	cancelSeed()

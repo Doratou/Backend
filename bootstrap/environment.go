@@ -48,6 +48,10 @@ type SeedConfig struct {
 	AdminEmail    string `mapstructure:"SEED_ADMIN_EMAIL"`
 	AdminPhone    string `mapstructure:"SEED_ADMIN_PHONE"`
 	AdminPassword string `mapstructure:"SEED_ADMIN_PASSWORD"`
+
+	GroupTitle          string `mapstructure:"SEED_GROUP_TITLE"`
+	GroupDescription    string `mapstructure:"SEED_GROUP_DESCRIPTION"`
+	GroupInvitePassword string `mapstructure:"SEED_GROUP_INVITE_PASSWORD"`
 }
 
 type JWTConfig struct {
