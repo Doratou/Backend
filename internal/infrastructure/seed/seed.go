@@ -37,6 +37,12 @@ func Run(
 		if err := SeedManualTestData(ctx, db, h, cfg); err != nil {
 			log.Printf("[SEED NOTICE] SeedManualTestData note: %v", err)
 		}
+		if err := SeedPollTestData(ctx, db); err != nil {
+			log.Printf("[SEED NOTICE] SeedPollTestData note: %v", err)
+		}
+		if err := SeedLuckyDrawTestData(ctx, db); err != nil {
+			log.Printf("[SEED NOTICE] SeedLuckyDrawTestData note: %v", err)
+		}
 	}
 
 	return nil
