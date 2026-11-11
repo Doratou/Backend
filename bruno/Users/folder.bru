@@ -1,0 +1,20 @@
+meta {
+  name: Users
+  seq: 12
+}
+
+auth {
+  mode: none
+}
+
+docs {
+  # Users
+
+  Get My Profile requires a valid Bearer access token and an ACTIVE account.
+
+  Get My Profile returns your own account and permanent friend_code. Share that code with another user. It is a public identifier, not an authentication token or an automatic friendship invitation.
+
+  To find a friend, enter their full code manually in friendCode in the selected environment and save. Friendships / Find User By Friend Code returns one public preview. Confirm the identity, then manually copy data.id into receiver_user_id and use Friendships / Send Friend Request. These requests do not automatically change environment IDs or friendship state.
+
+  Run `go run ./cmd/migrate up` before starting this backend version. The new migration fills existing accounts, including soft-deleted accounts; new accounts and seed users get a code automatically. Codes remain unchanged across logins, password/avatar updates, restarts and soft deletion/restoration.
+}

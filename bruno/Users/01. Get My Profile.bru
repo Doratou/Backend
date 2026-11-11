@@ -1,0 +1,84 @@
+meta {
+  name: 01. Get My Profile
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/me
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+docs {
+  # Get My Profile
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/users/me`
+  **Auth:** Bearer access token
+
+  ## Description
+
+  Returns the authenticated ACTIVE user's current account, including friend_code. The user is determined from the token, so no user ID or body is accepted. Copy data.friend_code to share it. The response has Cache-Control: no-store.
+
+  friend_code is also included in data.user in successful Register, Login and Login with OTP responses, and in the user response from Update Avatar. Existing request bodies, token fields and friendship endpoints remain unchanged. Refresh Token still returns only a token pair.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <token>` |
+
+  No body or query parameters are required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "name": "Default User",
+      "friend_code": "DR-7K9M2X8Q4P6R",
+      "email": "user@doratou.local",
+      "is_email_verified": true,
+      "is_phone_verified": false,
+      "avatar_attachment_id": null,
+      "system_role": "USER",
+      "status": "ACTIVE",
+      "wallet": 0,
+      "created_at": "2026-11-11T10:00:00Z"
+    }
+  }
+  ```
+
+  phone, telegram_chat_id and telegram_user_id are present when set. Email is omitted when unset. The friend's lookup endpoint returns a separate public DTO and never this complete account response.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Bearer token is missing or the Authorization scheme is invalid. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Token is invalid or is a refresh token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token has expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token has been blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is INACTIVE. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or is soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or token blacklist access fails. |
+
+  ```json
+  {
+    "success": false,
+    "code": "USER_INACTIVE",
+    "error": "user account is deactivated"
+  }
+  ```
+}

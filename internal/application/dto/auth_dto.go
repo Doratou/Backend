@@ -78,6 +78,7 @@ type TokenPairResponse struct {
 type UserResponse struct {
 	ID                 int64           `json:"id"`
 	Name               string          `json:"name"`
+	FriendCode         string          `json:"friend_code"`
 	Email              *string         `json:"email,omitempty"`
 	Phone              *string         `json:"phone,omitempty"`
 	IsEmailVerified    bool            `json:"is_email_verified"`
@@ -105,6 +106,7 @@ func ToUserResponse(user *entity.User) UserResponse {
 	return UserResponse{
 		ID:                 user.ID,
 		Name:               user.Name,
+		FriendCode:         user.FriendCode,
 		Email:              user.Email,
 		Phone:              user.Phone,
 		IsEmailVerified:    user.IsEmailVerified,

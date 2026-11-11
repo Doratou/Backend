@@ -35,6 +35,8 @@ docs {
 
   Creates a PENDING friend request from the authenticated user to another ACTIVE user. The requester is determined from the access token. The request body requires `receiver_user_id`, a positive JSON integer in the BIGINT range.
 
+  First use `GET /api/v1/users/by-friend-code/{friendCode}` to find the recipient by their full friend code. Confirm the returned name and avatar, then enter that response's `data.id` in `receiver_user_id`. The lookup only previews a user; it does not send or accept a request. This endpoint still rechecks the recipient and every friendship rule when sending. Do not put the friend code itself in `receiver_user_id`.
+
   In this Bruno request, set `receiver_user_id` manually in the selected Local environment to the other user's actual ID. The body uses `{{receiver_user_id}}` without quotation marks so the resolved value is a JSON number. Log in through Auth to populate `token`. After a successful response, copy `data.id` into `friendRequestId` in the Local environment and save it before using the request action endpoints. No response automatically changes friendship identifiers. Logging in as another user replaces `token` while your manually configured IDs remain unchanged. Bruno environment values are independent of Postman.
 
   Each unordered pair of users has one database record. An allowed resend reuses the same record and ID, updates the sender and recipient to the new direction, sets the latest request time, clears `responded_at` and `deleted_at`, and restores PENDING. The response field `created_at` represents this latest request time, backed by `requested_at` in the database. Both the first send and an allowed resend return `201 Created`.
@@ -49,7 +51,7 @@ docs {
 
   Use the recipient's token to accept or reject a pending request and the sender's token to cancel it. These are alternative actions on PENDING; do not run all three in sequence on the same request. Refresh the relevant list before using an old saved ID because that ID refers to the latest state and direction.
 
-  Apply the project migrations, including `00003_reuse_friendships_and_add_request_time.sql`, before using this API version.
+  Apply the project migrations, including `20261105000004_reuse_friendships_and_add_request_time.sql` and `20261111183000_add_user_friend_codes.sql`, before using this API version.
 
   ## Request
 

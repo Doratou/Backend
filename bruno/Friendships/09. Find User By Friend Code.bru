@@ -1,0 +1,86 @@
+meta {
+  name: 09. Find User By Friend Code
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/by-friend-code/{{friendCode}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+docs {
+  # Find User By Friend Code
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/users/by-friend-code/{friendCode}`
+  **Auth:** Bearer access token
+
+  ## Description
+
+  Finds exactly one ACTIVE, non-deleted user by their complete friend code. Returns only the public preview needed to confirm the recipient before sending a friend request. It does not create a request or friendship. Email, phone, wallet, account role and Telegram identifiers are never included.
+
+  A code contains DR- followed by 12 characters from 23456789ABCDEFGHJKLMNPQRSTUVWXYZ. Lowercase input is accepted and surrounding whitespace is trimmed. Partial codes, names, emails, wildcard searches and numeric database IDs are not supported. Codes stay reserved even while the account is inactive or soft-deleted; those accounts return USER_NOT_FOUND during lookup.
+
+  Set friendCode manually in the selected environment and save it. After confirming the name and avatar, manually copy data.id into receiver_user_id and run Friendships / Send Friend Request. Already-friends, pending requests, self requests and cooldowns are validated by Send Friend Request; a successful lookup is not a guarantee that a send is allowed. Looking up your own code is allowed, but sending a request to yourself is rejected.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | `Bearer <token>` |
+
+  ### Path parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `friendCode` | `string` | Yes | Full friend code, for example `DR-7K9M2X8Q4P6R` |
+
+  No body is required. A missing path segment does not match this route and returns the router's 404.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 5,
+      "name": "Ali Rezaei",
+      "avatar_attachment_id": null,
+      "avatar_url": null
+    }
+  }
+  ```
+
+  avatar_url contains an accessible image URL when available; use a placeholder when null. Attachment access rules are preserved, so a missing/deleted/inaccessible avatar has no URL. The response has Cache-Control: no-store.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `FRIEND_CODE_INVALID` | `friend code must start with DR- followed by 12 letters or digits, excluding 0, 1, I and O` | Code format is invalid, including unresolved environment variables sent literally. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Bearer token is missing or the Authorization scheme is invalid. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Token is invalid or is a refresh token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token has expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token has been blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated caller is INACTIVE. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller is missing/deleted, or no ACTIVE, non-deleted account matches the code. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, avatar lookup or token blacklist access fails. |
+
+  ```json
+  {
+    "success": false,
+    "code": "FRIEND_CODE_INVALID",
+    "error": "friend code must start with DR- followed by 12 letters or digits, excluding 0, 1, I and O"
+  }
+  ```
+}

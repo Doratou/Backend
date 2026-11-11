@@ -14,6 +14,7 @@ type UserRepository interface {
 
 	// FindByID retrieves a user by their primary key, including avatar relations.
 	FindByID(ctx context.Context, id int64) (*entity.User, error)
+	FindByFriendCode(ctx context.Context, friendCode string) (*entity.User, error)
 
 	// FindByEmail retrieves a user by their email address.
 	FindByEmail(ctx context.Context, email string) (*entity.User, error)
