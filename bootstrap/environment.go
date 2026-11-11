@@ -21,6 +21,13 @@ type Environment struct {
 	Friendship FriendshipConfig `mapstructure:",squash"`
 	RustFS     RustFSConfig     `mapstructure:",squash"`
 	PoW        PoWConfig        `mapstructure:",squash"`
+	Google     GoogleOAuthConfig `mapstructure:",squash"`
+}
+
+type GoogleOAuthConfig struct {
+	ClientID     string `mapstructure:"GOOGLE_CLIENT_ID"`
+	ClientSecret string `mapstructure:"GOOGLE_CLIENT_SECRET" json:"-"`
+	RedirectURL  string `mapstructure:"GOOGLE_REDIRECT_URL"`
 }
 
 type FriendshipConfig struct {
