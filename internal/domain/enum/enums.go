@@ -137,4 +137,3 @@ const (
 	ExpenseTypeNormal  ExpenseType = "NORMAL"
 	ExpenseTypePremium ExpenseType = "PREMIUM"
 )
-
