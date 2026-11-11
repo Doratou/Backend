@@ -1,5 +1,5 @@
 # Build from the repository root:
-# docker build -f Dockerfile.migrate -t doratou-migrate:local .
+# docker build -f docker/Dockerfile.migrate -t doratou-migrate:local .
 FROM golang:1.26-alpine AS goose-builder
 
 RUN go install github.com/pressly/goose/v3/cmd/goose@v3.29.0
