@@ -218,7 +218,10 @@ func main() {
 		cfg.Constant,
 	)
 
+	userService := service.NewUserService(userRepo, attachmentService)
+
 	// 8. Presentation Handlers & Routers
+	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
 
@@ -233,6 +236,7 @@ func main() {
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
 		AuthHandler:        authHandler,
+		UserHandler:        userHandler,
 		CaptchaHandler:     captchaHandler,
 		AttachmentHandler:  attachmentHandler,
 		AdminReportHandler: adminReportHandler,

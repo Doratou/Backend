@@ -16,6 +16,7 @@ import (
 type Dependencies struct {
 	AttachmentHandler  *handler.AttachmentHandler
 	AuthHandler        *handler.AuthHandler
+	UserHandler        *handler.UserHandler
 	CaptchaHandler     *handler.CaptchaHandler
 	AdminReportHandler *handler.AdminReportHandler
 	FriendshipHandler  *handler.FriendshipHandler
@@ -58,6 +59,9 @@ func New(deps Dependencies) *gin.Engine {
 
 	v1 := engine.Group("/api/v1")
 	RegisterAuthRoutes(v1, deps.AuthHandler, authMiddleware, captchaMiddleware)
+	if deps.UserHandler != nil {
+		RegisterUserRoutes(v1, deps.UserHandler, authMiddleware)
+	}
 	RegisterCaptchaRoutes(v1, deps.CaptchaHandler)
 	RegisterAttachmentRoutes(v1, deps.AttachmentHandler, authMiddleware, optionalAuthMiddleware)
 	RegisterAdminReportRoutes(v1, deps.AdminReportHandler, authMiddleware)
