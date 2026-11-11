@@ -17,6 +17,7 @@ import (
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	emailInfra "github.com/Doratou/Backend/internal/infrastructure/email"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
+	randomInfra "github.com/Doratou/Backend/internal/infrastructure/random"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	postgresRepo "github.com/Doratou/Backend/internal/infrastructure/repository/postgres"
 	redisRepo "github.com/Doratou/Backend/internal/infrastructure/repository/redis"
@@ -111,6 +112,7 @@ func main() {
 	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	pollRepo := postgresRepo.NewPollRepository(postgresDB)
+	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
@@ -198,6 +200,7 @@ func main() {
 	groupService := service.NewGroupService(groupRepo, attachmentRepo)
 	inviteService := service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
 	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
+	luckyDrawService := service.NewLuckyDrawService(luckyDrawRepo, userRepo, dbTrxManager, randomInfra.NewCryptoGenerator())
 
 	adminReportService := service.NewAdminReportService(
 		adminReportRepo,
@@ -226,6 +229,7 @@ func main() {
 	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
 	pollHandler := handler.NewPollHandler(pollService)
+	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
 		AuthHandler:        authHandler,
@@ -236,6 +240,7 @@ func main() {
 		InviteHandler:      inviteHandler,
 		FriendshipHandler:  friendshipHandler,
 		PollHandler:        pollHandler,
+		LuckyDrawHandler:   luckyDrawHandler,
 		CaptchaService:     captchaService,
 		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
 		TokenMaker:         jwtMaker,
