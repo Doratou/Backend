@@ -40,5 +40,6 @@ func RegisterAuthRoutes(
 		// Protected endpoints (require valid access token)
 		auth.POST("/logout", authMiddleware, authHandler.Logout)
 		auth.POST("/password/change", authMiddleware, authHandler.ChangePassword)
+		auth.PATCH("/me/avatar", authMiddleware, authHandler.UpdateAvatar)
 	}
 }

@@ -15,5 +15,5 @@ endif
 
 # Each target runs the script with the same name.
 # Examples:  make up | make migrate-down STEPS=2 | make db-reset YES=1
-up down run stop migrate-up migrate-down db-reset:
+up down run stop migrate-up migrate-down migrate-reset db-reset fmt:
 	@$(RUNNER) $(SCRIPT_DIR)/$@.$(EXT)

@@ -1,0 +1,121 @@
+meta {
+  name: 03. Get Lucky Draw
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{drawGroupId}}/draws/{{drawId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Lucky Draw
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/draws/:drawID`
+  **Auth:** Required
+
+  ## Description
+
+  Returns the draw's title, candidate texts and weights, lifecycle status, total_weight and stored result. Drafts return result=null and completed_at=null. Completed draws expose the winner as result.index, result.title and result.weight.
+
+  result.index is zero-based and refers to the candidates array. For example index=1 means its second entry. Probabilities are candidate.weight / total_weight; the server does not return percentages.
+
+  Active members can read history even while the group is inactive. Changing drawId cannot expose a draw from another group.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in this group. Text candidates are not people or memberships. There is no deletion endpoint.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; variable `drawGroupId` |
+  | `drawID` | `integer` | Yes | Positive BIGINT draw ID; variable `drawId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 701,
+      "group_id": 10,
+      "created_by_member_id": 30,
+      "title": "Dinner choice",
+      "status": "COMPLETED",
+      "is_frozen": false,
+      "result": {
+        "index": 1,
+        "title": "Kebab",
+        "weight": 3
+      },
+      "completed_at": "2026-11-11T10:05:00Z",
+      "created_at": "2026-11-11T10:00:00Z",
+      "updated_at": "2026-11-11T10:05:00Z",
+      "candidates": [
+        {
+          "title": "Pizza",
+          "weight": 1
+        },
+        {
+          "title": "Kebab",
+          "weight": 3
+        }
+      ],
+      "total_weight": 4
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the standard Auth, Friendships and Polls envelope. Authentication and malformed HTTP input are validated before service rules. An inactive group is checked before loading a draw for a write, so DRAW_GROUP_INACTIVE can precede draw state or creator errors.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | bad request payload or parameters | Invalid JSON, field type, title, empty update, path ID, status filter or pagination. |
+  | 401 | `MISSING_TOKEN` | authorization token is missing | A Bearer access token is required. |
+  | 401 | `TOKEN_INVALID` | authorization token is invalid | The token is invalid or not an access token. |
+  | 401 | `TOKEN_EXPIRED` | authorization token has expired | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | authorization token has been revoked | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | user account is deactivated | The caller account is inactive. |
+  | 403 | `DRAW_FORBIDDEN` | only active group members can access this lucky draw | The caller is not an active member of this group, or has left it. |
+  | 404 | `USER_NOT_FOUND` | user not found | The caller no longer exists or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | group not found | The group does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | an internal server error occurred | Persistence, transaction, random generation or authentication infrastructure failed; internal causes are not returned. |
+  | 404 | `DRAW_NOT_FOUND` | lucky draw not found | The ID does not exist, is soft-deleted, or belongs to a different group. |
+
+  **Example: 403**
+
+  ```json
+  {
+    "success": false,
+    "code": "DRAW_FORBIDDEN",
+    "error": "only active group members can access this lucky draw"
+  }
+  ```
+}

@@ -72,5 +72,4 @@ jobs:
             --exit-code 1 \
             --severity CRITICAL,HIGH \
             --skip-dirs .git \
-            --skip-files docker/Dockerfile \
             /workspace

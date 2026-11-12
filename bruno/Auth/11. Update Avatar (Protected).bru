@@ -1,0 +1,58 @@
+meta {
+  name: 11. Update Avatar (Protected)
+  type: http
+  seq: 11
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/auth/me/avatar
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "avatar_attachment_id": 1
+  }
+}
+
+docs {
+  # Update Avatar
+
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/auth/me/avatar`
+  **Auth:** Bearer Token (Protected)
+
+  ## Description
+
+  Updates the logged-in user's avatar by linking a valid uploaded attachment of type `PROFILE_IMAGE` owned by the user.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  ```json
+  {
+    "avatar_attachment_id": 1
+  }
+  ```
+
+  ## Response
+
+  Returns the updated user profile (`dto.UserResponse`) with HTTP 200, including the account's unchanged friend_code. Updating the avatar does not regenerate the friend code.
+}

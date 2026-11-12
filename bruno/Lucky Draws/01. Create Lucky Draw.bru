@@ -1,0 +1,158 @@
+meta {
+  name: 01. Create Lucky Draw
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/groups/{{drawGroupId}}/draws
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Dinner choice",
+    "candidates": [
+      {
+        "title": "Pizza",
+        "weight": 1
+      },
+      {
+        "title": "Kebab",
+        "weight": 3
+      }
+    ]
+  }
+}
+
+docs {
+  # Create Lucky Draw
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/groups/:groupID/draws`
+  **Auth:** Required
+
+  ## Description
+
+  Creates a DRAFT lucky draw inside this group. It does not select a winner. The creator is the authenticated caller's active group membership.
+
+  Candidates are plain text labels with positive integer weights, stored together as JSON. They have no candidate IDs, member IDs or user associations. Titles are trimmed; duplicates are rejected after lowercase comparison. Weights are relative and do not have to add up to 100. The sample has probabilities 25% for Pizza and 75% for Kebab.
+
+  Set drawGroupId manually to the group ID and, after success, copy data.id into drawId in your selected environment. These requests never populate identifiers automatically.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in this group. Text candidates are not people or memberships. There is no deletion endpoint.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; variable `drawGroupId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | title | string | Yes | 1 to 200 Unicode characters after trimming. |
+  | candidates | array of objects | Yes | 2 to 100 text candidates. |
+  | candidates[].title | string | Yes | 1 to 255 Unicode characters after trimming; distinct. |
+  | candidates[].weight | integer | Yes | 1 to 1000000; fractional values are rejected. |
+
+  ```json
+  {
+    "title": "Dinner choice",
+    "candidates": [
+      {
+        "title": "Pizza",
+        "weight": 1
+      },
+      {
+        "title": "Kebab",
+        "weight": 3
+      }
+    ]
+  }
+  ```
+
+  ## Response
+
+  **`201 Created`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 701,
+      "group_id": 10,
+      "created_by_member_id": 30,
+      "title": "Dinner choice",
+      "status": "DRAFT",
+      "is_frozen": false,
+      "result": null,
+      "completed_at": null,
+      "created_at": "2026-11-11T10:00:00Z",
+      "updated_at": "2026-11-11T10:00:00Z",
+      "candidates": [
+        {
+          "title": "Pizza",
+          "weight": 1
+        },
+        {
+          "title": "Kebab",
+          "weight": 3
+        }
+      ],
+      "total_weight": 4
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the standard Auth, Friendships and Polls envelope. Authentication and malformed HTTP input are validated before service rules. An inactive group is checked before loading a draw for a write, so DRAW_GROUP_INACTIVE can precede draw state or creator errors.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | bad request payload or parameters | Invalid JSON, field type, title, empty update, path ID, status filter or pagination. |
+  | 401 | `MISSING_TOKEN` | authorization token is missing | A Bearer access token is required. |
+  | 401 | `TOKEN_INVALID` | authorization token is invalid | The token is invalid or not an access token. |
+  | 401 | `TOKEN_EXPIRED` | authorization token has expired | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | authorization token has been revoked | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | user account is deactivated | The caller account is inactive. |
+  | 403 | `DRAW_FORBIDDEN` | only active group members can access this lucky draw | The caller is not an active member of this group, or has left it. |
+  | 404 | `USER_NOT_FOUND` | user not found | The caller no longer exists or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | group not found | The group does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | an internal server error occurred | Persistence, transaction, random generation or authentication infrastructure failed; internal causes are not returned. |
+  | 409 | `DRAW_GROUP_INACTIVE` | lucky draws cannot be changed while the group is inactive | The group is inactive; writes are frozen. |
+  | 400 | `DRAW_INVALID_CANDIDATES` | provide 2 to 100 candidates with non-empty titles of at most 255 characters and integer weights from 1 to 1000000 | Candidate content failed service validation; DTO validation failures return BAD_REQUEST. |
+  | 400 | `DRAW_DUPLICATE_CANDIDATES` | lucky draw candidate titles must be unique | Two titles match after trimming and conversion to lowercase. |
+
+  **Example: 403**
+
+  ```json
+  {
+    "success": false,
+    "code": "DRAW_FORBIDDEN",
+    "error": "only active group members can access this lucky draw"
+  }
+  ```
+}

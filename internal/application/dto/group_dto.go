@@ -3,13 +3,19 @@ package dto
 import "time"
 
 type CreateGroupRequest struct {
-	Title       string  `json:"title" binding:"required,min=1,max=150"`
-	Description *string `json:"description" binding:"omitempty,max=5000"`
+	Title             string  `json:"title" binding:"required,min=1,max=150"`
+	Description       *string `json:"description" binding:"omitempty,max=5000"`
+	CoverAttachmentID *int64  `json:"cover_attachment_id"`
 }
 
 type UpdateGroupRequest struct {
-	Title       *string `json:"title" binding:"omitempty,min=1,max=150"`
-	Description *string `json:"description" binding:"omitempty,max=5000"`
+	Title             *string `json:"title" binding:"omitempty,min=1,max=150"`
+	Description       *string `json:"description" binding:"omitempty,max=5000"`
+	CoverAttachmentID *int64  `json:"cover_attachment_id"`
+}
+
+type UpdateGroupCoverRequest struct {
+	CoverAttachmentID int64 `json:"cover_attachment_id" binding:"required,gt=0"`
 }
 
 type CloneGroupRequest struct {

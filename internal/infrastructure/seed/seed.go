@@ -16,14 +16,16 @@ import (
 	"github.com/Doratou/Backend/internal/domain/enum"
 	"github.com/Doratou/Backend/internal/domain/exception"
 	domain_db "github.com/Doratou/Backend/internal/domain/repository/DB"
+	"github.com/Doratou/Backend/internal/infrastructure/database"
 	"github.com/Doratou/Backend/pkg/hasher"
 )
 
-// Run seeds default regular user and admin user into PostgreSQL if they do not exist.
+// Run seeds default users, admin, and manual testing groups into PostgreSQL if they do not exist.
 // This operation is completely idempotent and safe to run on every application startup.
 func Run(
 	ctx context.Context,
 	userRepo domain_db.UserRepository,
+	db database.Database,
 	groupRepo domain_db.GroupRepository,
 	inviteRepo domain_db.InviteRepository,
 	h hasher.Hasher,
@@ -37,6 +39,19 @@ func Run(
 	// 2. Seed Admin User
 	if err := seedUser(ctx, userRepo, h, cfg.AdminName, cfg.AdminEmail, cfg.AdminPhone, cfg.AdminPassword, enum.UserRoleAdmin); err != nil {
 		return fmt.Errorf("seed admin user: %w", err)
+	}
+
+	// 3. Seed Manual Testing Users and Groups (Idempotent)
+	if db != nil {
+		if err := SeedManualTestData(ctx, db, h, cfg); err != nil {
+			log.Printf("[SEED NOTICE] SeedManualTestData note: %v", err)
+		}
+		if err := SeedPollTestData(ctx, db); err != nil {
+			log.Printf("[SEED NOTICE] SeedPollTestData note: %v", err)
+		}
+		if err := SeedLuckyDrawTestData(ctx, db); err != nil {
+			log.Printf("[SEED NOTICE] SeedLuckyDrawTestData note: %v", err)
+		}
 	}
 	if err := seedGroup(ctx, userRepo, groupRepo, inviteRepo, h, cfg); err != nil {
 		return fmt.Errorf("seed group: %w", err)

@@ -1,0 +1,65 @@
+meta {
+  name: 08. Admin - Get Report Details
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/reports/1
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - Get Report Details
+  
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/admin/reports/:id`
+  **Auth:** Required (Admin Access Token)
+  
+  ## Description
+  Retrieves comprehensive report details by ID including populated reporter, reported user, and reviewing admin profile information.
+  
+  ## Request
+  
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "reporter_user_id": 1,
+      "reporter_user": {
+        "id": 1,
+        "name": "Ali Rezaei",
+        "email": "ali@example.com"
+      },
+      "reported_user_id": 2,
+      "reported_user": {
+        "id": 2,
+        "name": "Spammer",
+        "email": "spam@example.com"
+      },
+      "reason": "HARASSMENT",
+      "description": "User is sending offensive messages repeatedly.",
+      "status": "PENDING",
+      "created_at": "2026-11-02T19:00:00Z",
+      "updated_at": "2026-11-02T19:00:00Z"
+    }
+  }
+  ```
+}

@@ -1,0 +1,45 @@
+meta {
+  name: 11. Batch Get Access URLs
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/batch/urls?expiry=1h
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  expiry: 1h
+  ~expiry: 30m
+  ~expiry: 2h
+  ~expiry: 24h
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ids": [1, 2, 3]
+  }
+}
+
+docs {
+  # Batch Get Access URLs
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/batch/urls`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Fetches active access URLs for a list of attachment IDs concurrently. For private files, generates freshly signed presigned GET URLs with the specified expiration. For public files, returns direct public URLs.
+}

@@ -37,6 +37,8 @@ docs {
 
   Passwordless login using a pre-verified email or mobile phone number. The backend automatically determines whether the identifier is an email or phone number at runtime.
 
+  data.user.friend_code contains the same permanent code returned by password login and Get My Profile. OTP login does not regenerate it. Recipient IDs and friendCode remain manually configured environment variables.
+
   ## Request
 
   | Field | Type | Required | Description |
@@ -52,6 +54,7 @@ docs {
     "data": {
       "user": {
         "id": 1,
+        "friend_code": "DR-7K9M2X8Q4P6R",
         "name": "Default User",
         "email": "user@doratou.local",
         "phone": "09120000001",

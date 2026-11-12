@@ -83,7 +83,6 @@ func (r *pollRepository) FindByGroupID(ctx context.Context, groupID int64, statu
 	}
 	query := db.Select("polls.*").
 		Preload("Options", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
-		Preload("CreatedByMember.User.AvatarAttachment").
 		Order("polls.created_at DESC").Order("polls.id DESC")
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -213,6 +212,42 @@ func (r *pollRepository) CountVotesByOption(ctx context.Context, pollID int64) (
 	result := make(map[int64]int64, len(counts))
 	for _, count := range counts {
 		result[count.OptionID] = count.VoteCount
+	}
+	return result, nil
+}
+
+func (r *pollRepository) FindVoteSummaries(ctx context.Context, groupID, memberID int64, pollIDs []int64) (map[int64]domain_repo.PollVoteSummary, error) {
+	if groupID <= 0 || memberID <= 0 {
+		return nil, exception.ErrBadRequest
+	}
+	result := make(map[int64]domain_repo.PollVoteSummary, len(pollIDs))
+	if len(pollIDs) == 0 {
+		return result, nil
+	}
+	var counts []struct {
+		PollID    int64
+		OptionID  int64
+		VoteCount int64
+		IsMyVote  bool
+	}
+	err := r.voteQuery(r.getDB(ctx)).
+		Select("poll_votes.poll_id, poll_votes.option_id, COUNT(*) AS vote_count, BOOL_OR(poll_votes.member_id = ?) AS is_my_vote", memberID).
+		Where("polls.group_id = ? AND poll_votes.poll_id IN ?", groupID, pollIDs).
+		Group("poll_votes.poll_id, poll_votes.option_id").Scan(&counts).Error
+	if err != nil {
+		return nil, pollPersistenceError(err)
+	}
+	for _, count := range counts {
+		summary := result[count.PollID]
+		if summary.OptionCounts == nil {
+			summary.OptionCounts = make(map[int64]int64)
+		}
+		summary.OptionCounts[count.OptionID] = count.VoteCount
+		if count.IsMyVote {
+			optionID := count.OptionID
+			summary.MyOptionID = &optionID
+		}
+		result[count.PollID] = summary
 	}
 	return result, nil
 }

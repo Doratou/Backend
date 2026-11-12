@@ -62,6 +62,37 @@ func Auth(tokenMaker jwt.TokenMaker, tokenRepo cache.AuthnTokenRepository) gin.H
 	}
 }
 
+// OptionalAuth creates a Gin middleware that extracts and sets verified JWT claims if an Authorization header
+// is present, but allows unauthenticated requests to proceed.
+func OptionalAuth(tokenMaker jwt.TokenMaker, tokenRepo cache.AuthnTokenRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader(authorizationHeaderKey)
+		if header == "" {
+			c.Next()
+			return
+		}
+
+		fields := strings.Fields(header)
+		if len(fields) != 2 || !strings.EqualFold(fields[0], authorizationTypeBearer) {
+			c.Next()
+			return
+		}
+
+		tokenString := fields[1]
+		claims, err := tokenMaker.VerifyToken(tokenString)
+		if err != nil || claims.TokenType != jwt.TokenTypeAccess {
+			c.Next()
+			return
+		}
+
+		isBlacklisted, err := tokenRepo.IsBlacklisted(c.Request.Context(), claims.ID)
+		if err == nil && !isBlacklisted {
+			tokencontext.SetClaims(c, claims)
+		}
+		c.Next()
+	}
+}
+
 func respondError(c *gin.Context, appErr *exception.AppError) {
 	c.AbortWithStatusJSON(appErr.HTTPStatus, gin.H{
 		"success": false,

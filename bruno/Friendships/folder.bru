@@ -8,6 +8,7 @@ auth {
 }
 
 script:pre-request {
+  bru.deleteVar("friendCode");
   bru.deleteVar("receiver_user_id");
   bru.deleteVar("friendRequestId");
   bru.deleteVar("friendshipId");
@@ -17,6 +18,8 @@ docs {
   # Friendships
 
   Configure receiver_user_id, friendRequestId and friendshipId manually in the Variables tab of the selected Local environment, then save the environment before sending a request. These fields start empty so you can enter the actual IDs from your own database and responses.
+
+  To find another user, get their friend code, enter it manually in friendCode in the environment and run Find User By Friend Code in this folder. Confirm the returned name and avatar, then copy data.id into receiver_user_id before sending a request. Users / Get My Profile returns your own friend_code for sharing.
 
   receiver_user_id identifies the other user when sending a request. friendRequestId is data.id from Send Friend Request or an item's id from Incoming or Outgoing Friend Requests. friendshipId is data.id from Accept Friend Request or an item's friendship_id from List Friends.
 

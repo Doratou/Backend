@@ -39,6 +39,8 @@ docs {
 
   Creates a new user account. Requires at least one credential (email or phone) to have been previously verified via OTP.
 
+  The backend generates a permanent friend_code automatically. Do not send friend_code in the request body. Share data.user.friend_code with friends, or read it later from `GET /api/v1/users/me`.
+
   ## Request
 
   | Field | Type | Required | Description |
@@ -57,6 +59,7 @@ docs {
     "data": {
       "user": {
         "id": 1,
+        "friend_code": "DR-7K9M2X8Q4P6R",
         "name": "New Registered User",
         "email": "newuser@doratou.local",
         "phone": null,

@@ -1,0 +1,125 @@
+meta {
+  name: 02. List Lucky Draws
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{drawGroupId}}/draws
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~status: DRAFT
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Lucky Draws
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/draws`
+  **Auth:** Required
+
+  ## Description
+
+  Lists this group's non-deleted draws in descending created_at and ID order. Both DRAFT and COMPLETED draws are included unless status is supplied.
+
+  Each item includes a result for completed draws and null for drafts. Candidates and total_weight are available through Get Lucky Draw. An inactive group remains readable and returns is_frozen=true. Empty results return items: []. A page beyond the final page can be empty while pagination.total is positive.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in this group. Text candidates are not people or memberships. There is no deletion endpoint.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; variable `drawGroupId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Starts at 1; default 1. |
+  | `limit` | `integer` | No | From 1 to 100; default 20. |
+  | `status` | `string` | No | Exactly DRAFT or COMPLETED. |
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 701,
+          "group_id": 10,
+          "created_by_member_id": 30,
+          "title": "Dinner choice",
+          "status": "DRAFT",
+          "is_frozen": false,
+          "result": null,
+          "completed_at": null,
+          "created_at": "2026-11-11T10:00:00Z",
+          "updated_at": "2026-11-11T10:00:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the standard Auth, Friendships and Polls envelope. Authentication and malformed HTTP input are validated before service rules. An inactive group is checked before loading a draw for a write, so DRAW_GROUP_INACTIVE can precede draw state or creator errors.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | bad request payload or parameters | Invalid JSON, field type, title, empty update, path ID, status filter or pagination. |
+  | 401 | `MISSING_TOKEN` | authorization token is missing | A Bearer access token is required. |
+  | 401 | `TOKEN_INVALID` | authorization token is invalid | The token is invalid or not an access token. |
+  | 401 | `TOKEN_EXPIRED` | authorization token has expired | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | authorization token has been revoked | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | user account is deactivated | The caller account is inactive. |
+  | 403 | `DRAW_FORBIDDEN` | only active group members can access this lucky draw | The caller is not an active member of this group, or has left it. |
+  | 404 | `USER_NOT_FOUND` | user not found | The caller no longer exists or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | group not found | The group does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | an internal server error occurred | Persistence, transaction, random generation or authentication infrastructure failed; internal causes are not returned. |
+
+  **Example: 403**
+
+  ```json
+  {
+    "success": false,
+    "code": "DRAW_FORBIDDEN",
+    "error": "only active group members can access this lucky draw"
+  }
+  ```
+}

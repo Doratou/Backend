@@ -29,16 +29,7 @@ type ListPollVotersRequest struct {
 }
 
 type PollListItem struct {
-	ID                int64               `json:"id"`
-	GroupID           int64               `json:"group_id"`
-	CreatedByMemberID int64               `json:"created_by_member_id"`
-	Question          string              `json:"question"`
-	Visibility        enum.PollVisibility `json:"visibility"`
-	Status            enum.PollStatus     `json:"status"`
-	IsFrozen          bool                `json:"is_frozen"`
-	ClosedAt          *time.Time          `json:"closed_at"`
-	CreatedAt         time.Time           `json:"created_at"`
-	UpdatedAt         time.Time           `json:"updated_at"`
+	PollResponse
 }
 
 type PollOptionResponse struct {
@@ -106,12 +97,10 @@ type PollStatusResponse struct {
 	ClosedAt *time.Time      `json:"closed_at"`
 }
 
-func ToPollListItem(poll *entity.Poll, isFrozen bool) PollListItem {
-	return PollListItem{
-		ID: poll.ID, GroupID: poll.GroupID, CreatedByMemberID: poll.CreatedByMemberID,
-		Question: poll.Question, Visibility: poll.Visibility, Status: poll.Status,
-		IsFrozen: isFrozen, ClosedAt: poll.ClosedAt, CreatedAt: poll.CreatedAt, UpdatedAt: poll.UpdatedAt,
-	}
+func ToPollListItem(poll *entity.Poll, counts map[int64]int64, myOptionID *int64, isFrozen bool) PollListItem {
+	response := ToPollResponse(poll, counts, nil, isFrozen)
+	response.MyOptionID = myOptionID
+	return PollListItem{PollResponse: response}
 }
 
 func ToPollResponse(poll *entity.Poll, counts map[int64]int64, vote *entity.PollVote, isFrozen bool) PollResponse {

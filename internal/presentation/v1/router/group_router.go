@@ -1,6 +1,8 @@
 package router
 
 import (
+	"github.com/Doratou/Backend/internal/domain/enum"
+	"github.com/Doratou/Backend/internal/presentation/middleware"
 	"github.com/Doratou/Backend/internal/presentation/v1/handler"
 	"github.com/gin-gonic/gin"
 )
@@ -10,7 +12,7 @@ func RegisterGroupRoutes(rg *gin.RouterGroup, groupHandler *handler.GroupHandler
 	{
 		groups.POST("", authMiddleware, groupHandler.Create)
 		groups.GET("", authMiddleware, groupHandler.ListMine)
-		groups.GET("/admin", authMiddleware, groupHandler.ListAll)
+		groups.GET("/admin", authMiddleware, middleware.RequireRole(enum.UserRoleAdmin), groupHandler.ListAll)
 		groups.GET("/:groupID", authMiddleware, groupHandler.Get)
 		groups.PATCH("/:groupID", authMiddleware, groupHandler.Update)
 		groups.PATCH("/:groupID/cover", authMiddleware, groupHandler.ChangeCover)

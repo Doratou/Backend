@@ -1,0 +1,63 @@
+meta {
+  name: 09. Batch Presigned Upload URLs (Protected)
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/batch/presigned-upload
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "filename": "gallery_1.jpg",
+        "type": "GALLERY_IMAGE",
+        // "type": "PROFILE_IMAGE",
+        // "type": "GROUP_COVER",
+        // "type": "EXPENSE_RECEIPT",
+        "file_size_bytes": 1048576,
+        "mime_type": "image/jpeg",
+        // "group_id": 1,
+        // "expense_id": 1,
+        "is_public": true
+        // "is_public": false
+      },
+      {
+        "filename": "receipt_1.pdf",
+        "type": "EXPENSE_RECEIPT",
+        // "type": "GALLERY_IMAGE",
+        "file_size_bytes": 524288,
+        "mime_type": "application/pdf",
+        // "group_id": 1,
+        // "expense_id": 1,
+        "is_public": false
+        // "is_public": true
+      }
+    ]
+  }
+}
+
+docs {
+  # Batch Presigned Upload URLs (Protected)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/batch/presigned-upload`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Requests direct upload URLs for multiple files simultaneously (up to 50 items).
+}

@@ -16,6 +16,7 @@ type AuthService interface {
 	ResetPassword(ctx context.Context, req dto.ResetPasswordRequest) error
 	Refresh(ctx context.Context, req dto.RefreshRequest) (*dto.TokenPairResponse, error)
 	Logout(ctx context.Context, accessToken string) error
+	UpdateAvatar(ctx context.Context, userID int64, avatarAttachmentID int64) (*dto.UserResponse, error)
 	SendOTP(ctx context.Context, req dto.SendOTPRequest) (*dto.SendOTPResponse, error)
 	VerifyOTP(ctx context.Context, req dto.VerifyOTPRequest) (*dto.VerifyOTPResponse, error)
 }

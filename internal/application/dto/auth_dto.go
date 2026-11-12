@@ -60,6 +60,10 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required,min=6,max=100"`
 }
 
+type UpdateAvatarRequest struct {
+	AvatarAttachmentID int64 `json:"avatar_attachment_id" binding:"required,gt=0"`
+}
+
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
@@ -74,6 +78,7 @@ type TokenPairResponse struct {
 type UserResponse struct {
 	ID                 int64           `json:"id"`
 	Name               string          `json:"name"`
+	FriendCode         string          `json:"friend_code"`
 	Email              *string         `json:"email,omitempty"`
 	Phone              *string         `json:"phone,omitempty"`
 	IsEmailVerified    bool            `json:"is_email_verified"`
@@ -101,6 +106,7 @@ func ToUserResponse(user *entity.User) UserResponse {
 	return UserResponse{
 		ID:                 user.ID,
 		Name:               user.Name,
+		FriendCode:         user.FriendCode,
 		Email:              user.Email,
 		Phone:              user.Phone,
 		IsEmailVerified:    user.IsEmailVerified,

@@ -1,0 +1,40 @@
+meta {
+  name: 12. Batch Download ZIP Stream
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/batch/download
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ids": [1, 2],
+    "archive_name": "squad_gallery.zip"
+    // "archive_name": "expense_receipts.zip"
+  }
+}
+
+docs {
+  # Batch Download ZIP Stream
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/batch/download`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Streams a compressed `.zip` archive on the fly containing all requested attachments. The server streams files directly from RustFS into the zip stream without accumulating the whole archive in server RAM.
+}

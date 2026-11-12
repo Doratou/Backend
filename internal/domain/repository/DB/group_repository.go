@@ -19,6 +19,7 @@ type GroupRepository interface {
 	FindAll(ctx context.Context, status *enum.GroupStatus, limit, offset int) ([]entity.Group, int64, error)
 	IsActiveMember(ctx context.Context, groupID, userID int64) (bool, error)
 	Update(ctx context.Context, group *entity.Group) error
+	UpdateCover(ctx context.Context, group *entity.Group) error
 	SetStatus(ctx context.Context, groupID int64, status enum.GroupStatus) error
 	Delete(ctx context.Context, groupID int64) error
 	CloneWithMembers(ctx context.Context, sourceGroupID int64, newGroup *entity.Group) error

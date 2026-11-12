@@ -63,6 +63,20 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity
 	return &user, nil
 }
 
+func (r *userRepository) FindByFriendCode(ctx context.Context, friendCode string) (*entity.User, error) {
+	var user entity.User
+	err := r.getDB(ctx).Preload("AvatarAttachment").
+		Where("friend_code = ? AND status = ?", friendCode, enum.UserStatusActive).
+		First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.ErrUserNotFound
+		}
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return &user, nil
+}
+
 func (r *userRepository) FindByPhone(ctx context.Context, phone string) (*entity.User, error) {
 	var user entity.User
 	db := r.getDB(ctx)
