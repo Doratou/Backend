@@ -1,0 +1,24 @@
+meta {
+  name: 12. Google OAuth - Login URL
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/api/v1/auth/google/login
+  body: none
+  auth: none
+}
+
+docs {
+  # Google OAuth - Login Redirect URL
+  
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/auth/google/login`
+  **Auth:** None
+  
+  ## Description
+  
+  Initiates the Google OAuth 2.0 / OIDC login flow.
+  In a web browser, this redirects (`302 Found`) directly to Google's OAuth consent screen with a cryptographically secure random `state` and `nonce` saved in Redis.
+}
