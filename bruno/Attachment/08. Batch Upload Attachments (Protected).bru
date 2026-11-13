@@ -40,7 +40,7 @@ docs {
 
   ## Description
 
-  Uploads multiple files concurrently in a single multipart HTTP request. The backend validates each file independently (MIME sniffing and size limits), hashes the content, extracts dimensions for images, and persists metadata. Adopts the **Partial Success Pattern**: if one file is invalid, valid files are still saved successfully and failures are reported in the response.
+  Uploads multiple files concurrently in a single multipart HTTP request. The backend validates each file independently (MIME sniffing and size limits), hashes the content, extracts dimensions for images, and persists metadata. Adopts the Partial Success Pattern: if one file is invalid, valid files are still saved successfully and failures are reported in the response.
 
   ## Request
 
@@ -57,7 +57,34 @@ docs {
   | --- | --- | --- | --- |
   | `files` | `file[]` | Yes | Multiple binary media files |
   | `type` | `string` | Yes | Attachment type (`GALLERY_IMAGE`, `GROUP_COVER`, `PROFILE_IMAGE`, `EXPENSE_RECEIPT`) |
-  | `group_id` | `int64` | No | Associated squad/group ID (required when uploading for a group or gallery) |
+  | `group_id` | `int64` | No | Associated squad/group ID |
   | `expense_id` | `int64` | No | Associated expense ID |
   | `is_public` | `boolean` | No | Whether files are public |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "successes": [
+        {
+          "id": 1,
+          "original_filename": "image1.jpg",
+          "file_size_bytes": 524288,
+          "mime_type": "image/jpeg",
+          "access_url": "https://storage.example.com/uploads/image1.jpg"
+        }
+      ],
+      "failures": []
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — No files provided or invalid attachment type
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester is not a member of the specified group
 }

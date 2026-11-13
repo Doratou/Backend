@@ -29,7 +29,7 @@ docs {
 
   **Method:** `PATCH`
   **Endpoint:** `/api/v1/auth/me/avatar`
-  **Auth:** Bearer Token (Protected)
+  **Auth:** Required
 
   ## Description
 
@@ -41,18 +41,41 @@ docs {
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `Authorization` | `string` | Yes | Bearer access token |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
   | `Content-Type` | `string` | Yes | `application/json` |
 
   ### Body
 
-  ```json
-  {
-    "avatar_attachment_id": 1
-  }
-  ```
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `avatar_attachment_id` | `int64` | Yes | ID of an uploaded `PROFILE_IMAGE` attachment owned by the user |
 
   ## Response
 
-  Returns the updated user profile (`dto.UserResponse`) with HTTP 200, including the account's unchanged friend_code. Updating the avatar does not regenerate the friend code.
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "friend_code": "DR-7K9M2X8Q4P6R",
+      "name": "Default User",
+      "email": "user@doratou.local",
+      "is_email_verified": true,
+      "is_phone_verified": false,
+      "avatar_attachment_id": 1,
+      "system_role": "USER",
+      "status": "ACTIVE",
+      "wallet": 0,
+      "created_at": "2026-11-11T10:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing or invalid avatar attachment ID
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Attachment is not owned by user or not a PROFILE_IMAGE
+  * `404 Not Found` — Attachment not found
 }

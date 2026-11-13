@@ -28,4 +28,50 @@ docs {
   ## Description
 
   Retrieves all attachments tied to a specific expense (such as receipt images, PDF invoices, and payment confirmations).
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `expense_id` | `int64` | Yes | Unique ID of the expense |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 1,
+          "uploader_user_id": 1,
+          "expense_id": 1,
+          "type": "EXPENSE_RECEIPT",
+          "original_filename": "receipt.pdf",
+          "file_size_bytes": 204800,
+          "mime_type": "application/pdf",
+          "access_url": "https://storage.example.com/uploads/receipt.pdf",
+          "created_at": "2026-11-02T19:00:00Z"
+        }
+      ],
+      "total": 1
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid expense ID format
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester is not a member of the expense's group
+  * `404 Not Found` — Expense not found
 }

@@ -20,5 +20,16 @@ docs {
   ## Description
   
   Initiates the Google OAuth 2.0 / OIDC login flow.
-  In a web browser, this redirects (`302 Found`) directly to Google's OAuth consent screen with a cryptographically secure random `state` and `nonce` saved in Redis.
+  In a web browser, this redirects directly to Google's OAuth consent screen with a cryptographically secure random `state` and `nonce` saved in Redis.
+
+  ## Response
+
+  **`302 Found`**
+  ```http
+  Location: https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=...&response_type=code&scope=openid+email+profile&state=...&nonce=...
+  ```
+
+  ## Errors
+
+  * `500 Internal Server Error` — Failed to generate OAuth state or connect to Redis
 }

@@ -42,4 +42,49 @@ docs {
   ## Description
 
   Fetches active access URLs for a list of attachment IDs concurrently. For private files, generates freshly signed presigned GET URLs with the specified expiration. For public files, returns direct public URLs.
+
+  ## Request
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `expiry` | `string` | No | URL expiration duration (e.g. `15m`, `1h`, `24h`; defaults to `1h`) |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `attachment_ids` | `int64[]` | Yes | List of attachment IDs (max 100) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "urls": [
+        {
+          "id": 1,
+          "access_url": "https://storage.example.com/uploads/photo.jpg?X-Amz-Signature=...",
+          "expires_at": "2026-11-02T20:00:00Z"
+        }
+      ]
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Empty attachment IDs list or exceeds limit (100)
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Access denied to one or more private attachments
 }

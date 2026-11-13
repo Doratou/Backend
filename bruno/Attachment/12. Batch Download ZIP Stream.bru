@@ -37,4 +37,36 @@ docs {
   ## Description
 
   Streams a compressed `.zip` archive on the fly containing all requested attachments. The server streams files directly from RustFS into the zip stream without accumulating the whole archive in server RAM.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `attachment_ids` | `int64[]` | Yes | List of attachment IDs to include in the ZIP (max 50) |
+  | `zip_filename` | `string` | No | Custom filename for the zip archive (defaults to `attachments.zip`) |
+
+  ## Response
+
+  **`200 OK`**
+  ```http
+  Content-Type: application/zip
+  Content-Disposition: attachment; filename="attachments.zip"
+  <binary zip stream>
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Empty attachment IDs list or exceeds limit of 50 items
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Access denied to one or more attachments
+  * `404 Not Found` — No files found to include in the zip archive
 }

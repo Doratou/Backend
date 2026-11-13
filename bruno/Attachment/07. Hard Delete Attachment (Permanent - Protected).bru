@@ -33,4 +33,43 @@ docs {
   ## Description
 
   Permanently deletes the attachment record from PostgreSQL and completely removes the physical file object (and any associated thumbnail) from RustFS / S3 storage.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Attachment primary key ID |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `hard` | `boolean` | Yes | Must be `true` for permanent physical deletion |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "attachment permanently deleted"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid attachment ID format
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester is not uploader, group owner, or admin
+  * `404 Not Found` — Attachment not found
 }

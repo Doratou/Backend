@@ -30,6 +30,12 @@ docs {
 
   ## Request
 
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Unique ID of the report to restore |
+
   ### Headers
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
@@ -45,4 +51,10 @@ docs {
     }
   }
   ```
+  ## Errors
+
+  * `400 Bad Request` — Invalid report ID format
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Insufficient permissions (requires ADMIN role)
+  * `404 Not Found` — Report not found
 }

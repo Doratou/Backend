@@ -71,4 +71,24 @@ docs {
   | `group_id` | `int64` | No | Associated squad/group ID |
   | `expense_id` | `int64` | No | Associated expense ID |
   | `is_public` | `boolean` | No | Whether the object should be public |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "upload_url": "https://storage.example.com/uploads/key?X-Amz-Signature=...",
+      "object_key": "raw-key.jpg",
+      "expires_at": "2026-11-02T19:15:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid file size, MIME type, or attachment type
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester is not a member of the associated group
 }

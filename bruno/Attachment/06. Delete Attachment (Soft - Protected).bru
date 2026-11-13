@@ -27,5 +27,38 @@ docs {
 
   ## Description
 
-  Soft-deletes the attachment record by populating `deleted_at`. The underlying object remains in storage, and can be restored or cleaned up later by background tasks.
+  Performs a soft delete on an attachment record. The metadata record is marked as deleted in PostgreSQL, but the physical file object remains in RustFS / S3 storage.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Attachment primary key ID |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "attachment soft-deleted"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid attachment ID format
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester is not uploader, group owner, or admin
+  * `404 Not Found` — Attachment not found
 }
