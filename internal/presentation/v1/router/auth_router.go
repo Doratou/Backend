@@ -27,6 +27,10 @@ func RegisterAuthRoutes(
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/login/otp", authHandler.LoginWithOTP)
 
+		// Google OAuth endpoints (public)
+		auth.GET("/google/login", authHandler.GoogleLoginRedirect)
+		auth.GET("/google/callback", authHandler.GoogleCallback)
+
 		// Password reset (protected by CaptchaGuard if configured)
 		if captchaMiddleware != nil {
 			auth.POST("/password/reset", captchaMiddleware, authHandler.ResetPassword)

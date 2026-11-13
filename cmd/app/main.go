@@ -17,6 +17,7 @@ import (
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	emailInfra "github.com/Doratou/Backend/internal/infrastructure/email"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
+	oauthInfra "github.com/Doratou/Backend/internal/infrastructure/oauth"
 	randomInfra "github.com/Doratou/Backend/internal/infrastructure/random"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	postgresRepo "github.com/Doratou/Backend/internal/infrastructure/repository/postgres"
@@ -114,8 +115,10 @@ func main() {
 	pollRepo := postgresRepo.NewPollRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
+	oauthRepo := postgresRepo.NewOAuthRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
+	oauthStateRepo := redisRepo.NewOAuthStateRepository(redisCache)
 	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
 
 	// 6. Crypto & Security Utilities
@@ -132,6 +135,26 @@ func main() {
 		log.Printf("[SEED WARNING] database seeder finished with notice/error: %v", err)
 	}
 	cancelSeed()
+
+	// 6.2 Google OAuth Provider
+	var googleProvider oauthInfra.GoogleProvider
+	if cfg.Environment.Google.ClientID != "" {
+		googleCtx, cancelGoogle := context.WithTimeout(context.Background(), 10*time.Second)
+		gp, err := oauthInfra.NewGoogleProvider(googleCtx, oauthInfra.GoogleConfig{
+			ClientID:     cfg.Environment.Google.ClientID,
+			ClientSecret: cfg.Environment.Google.ClientSecret,
+			RedirectURL:  "http://" + cfg.Environment.DataBase.Host + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
+		})
+		cancelGoogle()
+		if err != nil {
+			log.Printf("[GOOGLE OAUTH WARNING] failed to initialize Google OAuth provider: %v", err)
+		} else {
+			googleProvider = gp
+			log.Print("Google OAuth provider initialized")
+		}
+	} else {
+		log.Print("[GOOGLE OAUTH NOTICE] GOOGLE_CLIENT_ID is not configured; Google OAuth login is disabled")
+	}
 
 	// 7. Application Services
 	emailSender := mail.NewMailer(mail.EmailConfig{
@@ -165,9 +188,12 @@ func main() {
 
 	authService := service.NewAuthService(
 		userRepo,
+		oauthRepo,
 		attachmentRepo,
 		otpService,
 		tokenRepo,
+		oauthStateRepo,
+		googleProvider,
 		dbTrxManager,
 		redisTrxManager,
 		jwtMaker,

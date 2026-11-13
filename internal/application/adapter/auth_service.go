@@ -19,4 +19,6 @@ type AuthService interface {
 	UpdateAvatar(ctx context.Context, userID int64, avatarAttachmentID int64) (*dto.UserResponse, error)
 	SendOTP(ctx context.Context, req dto.SendOTPRequest) (*dto.SendOTPResponse, error)
 	VerifyOTP(ctx context.Context, req dto.VerifyOTPRequest) (*dto.VerifyOTPResponse, error)
+	GoogleLoginURL(ctx context.Context) (*dto.OAuthLoginURLResponse, error)
+	GoogleCallback(ctx context.Context, req dto.GoogleCallbackRequest) (*dto.AuthResponse, error)
 }

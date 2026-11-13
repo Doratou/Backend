@@ -17,8 +17,8 @@ type dummyRedisCache struct {
 	cmd goredis.Cmdable
 }
 
-func (d *dummyRedisCache) GetRDB() goredis.Cmdable       { return d.cmd }
-func (d *dummyRedisCache) GetClient() *goredis.Client     { return nil }
+func (d *dummyRedisCache) GetRDB() goredis.Cmdable    { return d.cmd }
+func (d *dummyRedisCache) GetClient() *goredis.Client { return nil }
 func (d *dummyRedisCache) WithCmdable(c goredis.Cmdable) redis.Cache {
 	return &dummyRedisCache{cmd: c}
 }

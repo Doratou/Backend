@@ -240,3 +240,33 @@ func (h *AuthHandler) UpdateAvatar(c *gin.Context) {
 
 	success(c, http.StatusOK, res)
 }
+
+// GoogleLoginRedirect handles GET /api/v1/auth/google/login
+// Generates state and nonce in Redis and redirects user to Google OAuth consent screen.
+func (h *AuthHandler) GoogleLoginRedirect(c *gin.Context) {
+	res, err := h.authService.GoogleLoginURL(c.Request.Context())
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.Redirect(http.StatusFound, res.URL)
+}
+
+// GoogleCallback handles GET /api/v1/auth/google/callback
+// Receives authorization code from Google, verifies state from Redis, exchanges code, and issues application JWT.
+func (h *AuthHandler) GoogleCallback(c *gin.Context) {
+	var req dto.GoogleCallbackRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+
+	res, err := h.authService.GoogleCallback(c.Request.Context(), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, res)
+}
