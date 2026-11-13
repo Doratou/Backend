@@ -45,6 +45,9 @@ func New(deps Dependencies) *gin.Engine {
 		})
 	})
 
+	// OAuth2 developer test UI
+	engine.GET("/oauth-test", handler.OAuthTestUI)
+
 	var authMiddleware gin.HandlerFunc
 	var optionalAuthMiddleware gin.HandlerFunc
 	if deps.TokenMaker != nil && deps.TokenRepo != nil {
