@@ -143,7 +143,7 @@ func main() {
 		gp, err := oauthInfra.NewGoogleProvider(googleCtx, oauthInfra.GoogleConfig{
 			ClientID:     cfg.Environment.Google.ClientID,
 			ClientSecret: cfg.Environment.Google.ClientSecret,
-			RedirectURL:  cfg.Environment.Google.RedirectURL,
+			RedirectURL:  "http://" + cfg.Environment.DataBase.Host + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
 		})
 		cancelGoogle()
 		if err != nil {

@@ -62,6 +62,7 @@ func SeedManualTestData(ctx context.Context, db database.Database, h hasher.Hash
 	// 2. Seed Rich Auxiliary Users with password 123123123
 	testUsers := []seedUserData{
 		// Primary persona aliases (for backward compatibility with previous scripts)
+		{Name: "Matin Admin", Email: "m9652973@gmail.com", Phone: "+989970000001", Role: enum.UserRoleAdmin, Password: defaultTestPassword},
 		{Name: "Alice Owner", Email: "owner@test.com", Phone: "+989120000001", Role: enum.UserRoleUser, Password: defaultTestPassword},
 		{Name: "Bob Member", Email: "member@test.com", Phone: "+989120000002", Role: enum.UserRoleUser, Password: defaultTestPassword},
 		{Name: "Charlie Inactive", Email: "inactive@test.com", Phone: "+989120000003", Role: enum.UserRoleUser, Password: defaultTestPassword},

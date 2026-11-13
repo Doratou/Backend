@@ -188,14 +188,7 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 
-	name := req.Name
-	if name == "" {
-		rand_name, err := s.randomEng.GenerateRandomBase58String(8)
-		if err != nil {
-			rand_name = "<|O__O|>"
-		}
-		name = rand_name
-	}
+	name := s.initRandomName(req.Name)
 
 	user := &entity.User{
 		Name:               name,
@@ -564,19 +557,24 @@ func (s *authService) GoogleLoginURL(ctx context.Context) (*dto.OAuthLoginURLRes
 }
 
 func (s *authService) GoogleCallback(ctx context.Context, req dto.GoogleCallbackRequest) (*dto.AuthResponse, error) {
+	log.Printf("Starting Google OAuth callback processing for state: %s", req.State)
+
 	if s.googleProvider == nil {
+		log.Println("Error: google oauth provider is not configured")
 		return nil, exception.Wrap(exception.ErrInternal, errors.New("google oauth provider is not configured"))
 	}
 
 	req.State = strings.TrimSpace(req.State)
 	req.Code = strings.TrimSpace(req.Code)
 	if req.State == "" || req.Code == "" {
+		log.Println("Error: missing state or code in google callback request")
 		return nil, exception.ErrBadRequest
 	}
 
 	// 1. Consume state from Redis (retrieves nonce and atomically deletes state to prevent replay)
 	nonce, err := s.oauthStateRepo.ConsumeState(ctx, req.State)
 	if err != nil {
+		log.Printf("Error: failed to consume oauth state from redis: %v", err)
 		return nil, err
 	}
 
@@ -586,22 +584,26 @@ func (s *authService) GoogleCallback(ctx context.Context, req dto.GoogleCallback
 
 	oauth2Token, err := s.googleProvider.Exchange(exchangeCtx, req.Code)
 	if err != nil {
+		log.Printf("Error: failed to exchange authorization code for token: %v", err)
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 
 	// 3. Verify id_token signature, claims and nonce
 	claims, err := s.googleProvider.VerifyIDToken(exchangeCtx, oauth2Token, nonce)
 	if err != nil {
+		log.Printf("Error: failed to verify id_token signature or claims: %v", err)
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 
 	// 4. Ensure email is verified by Google
 	if !claims.EmailVerified {
+		log.Printf("Warning: google email is not verified: %s", claims.Email)
 		return nil, exception.ErrOAuthEmailUnverified
 	}
 
 	email := strings.TrimSpace(strings.ToLower(claims.Email))
 	if email == "" {
+		log.Println("Warning: extracted email from claims is empty")
 		return nil, exception.ErrBadRequest
 	}
 
@@ -609,17 +611,22 @@ func (s *authService) GoogleCallback(ctx context.Context, req dto.GoogleCallback
 	var user *entity.User
 	existingUser, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil && !errors.Is(err, exception.ErrUserNotFound) {
+		log.Printf("Error: failed to lookup user by email %s: %v", email, err)
 		return nil, err
 	}
 
 	if existingUser != nil {
 		user = existingUser
+		log.Printf("Info: existing user found for account linking, user_id: %d, email: %s", user.ID, email)
+
 		if user.Status != enum.UserStatusActive {
+			log.Printf("Warning: attempted login for inactive user, user_id: %d", user.ID)
 			return nil, exception.ErrUserInactive
 		}
 
 		// Ensure is_email_verified is true since Google verified it
 		if !user.IsEmailVerified {
+			log.Printf("Info: updating email verification status for user_id: %d", user.ID)
 			user.IsEmailVerified = true
 			_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, true, user.IsPhoneVerified)
 		}
@@ -627,28 +634,25 @@ func (s *authService) GoogleCallback(ctx context.Context, req dto.GoogleCallback
 		// Check if OAuth account link already exists for this provider
 		exists, err := s.oauthRepo.ExistsByUserAndProvider(ctx, user.ID, "google")
 		if err != nil {
+			log.Printf("Error: failed to check existing oauth account link for user_id %d: %v", user.ID, err)
 			return nil, err
 		}
 		if !exists {
+			log.Printf("Info: creating new oauth account link for existing user, user_id: %d", user.ID)
 			oauthAccount := &entity.UserOAuthAccount{
 				UserID:     user.ID,
 				Provider:   "google",
 				ProviderID: claims.Sub,
 			}
 			if err := s.oauthRepo.Create(ctx, oauthAccount); err != nil {
+				log.Printf("Error: failed to create oauth account link for user_id %d: %v", user.ID, err)
 				return nil, err
 			}
 		}
 	} else {
 		// New user registration via Google OAuth
-		name := strings.TrimSpace(claims.Name)
-		if name == "" {
-			randName, err := s.randomEng.GenerateRandomBase58String(8)
-			if err != nil {
-				randName = "<|O__O|>"
-			}
-			name = randName
-		}
+		log.Printf("Info: registering new user via google oauth, email: %s", email)
+		name := s.initRandomName(strings.TrimSpace(claims.Name))
 
 		user = &entity.User{
 			Name:               name,
@@ -677,15 +681,20 @@ func (s *authService) GoogleCallback(ctx context.Context, req dto.GoogleCallback
 			return s.oauthRepo.Create(trxCtx, oauthAccount)
 		})
 		if err != nil {
+			log.Printf("Error: failed to execute database transaction for new user registration: %v", err)
 			return nil, err
 		}
+		log.Printf("Info: new user successfully registered, user_id: %d", user.ID)
 	}
 
 	// 6. Issue JWT access and refresh token pair
 	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
 	if err != nil {
+		log.Printf("Error: failed to issue jwt token pair for user_id %d: %v", user.ID, err)
 		return nil, err
 	}
+
+	log.Printf("Info: google oauth login successful for user_id: %d", user.ID)
 
 	userResponse := dto.ToUserResponse(user)
 	return &dto.AuthResponse{
@@ -696,4 +705,16 @@ func (s *authService) GoogleCallback(ctx context.Context, req dto.GoogleCallback
 		RefreshTokenExpiresAt: refreshClaims.ExpiresAt.Time,
 		ExpiresAt:             accessClaims.ExpiresAt.Time,
 	}, nil
+}
+
+func (s *authService) initRandomName(reqName string) string {
+	name := reqName
+	if name == "" {
+		rand_name, err := s.randomEng.GenerateRandomBase58String(8)
+		if err != nil {
+			rand_name = "<|O__O|>"
+		}
+		name = rand_name
+	}
+	return name
 }
