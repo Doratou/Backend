@@ -48,4 +48,52 @@ docs {
   ## Description
 
   Confirms multiple direct client uploads. Verifies each object in storage, queries file sizes and ETags, and inserts all records in PostgreSQL.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `items` | `array` | Yes | Array of confirm upload requests (max 50) |
+  | `items[].object_key` | `string` | Yes | RustFS object key received during presign |
+  | `items[].original_filename` | `string` | Yes | Original file name |
+  | `items[].type` | `string` | Yes | Attachment type |
+  | `items[].group_id` | `int64` | No | Associated squad/group ID |
+  | `items[].expense_id` | `int64` | No | Associated expense ID |
+  | `items[].is_public` | `boolean` | No | Whether the file is public |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 1,
+          "object_key": "raw-key.jpg",
+          "original_filename": "photo.jpg",
+          "type": "GALLERY_IMAGE",
+          "created_at": "2026-11-02T19:00:00Z"
+        }
+      ],
+      "total": 1
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Empty items list or exceeds maximum limit of 50 items
+  * `401 Unauthorized` — Missing or invalid token
+  * `404 Not Found` — One or more objects not found in storage
 }

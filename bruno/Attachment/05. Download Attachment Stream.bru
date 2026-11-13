@@ -16,26 +16,42 @@ headers {
 
 docs {
   # Download Attachment Stream
-
+  
   **Method:** `GET`
   **Endpoint:** `/api/v1/attachments/:id/download`
-  **Auth:** Optional (`OptionalAuth` middleware). Public attachments require no auth; private attachments require Bearer token of uploader or group member.
-
+  **Auth:** Optional (`OptionalAuth` middleware). Public attachments require no auth; private attachments require Bearer token.
+  
   ## Description
-
-  Streams the raw file bytes directly from RustFS / S3 storage through the backend server as a file download. Sets the `Content-Disposition: attachment; filename="..."`, `Content-Type`, and `Content-Length` headers properly.
-
+  
+  Streams the binary file contents directly through the backend server from storage. Supports range requests and sets appropriate `Content-Disposition` and `Content-Type` headers.
+  
   ## Request
-
+  
+  ### Path Parameters
+  
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Attachment primary key ID |
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Optional | Bearer access token (required for private files) |
 
-  ### URL Parameters
+  ## Response
 
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `id` | `int64` | Yes | Attachment ID |
+  **`200 OK`**
+  ```http
+  Content-Type: image/jpeg
+  Content-Disposition: attachment; filename="photo.jpg"
+  <binary file stream>
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid attachment ID format
+  * `401 Unauthorized` — Authentication required for private attachment
+  * `403 Forbidden` — Access denied to private attachment
+  * `404 Not Found` — Attachment or physical object not found in storage
 }

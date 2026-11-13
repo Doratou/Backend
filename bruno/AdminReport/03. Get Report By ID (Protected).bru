@@ -30,6 +30,12 @@ docs {
 
   ## Request
 
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Unique ID of the report |
+
   ### Headers
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
@@ -52,4 +58,10 @@ docs {
     }
   }
   ```
+  ## Errors
+
+  * `400 Bad Request` — Invalid report ID format
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Access denied (report belongs to another user and requester is not admin)
+  * `404 Not Found` — Report not found
 }

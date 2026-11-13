@@ -32,21 +32,52 @@ docs {
   
   ## Request
   
+  ### Path Parameters
+  
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `int64` | Yes | Attachment primary key ID |
+  
+  ### Query Parameters
+  
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `expiry` | `string` | No | Presigned URL duration (e.g. `15m`, `1h`, `24h`; defaults to `1h`) |
+  
   ### Headers
   
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Optional | Bearer access token (required for private files) |
-  
-  ### URL Parameters
-  
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `id` | `int64` | Yes | Attachment ID |
-  
-  ### Query Parameters
-  
-  | Parameter | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `include_relations` | `boolean` | No | If `true`, preloads and returns related user, group, and expense details |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "uploader_user_id": 1,
+      "group_id": 1,
+      "type": "GALLERY_IMAGE",
+      "original_filename": "photo.jpg",
+      "file_size_bytes": 1048576,
+      "mime_type": "image/jpeg",
+      "sha256_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "is_public": false,
+      "width": 1920,
+      "height": 1080,
+      "access_url": "https://storage.example.com/uploads/photo.jpg?X-Amz-Signature=...",
+      "created_at": "2026-11-02T19:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid attachment ID format
+  * `401 Unauthorized` — Authentication required to view private attachment
+  * `403 Forbidden` — Access denied to private attachment
+  * `404 Not Found` — Attachment not found
 }

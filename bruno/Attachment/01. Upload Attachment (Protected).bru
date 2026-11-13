@@ -40,11 +40,13 @@ vars:post-response {
 docs {
   # Upload Attachment (Protected)
   
-  **Method:** `POST` **Endpoint:** `/api/v1/attachments/upload` **Auth:** Required (Bearer Token)
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/upload`
+  **Auth:** Required (Bearer Token)
   
   ## Description
   
-  Uploads a file directly through the backend server using `multipart/form-data`. The server inspects the binary content for MIME sniffing, validates the file size against configured limits for the attachment type, extracts dimensions if it is an image, generates a SHA-256 hash, stores the object in RustFS / S3, and records metadata in PostgreSQL.
+  Uploads a file directly through the backend server using `multipart/form-data`. The server inspects the binary content for MIME sniffing, validates the file size against configured limits for the attachment type, extracts dimensions if it is an image, generates a SHA-256 hash, stores the object in storage, and records metadata in PostgreSQL.
   
   ## Request
   
@@ -60,9 +62,42 @@ docs {
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `file` | `file` | Yes | Binary media file |
-  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`, `SETTLEMENT_RECEIP`,`GALLERY_VIDEO`) |
+  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`, `SETTLEMENT_RECEIPT`, `GALLERY_VIDEO`) |
   | `group_id` | `int64` | No | Associated squad/group ID (required when uploading for a group or group gallery) |
   | `expense_id` | `int64` | No | Associated expense ID (required when uploading expense receipts) |
   | `is_public` | `boolean` | No | Whether the file is publicly readable |
-  
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "uploader_user_id": 1,
+      "group_id": 1,
+      "expense_id": null,
+      "type": "GALLERY_IMAGE",
+      "original_filename": "photo.jpg",
+      "file_size_bytes": 1048576,
+      "mime_type": "image/jpeg",
+      "sha256_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "is_public": true,
+      "width": 1920,
+      "height": 1080,
+      "duration_seconds": null,
+      "access_url": "https://storage.example.com/uploads/photo.jpg",
+      "created_at": "2026-11-02T19:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid multipart payload or invalid attachment type
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester is not a member of the specified group
+  * `413 Payload Too Large` — File size exceeds allowed limit for the specified type
+  * `415 Unsupported Media Type` — MIME sniffing failed or invalid file format
 }

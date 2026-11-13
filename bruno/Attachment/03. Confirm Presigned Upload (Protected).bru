@@ -64,4 +64,30 @@ docs {
   | `group_id` | `int64` | No | Associated squad/group ID |
   | `expense_id` | `int64` | No | Associated expense ID |
   | `is_public` | `boolean` | No | Whether the file is public |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "uploader_user_id": 1,
+      "group_id": 1,
+      "type": "GALLERY_IMAGE",
+      "original_filename": "photo.jpg",
+      "file_size_bytes": 1048576,
+      "mime_type": "image/jpeg",
+      "access_url": "https://storage.example.com/uploads/photo.jpg",
+      "created_at": "2026-11-02T19:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Missing object key or invalid input
+  * `401 Unauthorized` — Missing or invalid token
+  * `404 Not Found` — Object not found in storage
 }

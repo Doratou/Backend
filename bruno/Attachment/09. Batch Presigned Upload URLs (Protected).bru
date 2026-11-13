@@ -60,4 +60,51 @@ docs {
   ## Description
 
   Requests direct upload URLs for multiple files simultaneously (up to 50 items).
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `files` | `array` | Yes | Array of presigned upload requests (max 50) |
+  | `files[].filename` | `string` | Yes | Original file name |
+  | `files[].type` | `string` | Yes | Attachment type |
+  | `files[].file_size_bytes` | `int64` | Yes | File size in bytes |
+  | `files[].mime_type` | `string` | Yes | Declared MIME type |
+  | `files[].group_id` | `int64` | No | Associated group ID |
+  | `files[].expense_id` | `int64` | No | Associated expense ID |
+  | `files[].is_public` | `boolean` | No | Whether the object is public |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "filename": "photo.jpg",
+          "upload_url": "https://storage.example.com/uploads/raw-key.jpg?X-Amz-Signature=...",
+          "object_key": "raw-key.jpg",
+          "expires_at": "2026-11-02T19:15:00Z"
+        }
+      ]
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Empty files list or exceeds maximum limit of 50 items
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester is not a member of the associated group
 }

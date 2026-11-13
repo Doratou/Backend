@@ -38,4 +38,60 @@ docs {
   ## Description
 
   Retrieves paginated attachments associated with a specific group (such as gallery images, videos, and group cover).
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `group_id` | `int64` | Yes | Unique ID of the group |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Page number (default: 1) |
+  | `page_size` | `integer` | No | Items per page (default: 20) |
+  | `type` | `string` | No | Filter by attachment type (`GALLERY_IMAGE`, `GALLERY_VIDEO`, `GROUP_COVER`) |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 1,
+          "uploader_user_id": 1,
+          "group_id": 1,
+          "type": "GALLERY_IMAGE",
+          "original_filename": "group-event.jpg",
+          "file_size_bytes": 1048576,
+          "mime_type": "image/jpeg",
+          "access_url": "https://storage.example.com/uploads/group-event.jpg",
+          "created_at": "2026-11-02T19:00:00Z"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "limit": 20,
+      "total_pages": 1
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid group ID format or invalid pagination parameters
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester is not an active member of this group
 }

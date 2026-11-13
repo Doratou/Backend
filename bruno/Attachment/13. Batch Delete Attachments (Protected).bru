@@ -40,4 +40,44 @@ docs {
   ## Description
 
   Deletes multiple attachments in bulk. By default performs a soft delete. When `?hard=true` is passed, permanently purges metadata from PostgreSQL and bulk-deletes the physical file objects from RustFS / S3 storage in a single network operation.
+
+  ## Request
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `hard` | `boolean` | No | Set to `true` for permanent physical purge (defaults to `false`) |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `attachment_ids` | `int64[]` | Yes | List of attachment IDs to delete (max 100) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "deleted_ids": [1, 2, 3],
+      "count": 3
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Empty attachment IDs list or invalid parameters
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Requester lacks deletion permissions for one or more files
 }
