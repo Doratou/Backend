@@ -20,10 +20,20 @@ type Environment struct {
 	Invite     InvitationConfig `mapstructure:",squash"`
 	Friendship FriendshipConfig `mapstructure:",squash"`
 	RustFS     RustFSConfig     `mapstructure:",squash"`
+	PoW        PoWConfig        `mapstructure:",squash"`
 }
 
 type FriendshipConfig struct {
 	RequestCooldown time.Duration `mapstructure:"FRIENDSHIP_REQUEST_COOLDOWN"`
+}
+
+type PoWConfig struct {
+	HMACSecret   string        `mapstructure:"POW_HMAC_SECRET" json:"-"`
+	ChallengeTTL time.Duration `mapstructure:"POW_CHALLENGE_TTL"`
+	BlockTTL     time.Duration `mapstructure:"POW_BLOCK_TTL"`
+	Difficulty   int           `mapstructure:"POW_DIFFICULTY"`
+	L1Limit      int           `mapstructure:"POW_L1_LIMIT"`
+	L2Limit      int           `mapstructure:"POW_L2_LIMIT"`
 }
 
 type RustFSConfig struct {
