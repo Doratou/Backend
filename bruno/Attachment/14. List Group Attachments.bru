@@ -10,14 +10,6 @@ get {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{token}}
-}
-
-headers {
-  Authorization: Bearer {{token}}
-}
-
 params:query {
   page: 1
   page_size: 20
@@ -28,41 +20,49 @@ params:query {
   ~type: ATTACHMENT
 }
 
+headers {
+  Authorization: Bearer {{token}}
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
 docs {
   # List Group Attachments
-
+  
   **Method:** `GET`
   **Endpoint:** `/api/v1/attachments/group/:group_id`
   **Auth:** Required (Bearer Token: active squad member or platform admin)
-
+  
   ## Description
-
+  
   Retrieves paginated attachments associated with a specific group (such as gallery images, videos, and group cover).
-
+  
   ## Request
-
+  
   ### Path Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `group_id` | `int64` | Yes | Unique ID of the group |
-
+  
   ### Query Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `page` | `integer` | No | Page number (default: 1) |
   | `page_size` | `integer` | No | Items per page (default: 20) |
-  | `type` | `string` | No | Filter by attachment type (`GALLERY_IMAGE`, `GALLERY_VIDEO`, `GROUP_COVER`) |
-
+  | `type` | `string` | No | Filter by attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`, `SETTLEMENT_RECEIPT`, `GALLERY_VIDEO`) |
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
-
+  
   ## Response
-
+  
   **`200 OK`**
   ```json
   {
@@ -88,9 +88,9 @@ docs {
     }
   }
   ```
-
+  
   ## Errors
-
+  
   * `400 Bad Request` — Invalid group ID format or invalid pagination parameters
   * `401 Unauthorized` — Missing or invalid token
   * `403 Forbidden` — Requester is not an active member of this group

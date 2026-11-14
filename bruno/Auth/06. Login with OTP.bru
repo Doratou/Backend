@@ -28,26 +28,25 @@ vars:post-response {
 
 docs {
   # Login with OTP
-
-  **Method:** `POST`
-  **Endpoint:** `/api/v1/auth/login/otp`
-  **Auth:** None
-
+  
+  **Method:** `POST` **Endpoint:** `/api/v1/auth/login/otp` **Auth:** None
+  
   ## Description
-
+  
   Passwordless login using a pre-verified email or mobile phone number. The backend automatically determines whether the identifier is an email or phone number at runtime.
-
+  
   data.user.friend_code contains the same permanent code returned by password login and Get My Profile. OTP login does not regenerate it. Recipient IDs and friendCode remain manually configured environment variables.
-
+  
   ## Request
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `identifier` | `string` | Yes | Verified email address or mobile phone number |
-
+  
   ## Response
-
-  **`200 OK`**
+  
+  `200 OK`
+  
   ```json
   {
     "success": true,
@@ -61,8 +60,8 @@ docs {
         "is_email_verified": true,
         "is_phone_verified": true,
         "avatar_attachment_id": null,
-        "system_role": "user",
-        "status": "active",
+        "system_role": "USER",
+        "status": "ACTIVE",
         "wallet": 0
       },
       "access_token": "eyJhbGciOiJIUzI1NiIs...",
@@ -72,10 +71,10 @@ docs {
     }
   }
   ```
-
+  
   ## Errors
-
-  * `400 Bad Request` — Missing identifier in request body
-  * `403 Forbidden` — Identifier has not been verified with OTP, or account is deactivated
-  * `404 Not Found` — User account not found
+  
+  - `400 Bad Request` — Missing identifier in request body
+  - `403 Forbidden` — Identifier has not been verified with OTP, or account is deactivated
+  - `404 Not Found` — User account not found
 }
