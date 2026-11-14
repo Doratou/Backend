@@ -1,0 +1,58 @@
+meta {
+  name: 02. Get Public Profile
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/{{profileUserId}}/profile
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+docs {
+  # Get Public Profile
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/users/{userID}/profile`
+  **Auth:** Bearer access token
+
+  ## Description
+
+  Returns current public profile fields only: id, name, avatar_attachment_id and avatar_url. Use this for USER candidate values and USER winners in lucky draws. Name/avatar changes are reflected on the next fetch. Cache by user ID within a page to avoid repeated requests for the same account.
+
+  The caller must be an ACTIVE, non-deleted account. The target must also be ACTIVE and non-deleted; otherwise USER_NOT_FOUND is returned. This route does not expose email, phone, wallet, roles, friend code or Telegram identifiers. It does not create a friendship or grant group access.
+
+  Avatar access rules remain enforced. avatar_url is null if the attachment is missing/deleted/inaccessible; use a placeholder. Response headers include Cache-Control: no-store. A USER option remains an ID in saved draw history even if its account later becomes unavailable.
+
+  ## Request
+
+  Authorization: Bearer <token>. Set profileUserId manually to a positive user ID. No request body.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {"success":true,"data":{"id":4,"name":"Current display name","avatar_attachment_id":null,"avatar_url":null}}
+  ```
+
+  ## Errors
+
+  | HTTP | code | error |
+  | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` |
+  | 404 | `USER_NOT_FOUND` | `user not found` |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` |
+
+  BAD_REQUEST means an invalid target ID. USER_INACTIVE applies to the caller. USER_NOT_FOUND applies to a missing/deleted caller or a missing/deleted/inactive target. Error responses use the same success:false, code and error envelope as the rest of this API.
+}

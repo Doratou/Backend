@@ -1,6 +1,6 @@
 meta {
   name: Lucky Draws
-  seq: 7
+  seq: 9
 }
 
 auth {
@@ -15,17 +15,61 @@ script:pre-request {
 docs {
   # Lucky Draws
 
-  Run go run ./cmd/migrate up before testing, including 20261111004824_create_lucky_draws_table.sql.
+  Every endpoint requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group. All active members can see the shared draft/history and run the draw. Only the original creator can edit; a group owner or system admin has no editing override. The group must be ACTIVE for Create, Update and Run. Inactive groups remain readable with is_frozen=true.
 
-  Set drawGroupId and drawId manually in your selected environment. Login through Auth to populate token. No draw response automatically changes these identifiers; the pre-request script clears stale runtime overrides so environment values take effect.
+  A group has at most one non-deleted DRAFT. Completing it makes room for a new draft. There are no delete, cancel, reset or new-winner rerun routes. Run retries return the original result and completed_at while the group is active. Update and Run lock the same row; concurrent Run calls cannot store different winners. Always animate using the final candidates and zero-based result.index returned by Run.
 
-  Five endpoints: Create a DRAFT, List draws, Get details, Update a DRAFT, and Run once. Candidates are text/weight values without individual IDs or membership associations. All group members with an ACTIVE account and ACTIVE membership may create and read. Only the creator may update and execute; group owners and admins have no override.
+  ## Enum values
 
-  Candidate counts range from 2 to 100. Titles are unique after trimming and lowercase comparison, and contain at most 255 Unicode characters. Weights must be integers from 1 to 1000000. They are relative, need not add up to 100, and the probability of each candidate is weight / total_weight.
+  | Field | Allowed values | Meaning |
+  | --- | --- | --- |
+  | `draw_type` | `EQUAL`, `WEIGHTED` | Equal actual odds, or explicit percentage chances. Required when creating; optional when updating. |
+  | `status` | `DRAFT`, `COMPLETED` | Not executed, or executed with a stored winner. Set by the backend; not writable through the body. |
+  | `candidates[].type` / `result.type` | `TEXT`, `USER` | A text label, or a user ID. List responses expose the type inside result only; result is null for DRAFT. |
 
-  Every draw starts as DRAFT with a null result. Update may replace title, candidates, or both. Run selects one winner from the saved draft, records completed_at and makes the draw COMPLETED. Repeated or simultaneous Run calls return the same stored result. Completed draws cannot be edited or deleted. There are no reset, rerun, cancellation or deletion routes.
+  ## Candidate configuration
 
-  INACTIVE groups freeze Create, Update and Run, but List and Get remain readable with is_frozen=true. Leaving the group does not remove history; the former creator loses access until active membership is restored.
+  TEXT value is a trimmed, non-empty string of at most 255 Unicode characters. USER value is a positive JSON integer user ID from 1 to 9223372036854775807, not a group member ID or a quoted number. On Create and every Update, USER options must identify ACTIVE, non-deleted accounts with ACTIVE membership and no left_at in this group. Leaving after an option was saved does not automatically remove the option or change its chance.
 
-  Manual scenario: use two active group members A and B. A creates a draft. B reads it but receives DRAW_CREATOR_REQUIRED on Update and Run. A edits weights, then runs. Repeat Run and compare result and completed_at; they must stay identical. Try to edit the completed record and expect DRAW_COMPLETED. Create another draft for freeze, permissions and malformed-input checks. Never run the full folder blindly: requests change state and later edits intentionally fail after execution.
+  For WEIGHTED, each weight is a JSON number greater than 0 and at most 100, with no more than two decimal places; the sum must equal exactly 100. A missing/null weight is invalid. These are percentages, not relative weights. Strings, percent signs, exponent notation and more than two decimal places return BAD_REQUEST during HTTP binding. Missing/range/total errors return DRAW_INVALID_PERCENTAGES.
+
+  For EQUAL, omit weights. The backend selects uniformly by option index. Display percentages use hundredths and total 100: three options display 33.34, 33.33, 33.33, while all three have exactly equal actual odds. If weights are supplied, they must exactly match this automatic allocation in array order. A null weight is treated as omitted.
+
+  ## Public profiles
+
+  USER options and winners store and return user IDs without name/avatar snapshots. Fetch current public fields through GET /api/v1/users/{userID}/profile using value. Cache repeated user IDs within the current page. A deleted/inactive target returns USER_NOT_FOUND; an absent/deleted/inaccessible avatar returns avatar_url=null. Show a fallback. TEXT values are displayed directly and do not require a profile lookup.
+
+  ## Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `id` / `group_id` | Draw ID and group ID. |
+  | `created_by_member_id` | Creator membership ID in this group, not their user ID. |
+  | `title` | Current saved draw title. |
+  | `draw_type` / `status` | Enum values listed above. |
+  | `candidate_count` | Number of saved options (2 to 100). |
+  | `is_frozen` | Derived from group status; independent of DRAFT/COMPLETED. |
+  | `can_edit` | true only for the active creator while the draw is DRAFT and the group is ACTIVE. |
+  | `can_run` | true for an active member while the draw is DRAFT and the group is ACTIVE. false after completion; retries still return the original result while the group is active. |
+  | `result` | null for DRAFT; otherwise index (zero-based), type, value and weight of the stored winner. |
+  | `completed_at` | null until Run; then the actual execution timestamp, unchanged on retries. |
+  | `created_at` / `updated_at` | Creation time and last draw write (Update or first Run). Reads/retries do not refresh them. Returned timestamps are RFC 3339 UTC strings. |
+  | `candidates` | Ordered array of type/value/weight objects; included in Create, Get, Update and Run, not in List items. |
+  | `total_weight` | Always 100 for a valid draw, including EQUAL. Included with candidates, not in List items. Use each weight directly as its display percentage. |
+
+  ## Manual setup and frontend flow
+
+  Set drawGroupId and drawId manually in the selected environment and save. Create returns data.id for drawId; List returns items[].id. These requests never populate IDs automatically. The folder script clears legacy runtime draw IDs so saved environment values are used. Auth Login/Refresh retain their existing automatic token behavior. All IDs, titles and dates in examples are illustrative; use values from your own responses.
+
+  1. Read GET /api/v1/groups/{groupID}/draws?status=DRAFT&limit=1. If an item exists, fetch its detail to build the shared wheel. Otherwise show Create.
+  2. Only the creator sees editing enabled through can_edit. All active members can execute while can_run is true. The backend still enforces these permissions.
+  3. Submit Run once, animate candidates/result.index from its response and add the completed record to history. After a timeout retry the same draw ID; do not create another draw to retry execution.
+  4. Load paginated history through status=COMPLETED. Resolve USER result.value through the public profile endpoint; TEXT result.value is a display label. Use completed_at for execution date/time.
+  5. While is_frozen=true, disable writes. Group freezing does not rewrite a draw's own status or completion timestamp.
+
+  For creator membership mapping, find the current user's user_id in GET /api/v1/groups/{groupID}/members and compare its member_id with created_by_member_id. Do not compare user_id directly to a membership ID. This is a UI convenience; the server remains authoritative.
+
+  Run go run ./cmd/migrate up before starting this API version. The redesign migration is 20261114160000_redesign_lucky_draw_candidates.sql. Old relative weights are converted to percentages; legacy text stays TEXT and stored winners are preserved. Where multiple drafts existed, only the newest remains visible. This API does not recreate deleted drafts or expose a deletion route.
+
+  All five requests contain only their own reachable HTTP errors. Unsupported enum inputs return BAD_REQUEST during binding; DRAW_INVALID_TYPE is an internal service error definition, not an additional HTTP case for these routes.
 }

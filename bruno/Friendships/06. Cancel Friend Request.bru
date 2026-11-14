@@ -29,13 +29,24 @@ docs {
 
   Cancels an outgoing PENDING friend request. Only the current sender may perform this action. The row is soft-deleted and disappears from both pending lists; its status remains PENDING and `deleted_at` is set. A later allowed send restores the same row and ID.
 
-  Use the sender's token and the selected outgoing request's ID. `friendRequestId` is saved by a successful Send Friend Request. Accepted friendships must be removed through Remove Friend.
+  Use the sender's token and set friendRequestId manually in the selected environment to data.id from Send Friend Request or the selected Outgoing Friend Requests item's id, then save the environment. Send does not populate this ID automatically. Accepted friendships must be removed through Remove Friend.
 
   After cancellation, the same sender can resend only after `FRIENDSHIP_REQUEST_COOLDOWN` has elapsed from the latest send time (`created_at` in the Send response). The interval does not restart at cancellation. If it has already elapsed, resending is immediately allowed. The previous recipient can initiate a reverse request.
 
   Any `429 FRIEND_REQUEST_COOLDOWN` is returned by Send Friend Request, not by Cancel. Repeating Cancel returns `404 FRIENDSHIP_NOT_FOUND` until the record is restored.
 
   The authenticated account must be ACTIVE. For an existing non-deleted record, the actor's permission is checked before the relationship status. An unauthorized actor receives `403 FRIENDSHIP_FORBIDDEN` even if the request is no longer PENDING. A currently canceled or removed record returns `404 FRIENDSHIP_NOT_FOUND`. An allowed resend restores the same ID with the latest direction and state; refresh the request list before acting on a saved ID.
+
+  ### Allowed values
+
+  | Field / concept | Allowed values | Meaning |
+  | --- | --- | --- |
+  | Friendship status | `PENDING`, `ACCEPTED`, `REJECTED` | Waiting for a reply, accepted friendship, rejected request. Values are uppercase and case-sensitive. |
+  | Request direction | `incoming`, `outgoing` | Required on List Friend Requests only; values are lowercase and case-sensitive. |
+
+  There are no CANCELED or REMOVED status values. Cancel and Remove use soft deletion. An allowed resend restores the existing relationship to PENDING.
+
+  Cancel keeps the stored status PENDING and soft-deletes the row; it does not return a status field.
 
   ## Request
 
@@ -65,6 +76,14 @@ docs {
     }
   }
   ```
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `data.message` | friend request canceled successfully. This response contains no status or identifier field. |
+
+  Timestamps are RFC 3339 / ISO 8601 strings and may include Z or a numeric UTC offset. Parse the timestamp before formatting local dates and times.
 
   ## Errors
 

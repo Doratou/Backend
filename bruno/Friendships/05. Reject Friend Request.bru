@@ -37,6 +37,17 @@ docs {
 
   The authenticated account must be ACTIVE. For an existing non-deleted record, the actor's permission is checked before the relationship status. An unauthorized actor receives `403 FRIENDSHIP_FORBIDDEN` even if the request is no longer PENDING. A currently canceled or removed record returns `404 FRIENDSHIP_NOT_FOUND`. An allowed resend restores the same ID with the latest direction and state; refresh the request list before acting on a saved ID.
 
+  ### Allowed values
+
+  | Field / concept | Allowed values | Meaning |
+  | --- | --- | --- |
+  | Friendship status | `PENDING`, `ACCEPTED`, `REJECTED` | Waiting for a reply, accepted friendship, rejected request. Values are uppercase and case-sensitive. |
+  | Request direction | `incoming`, `outgoing` | Required on List Friend Requests only; values are lowercase and case-sensitive. |
+
+  There are no CANCELED or REMOVED status values. Cancel and Remove use soft deletion. An allowed resend restores the existing relationship to PENDING.
+
+  The successful Reject response status is REJECTED.
+
   ## Request
 
   ### Headers
@@ -67,6 +78,16 @@ docs {
     }
   }
   ```
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `data.id` | The same relationship/request ID; it is reused if a later send is allowed. |
+  | `data.status` | REJECTED. |
+  | `data.responded_at` | Rejection timestamp; the same sender cooldown starts here. |
+
+  Timestamps are RFC 3339 / ISO 8601 strings and may include Z or a numeric UTC offset. Parse the timestamp before formatting local dates and times.
 
   ## Errors
 
