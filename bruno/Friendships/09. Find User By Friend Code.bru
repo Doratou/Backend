@@ -63,6 +63,17 @@ docs {
 
   avatar_url contains an accessible image URL when available; use a placeholder when null. Attachment access rules are preserved, so a missing/deleted/inaccessible avatar has no URL. The response has Cache-Control: no-store.
 
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `data.id` | Matched user ID; use it as receiver_user_id after confirming the identity. |
+  | `data.name` | Current display name. |
+  | `data.avatar_attachment_id` | Avatar attachment ID or null; this is not a user or friendship ID. |
+  | `data.avatar_url` | Current authorized avatar URL, or null when the avatar is absent, deleted or inaccessible. |
+
+  Timestamps are RFC 3339 / ISO 8601 strings and may include Z or a numeric UTC offset. Parse the timestamp before formatting local dates and times.
+
   ## Errors
 
   | HTTP | code | error | When |

@@ -24,4 +24,24 @@ docs {
   receiver_user_id identifies the other user when sending a request. friendRequestId is data.id from Send Friend Request or an item's id from Incoming or Outgoing Friend Requests. friendshipId is data.id from Accept Friend Request or an item's friendship_id from List Friends.
 
   Responses do not automatically populate or overwrite these identifiers. The folder pre-request script clears legacy runtime values so the manually configured environment values are used. Authentication continues to use token populated by Login or Refresh Token.
+
+  ### Allowed values
+
+  | Field / concept | Allowed values | Meaning |
+  | --- | --- | --- |
+  | Friendship status | `PENDING`, `ACCEPTED`, `REJECTED` | Waiting for a reply, accepted friendship, rejected request. Values are uppercase and case-sensitive. |
+  | Request direction | `incoming`, `outgoing` | Required on List Friend Requests only; values are lowercase and case-sensitive. |
+
+  There are no CANCELED or REMOVED status values. Cancel and Remove use soft deletion. An allowed resend restores the existing relationship to PENDING.
+
+  ### Frontend flow
+
+  1. Read your own friend_code through GET /api/v1/users/me or the authenticated user returned by Auth. Share the code; it is not an access token.
+  2. Look up the other user's full friend code, show the returned public name/avatar, and send receiver_user_id=data.id only after the user confirms.
+  3. Use the recipient's session for Accept/Reject and the sender's session for Cancel. Either participant may Remove an accepted friendship.
+  4. Refresh lists after an action. A relationship ID is reused after an allowed resend; the same ID can later have a new direction and request time.
+
+  Friendship summaries in pending/friend lists return avatar_attachment_id, not avatar_url. Resolve a current authorized avatar through GET /api/v1/users/{userID}/profile using the summary user ID, and handle null/unavailable avatars. Find User By Friend Code already returns avatar_url.
+
+  Examples use illustrative IDs, names and dates. They do not guarantee that these records exist in your database. Runtime/environment identifiers are set manually; only the existing Auth token behavior remains automatic.
 }
