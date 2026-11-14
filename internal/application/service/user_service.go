@@ -46,6 +46,27 @@ func (s *userService) FindByFriendCode(ctx context.Context, userID int64, friend
 	if err != nil {
 		return nil, err
 	}
+	return s.publicProfile(ctx, userID, user)
+}
+
+func (s *userService) GetProfile(ctx context.Context, callerUserID, targetUserID int64) (*dto.UserPreviewResponse, error) {
+	if targetUserID <= 0 {
+		return nil, exception.ErrBadRequest
+	}
+	if _, err := s.activeUser(ctx, callerUserID); err != nil {
+		return nil, err
+	}
+	user, err := s.userRepo.FindByID(ctx, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Status != enum.UserStatusActive {
+		return nil, exception.ErrUserNotFound
+	}
+	return s.publicProfile(ctx, callerUserID, user)
+}
+
+func (s *userService) publicProfile(ctx context.Context, userID int64, user *entity.User) (*dto.UserPreviewResponse, error) {
 	response := &dto.UserPreviewResponse{
 		ID:                 user.ID,
 		Name:               user.Name,

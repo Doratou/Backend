@@ -7,63 +7,51 @@ meta {
 get {
   url: {{baseUrl}}/api/v1/groups/{{drawGroupId}}/draws
   body: none
-  auth: bearer
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
 }
 
 params:query {
   page: 1
   limit: 20
-  ~status: DRAFT
-}
-
-headers {
-  Content-Type: application/json
-}
-
-auth:bearer {
-  token: {{token}}
+  ~status: COMPLETED
 }
 
 docs {
   # List Lucky Draws
 
   **Method:** `GET`
-  **Endpoint:** `/api/v1/groups/:groupID/draws`
-  **Auth:** Required
+  **Endpoint:** `/api/v1/groups/{groupID}/draws`
+  **Auth:** Bearer access token
 
   ## Description
 
-  Lists this group's non-deleted draws in descending created_at and ID order. Both DRAFT and COMPLETED draws are included unless status is supplied.
+  Use status=DRAFT with limit=1 for the shared open card, then Get its ID to draw the wheel. Use status=COMPLETED for the shared history. The saved Bruno request uses both statuses by default; add status in Params when needed. Pagination uses page (default 1) and limit (default 20, maximum 100).
 
-  Each item includes a result for completed draws and null for drafts. Candidates and total_weight are available through Get Lucky Draw. An inactive group remains readable and returns is_frozen=true. Empty results return items: []. A page beyond the final page can be empty while pagination.total is positive.
+  Items include draw_type, candidate_count, typed result, creator member ID, timestamps, is_frozen, can_edit and can_run. List items do not include the full candidate array. Rows are ordered by COALESCE(completed_at,created_at) descending then ID descending; COMPLETED history is therefore ordered by actual execution time.
 
-  All endpoints require an ACTIVE account and ACTIVE membership in this group. Text candidates are not people or memberships. There is no deletion endpoint.
+  An empty draft list can coexist with non-empty completed history. No user names or avatar snapshots are included: resolve USER result.value through Get Public Profile.
+
+  All routes require a valid Bearer access token, an ACTIVE account and active membership in the specified group. Every active member can see the shared draft and completed results. Only the creator may edit; every active member may run. Group owners and admins do not override creator-only editing. An inactive group allows reads but rejects Create, Update and Run.
+
+  A group has at most one non-deleted DRAFT. Completing it makes room for the next draft. There is no delete, cancel, reset or rerun-for-a-new-result route. A repeat Run returns the same stored result. Concurrent Create is guarded by a unique PostgreSQL index; Update and Run lock the same draw row.
+
+  Candidates have type, value and weight. TEXT value is a trimmed non-empty string of at most 255 characters. USER value is a positive JSON integer user ID, not a group member ID. USER candidates must be active accounts and active group members when creating or editing. User IDs are stored without a name or avatar snapshot. Fetch current names and avatars from GET /api/v1/users/{userID}/profile; cache by user ID within the page. A deleted/inactive account returns USER_NOT_FOUND; show a placeholder. Leaving the group later does not change an already-saved option or its chance automatically.
+
+  WEIGHTED requires a weight on each option: greater than 0, at most 100, at most two decimal places, with a total of exactly 100. Values are JSON numbers such as 12.50, not strings with a % sign. Strings, exponent notation and more than two decimal places are rejected during binding. EQUAL assigns uniform actual odds. Omit weights for EQUAL; if supplied, they must match the automatic display allocation. Display percentages use 0.01 increments and total 100 (three equal options display 33.34, 33.33, 33.33); random selection remains exactly uniform in EQUAL mode.
+
+  Duplicate TEXT values are rejected after trimming/case normalization; duplicate USER IDs are rejected. Different users sharing a name remain separate options. TEXT and USER are separate namespaces. There must be 2 to 100 options. Percentages are calculated with integer hundredths internally.
+
+  Set drawGroupId and drawId manually in the selected environment. These requests do not automatically overwrite IDs. Login/Refresh keep their existing token scripts. Run the migrations before starting this backend version.
 
   ## Request
 
-  ### Headers
+  Authorization: Bearer <token>. Path IDs are positive BIGINT integers.
 
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
-
-  ### Path Parameters
-
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `groupID` | `integer` | Yes | Positive BIGINT group ID; variable `drawGroupId` |
-
-  Path IDs must be from 1 to 9223372036854775807.
-
-  ### Query Parameters
-
-  | Field | Type | Required | Description |
-  | --- | --- | --- | --- |
-  | `page` | `integer` | No | Starts at 1; default 1. |
-  | `limit` | `integer` | No | From 1 to 100; default 20. |
-  | `status` | `string` | No | Exactly DRAFT or COMPLETED. |
-
-  No request body is required.
+  No body is required.
 
   ## Response
 
@@ -75,16 +63,25 @@ docs {
     "data": {
       "items": [
         {
-          "id": 701,
-          "group_id": 10,
-          "created_by_member_id": 30,
-          "title": "Dinner choice",
-          "status": "DRAFT",
+          "id": 10,
+          "group_id": 1,
+          "created_by_member_id": 3,
+          "title": "Who pays for dinner?",
+          "draw_type": "WEIGHTED",
+          "candidate_count": 3,
+          "status": "COMPLETED",
           "is_frozen": false,
-          "result": null,
-          "completed_at": null,
-          "created_at": "2026-11-11T10:00:00Z",
-          "updated_at": "2026-11-11T10:00:00Z"
+          "can_edit": false,
+          "can_run": false,
+          "result": {
+            "index": 1,
+            "type": "USER",
+            "value": 7,
+            "weight": 50
+          },
+          "completed_at": "2026-11-14T12:00:00Z",
+          "created_at": "2026-11-14T11:00:00Z",
+          "updated_at": "2026-11-14T12:00:00Z"
         }
       ],
       "pagination": {
@@ -98,28 +95,28 @@ docs {
 
   ## Errors
 
-  Errors use the standard Auth, Friendships and Polls envelope. Authentication and malformed HTTP input are validated before service rules. An inactive group is checked before loading a draw for a write, so DRAW_GROUP_INACTIVE can precede draw state or creator errors.
-
   | HTTP | code | error | When |
   | --- | --- | --- | --- |
-  | 400 | `BAD_REQUEST` | bad request payload or parameters | Invalid JSON, field type, title, empty update, path ID, status filter or pagination. |
-  | 401 | `MISSING_TOKEN` | authorization token is missing | A Bearer access token is required. |
-  | 401 | `TOKEN_INVALID` | authorization token is invalid | The token is invalid or not an access token. |
-  | 401 | `TOKEN_EXPIRED` | authorization token has expired | The access token expired. |
-  | 401 | `TOKEN_REVOKED` | authorization token has been revoked | The access token is blacklisted. |
-  | 403 | `USER_INACTIVE` | user account is deactivated | The caller account is inactive. |
-  | 403 | `DRAW_FORBIDDEN` | only active group members can access this lucky draw | The caller is not an active member of this group, or has left it. |
-  | 404 | `USER_NOT_FOUND` | user not found | The caller no longer exists or has been soft-deleted. |
-  | 404 | `GROUP_NOT_FOUND` | group not found | The group does not exist or has been soft-deleted. |
-  | 500 | `INTERNAL_SERVER_ERROR` | an internal server error occurred | Persistence, transaction, random generation or authentication infrastructure failed; internal causes are not returned. |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Malformed JSON, invalid field type, malformed percentage, missing required field, invalid ID/pagination, empty update or invalid title. |
+  | 400 | `DRAW_INVALID_TYPE` | `draw_type must be EQUAL or WEIGHTED` | The service receives an unsupported draw type; HTTP binding may reject it as BAD_REQUEST first. |
+  | 400 | `DRAW_INVALID_CANDIDATES` | `provide 2 to 100 candidates of type TEXT with a non-empty string of at most 255 characters, or USER with a positive integer user ID` | Candidate count, value or type is invalid. HTTP binding may reject invalid count/type first. |
+  | 400 | `DRAW_DUPLICATE_CANDIDATES` | `text options and user IDs must be unique within their candidate type` | Repeated normalized TEXT or USER ID. |
+  | 400 | `DRAW_INVALID_PERCENTAGES` | `weighted chances must be greater than zero, have at most two decimal places and total exactly 100; equal chances are assigned automatically` | Missing weighted chances, out-of-range percentages, incorrect sum or incorrect supplied EQUAL weights. Malformed numeric syntax returns BAD_REQUEST first. |
+  | 400 | `DRAW_CANDIDATE_NOT_MEMBER` | `user candidates must be active accounts and active members of this group` | A USER option is missing/deleted/inactive or not an active member when creating/editing. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | No valid Bearer header. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid token or a refresh token used as access token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Caller account is inactive. |
+  | 403 | `DRAW_FORBIDDEN` | `only active group members can access this lucky draw` | Caller is not an active member or has left the group. |
+  | 403 | `DRAW_CREATOR_REQUIRED` | `only the lucky draw creator can perform this action` | A different member tries to edit. This does not restrict Run. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Caller does not exist or is soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Missing or soft-deleted group. |
+  | 404 | `DRAW_NOT_FOUND` | `lucky draw not found` | Missing, soft-deleted or different-group draw ID. |
+  | 409 | `DRAW_DRAFT_EXISTS` | `this group already has an unexecuted lucky draw` | Another draft already exists, including a concurrent Create. |
+  | 409 | `DRAW_COMPLETED` | `a completed lucky draw cannot be edited` | Editing after execution, including losing an Update/Run race. |
+  | 409 | `DRAW_GROUP_INACTIVE` | `lucky draws cannot be changed while the group is inactive` | Create, Update or Run on an inactive group, including repeating Run. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Storage, transaction, randomness or token-blacklist failure. |
 
-  **Example: 403**
-
-  ```json
-  {
-    "success": false,
-    "code": "DRAW_FORBIDDEN",
-    "error": "only active group members can access this lucky draw"
-  }
-  ```
+  Errors use the standard envelope: {"success":false,"code":"DRAW_DRAFT_EXISTS","error":"this group already has an unexecuted lucky draw"}. Internal details are not returned.
 }

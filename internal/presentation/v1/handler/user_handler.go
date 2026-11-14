@@ -46,3 +46,23 @@ func (h *UserHandler) FindByFriendCode(c *gin.Context) {
 	}
 	success(c, http.StatusOK, response)
 }
+
+func (h *UserHandler) GetProfile(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	targetUserID, err := parseIDParam(c, "userID")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response, err := h.userService.GetProfile(c.Request.Context(), userID, targetUserID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, response)
+}

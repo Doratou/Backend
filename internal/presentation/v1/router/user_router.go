@@ -16,5 +16,6 @@ func RegisterUserRoutes(rg *gin.RouterGroup, userHandler *handler.UserHandler, a
 	{
 		users.GET("/me", userHandler.GetMe)
 		users.GET("/by-friend-code/:friendCode", userHandler.FindByFriendCode)
+		users.GET("/:userID/profile", userHandler.GetProfile)
 	}
 }
