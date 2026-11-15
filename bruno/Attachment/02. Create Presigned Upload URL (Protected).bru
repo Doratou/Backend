@@ -65,15 +65,15 @@ docs {
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `filename` | `string` | Yes | Original file name including extension |
-  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`) |
+  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`, `SETTLEMENT_RECEIPT`, `GALLERY_VIDEO`) |
   | `file_size_bytes` | `int64` | Yes | Expected file size in bytes |
   | `mime_type` | `string` | Yes | Declared MIME type |
   | `group_id` | `int64` | No | Associated squad/group ID |
   | `expense_id` | `int64` | No | Associated expense ID |
   | `is_public` | `boolean` | No | Whether the object should be public |
-
+  
   ## Response
-
+  
   **`200 OK`**
   ```json
   {
@@ -85,9 +85,9 @@ docs {
     }
   }
   ```
-
+  
   ## Errors
-
+  
   * `400 Bad Request` — Invalid file size, MIME type, or attachment type
   * `401 Unauthorized` — Missing or invalid token
   * `403 Forbidden` — Requester is not a member of the associated group

@@ -64,7 +64,7 @@ func (r *luckyDrawRepository) FindByGroupID(ctx context.Context, groupID int64, 
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, luckyDrawPersistenceError(err)
 	}
-	err := db.Select("lucky_draws.*").Order("lucky_draws.created_at DESC").Order("lucky_draws.id DESC").
+	err := db.Select("lucky_draws.*").Order("COALESCE(lucky_draws.completed_at, lucky_draws.created_at) DESC").Order("lucky_draws.id DESC").
 		Limit(limit).Offset(offset).Find(&draws).Error
 	if err != nil {
 		return nil, 0, luckyDrawPersistenceError(err)
@@ -119,7 +119,7 @@ func (r *luckyDrawRepository) UpdateDraft(ctx context.Context, draw *entity.Luck
 	updatedAt := db.NowFunc().UTC().Truncate(time.Microsecond)
 	result := db.Model(&entity.LuckyDraw{}).
 		Where("id = ? AND group_id = ? AND created_by_member_id = ? AND status = ?", draw.ID, draw.GroupID, draw.CreatedByMemberID, enum.LuckyDrawStatusDraft).
-		Updates(map[string]any{"title": draw.Title, "candidates": string(data), "updated_at": updatedAt})
+		Updates(map[string]any{"title": draw.Title, "draw_type": draw.DrawType, "candidates": string(data), "updated_at": updatedAt})
 	if result.Error != nil {
 		return luckyDrawPersistenceError(result.Error)
 	}
@@ -128,6 +128,27 @@ func (r *luckyDrawRepository) UpdateDraft(ctx context.Context, draw *entity.Luck
 	}
 	draw.UpdatedAt = updatedAt
 	return nil
+}
+
+func (r *luckyDrawRepository) FindActiveCandidateUserIDs(ctx context.Context, groupID int64, userIDs []int64) ([]int64, error) {
+	var rows []struct{ ID int64 }
+	if len(userIDs) == 0 {
+		return []int64{}, nil
+	}
+	err := r.getDB(ctx).Table("users").Select("users.id").
+		Joins("JOIN group_members ON group_members.user_id = users.id AND group_members.group_id = ?", groupID).
+		Where("users.id IN ? AND users.status = ? AND users.deleted_at IS NULL", userIDs, enum.UserStatusActive).
+		Where("group_members.status = ? AND group_members.left_at IS NULL", enum.GroupMemberStatusActive).
+		Order("users.id ASC").Clauses(clause.Locking{Strength: "SHARE", Table: clause.Table{Name: "users, group_members", Raw: true}}).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, luckyDrawPersistenceError(err)
+	}
+	ids := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	return ids, nil
 }
 
 func (r *luckyDrawRepository) Complete(ctx context.Context, draw *entity.LuckyDraw) error {
@@ -159,6 +180,10 @@ func luckyDrawPersistenceError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
+		case "23505":
+			if pgErr.ConstraintName == "idx_lucky_draws_one_draft_per_group" {
+				return exception.ErrLuckyDrawDraftExists
+			}
 		case "23503":
 			switch pgErr.ConstraintName {
 			case "lucky_draws_group_id_fkey":
@@ -167,6 +192,9 @@ func luckyDrawPersistenceError(err error) error {
 				return exception.ErrGroupMemberNotFound
 			}
 		case "23514":
+			if pgErr.ConstraintName == "chk_lucky_draws_configuration" {
+				return exception.ErrLuckyDrawInvalidPercentages
+			}
 			if pgErr.ConstraintName == "chk_lucky_draws_candidates" {
 				return exception.ErrLuckyDrawInvalidCandidates
 			}

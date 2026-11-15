@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -31,20 +33,23 @@ func (s *luckyDrawService) Create(ctx context.Context, userID, groupID int64, re
 	if !validLuckyDrawText(title, 200) {
 		return nil, exception.ErrBadRequest
 	}
-	candidates, err := luckyDrawCandidates(req.Candidates)
+	candidates, err := luckyDrawCandidates(req.DrawType, req.Candidates)
 	if err != nil {
 		return nil, err
 	}
-	draw := &entity.LuckyDraw{Title: title, Candidates: candidates, Status: enum.LuckyDrawStatusDraft}
+	draw := &entity.LuckyDraw{Title: title, DrawType: req.DrawType, Candidates: candidates, Status: enum.LuckyDrawStatusDraft}
 	err = s.withGroupAccess(ctx, userID, groupID, true, func(trxCtx context.Context, group *entity.Group, member *entity.GroupMember) error {
 		draw.GroupID = group.ID
 		draw.CreatedByMemberID = member.ID
+		if err := s.validateCandidateUsers(trxCtx, group.ID, candidates); err != nil {
+			return err
+		}
 		return s.drawRepo.Create(trxCtx, draw)
 	})
 	if err != nil {
 		return nil, err
 	}
-	response := dto.ToLuckyDrawResponse(draw, false)
+	response := dto.ToLuckyDrawResponse(draw, false, draw.CreatedByMemberID)
 	return &response, nil
 }
 
@@ -68,7 +73,7 @@ func (s *luckyDrawService) List(ctx context.Context, userID, groupID int64, req 
 		}
 		items := make([]dto.LuckyDrawListItem, 0, len(draws))
 		for _, draw := range draws {
-			items = append(items, dto.ToLuckyDrawListItem(draw, group.Status != enum.GroupStatusActive))
+			items = append(items, dto.ToLuckyDrawListItem(draw, group.Status != enum.GroupStatusActive, member.ID))
 		}
 		response = dto.PaginatedResponse[dto.LuckyDrawListItem]{Items: items, Pagination: dto.PaginationResponse{Page: page, Limit: limit, Total: total}}
 		return nil
@@ -82,7 +87,7 @@ func (s *luckyDrawService) List(ctx context.Context, userID, groupID int64, req 
 func (s *luckyDrawService) Get(ctx context.Context, userID, groupID, drawID int64) (*dto.LuckyDrawResponse, error) {
 	var response dto.LuckyDrawResponse
 	err := s.withDrawAccess(ctx, userID, groupID, drawID, false, func(trxCtx context.Context, group *entity.Group, member *entity.GroupMember, draw *entity.LuckyDraw) error {
-		response = dto.ToLuckyDrawResponse(draw, group.Status != enum.GroupStatusActive)
+		response = dto.ToLuckyDrawResponse(draw, group.Status != enum.GroupStatusActive, member.ID)
 		return nil
 	})
 	if err != nil {
@@ -92,7 +97,7 @@ func (s *luckyDrawService) Get(ctx context.Context, userID, groupID, drawID int6
 }
 
 func (s *luckyDrawService) Update(ctx context.Context, userID, groupID, drawID int64, req dto.UpdateLuckyDrawRequest) (*dto.LuckyDrawResponse, error) {
-	if req.Title == nil && req.Candidates == nil {
+	if req.Title == nil && req.Candidates == nil && req.DrawType == nil {
 		return nil, exception.ErrBadRequest
 	}
 	var title *string
@@ -103,29 +108,46 @@ func (s *luckyDrawService) Update(ctx context.Context, userID, groupID, drawID i
 		}
 		title = &value
 	}
-	var candidates []entity.LuckyDrawCandidate
-	if req.Candidates != nil {
-		var err error
-		candidates, err = luckyDrawCandidates(*req.Candidates)
-		if err != nil {
-			return nil, err
-		}
-	}
 	var response dto.LuckyDrawResponse
 	err := s.withDrawAccess(ctx, userID, groupID, drawID, true, func(trxCtx context.Context, group *entity.Group, member *entity.GroupMember, draw *entity.LuckyDraw) error {
+		if draw.CreatedByMemberID != member.ID {
+			return exception.ErrLuckyDrawCreatorRequired
+		}
 		if draw.Status != enum.LuckyDrawStatusDraft {
 			return exception.ErrLuckyDrawCompleted
 		}
-		if title != nil {
-			draw.Title = *title
+		drawType := draw.DrawType
+		if req.DrawType != nil {
+			drawType = *req.DrawType
+		}
+		input := make([]dto.LuckyDrawCandidateInput, 0, len(draw.Candidates))
+		for _, candidate := range draw.Candidates {
+			weight := candidate.Weight
+			entry := dto.LuckyDrawCandidateInput{Type: candidate.Type, Value: candidate.Value}
+			if drawType == enum.LuckyDrawTypeWeighted {
+				entry.Weight = &weight
+			}
+			input = append(input, entry)
 		}
 		if req.Candidates != nil {
-			draw.Candidates = candidates
+			input = *req.Candidates
+		}
+		candidates, err := luckyDrawCandidates(drawType, input)
+		if err != nil {
+			return err
+		}
+		if err := s.validateCandidateUsers(trxCtx, group.ID, candidates); err != nil {
+			return err
+		}
+		draw.DrawType = drawType
+		draw.Candidates = candidates
+		if title != nil {
+			draw.Title = *title
 		}
 		if err := s.drawRepo.UpdateDraft(trxCtx, draw); err != nil {
 			return err
 		}
-		response = dto.ToLuckyDrawResponse(draw, false)
+		response = dto.ToLuckyDrawResponse(draw, false, member.ID)
 		return nil
 	})
 	if err != nil {
@@ -138,13 +160,13 @@ func (s *luckyDrawService) Run(ctx context.Context, userID, groupID, drawID int6
 	var response dto.LuckyDrawResponse
 	err := s.withDrawAccess(ctx, userID, groupID, drawID, true, func(trxCtx context.Context, group *entity.Group, member *entity.GroupMember, draw *entity.LuckyDraw) error {
 		if draw.Status == enum.LuckyDrawStatusCompleted {
-			response = dto.ToLuckyDrawResponse(draw, false)
+			response = dto.ToLuckyDrawResponse(draw, false, member.ID)
 			return nil
 		}
 		if draw.Status != enum.LuckyDrawStatusDraft {
 			return exception.Wrap(exception.ErrInternal, fmt.Errorf("unexpected lucky draw status"))
 		}
-		index, err := s.pickCandidate(draw.Candidates)
+		index, err := s.pickCandidate(draw.DrawType, draw.Candidates)
 		if err != nil {
 			return exception.Wrap(exception.ErrInternal, err)
 		}
@@ -152,7 +174,7 @@ func (s *luckyDrawService) Run(ctx context.Context, userID, groupID, drawID int6
 		if err := s.drawRepo.Complete(trxCtx, draw); err != nil {
 			return err
 		}
-		response = dto.ToLuckyDrawResponse(draw, false)
+		response = dto.ToLuckyDrawResponse(draw, false, member.ID)
 		return nil
 	})
 	if err != nil {
@@ -206,26 +228,39 @@ func (s *luckyDrawService) withDrawAccess(ctx context.Context, userID, groupID, 
 		if err != nil {
 			return err
 		}
-		if write && draw.CreatedByMemberID != member.ID {
-			return exception.ErrLuckyDrawCreatorRequired
-		}
 		return fn(trxCtx, group, member, draw)
 	})
 }
 
-func (s *luckyDrawService) pickCandidate(candidates []entity.LuckyDrawCandidate) (int, error) {
+func (s *luckyDrawService) pickCandidate(drawType enum.LuckyDrawType, candidates []entity.LuckyDrawCandidate) (int, error) {
 	if s.random == nil {
 		return 0, fmt.Errorf("random generator is not configured")
 	}
 	if len(candidates) < 2 || len(candidates) > 100 {
 		return 0, fmt.Errorf("invalid stored candidate count")
 	}
+	if drawType == enum.LuckyDrawTypeEqual {
+		value, err := s.random.Int64n(int64(len(candidates)))
+		if err != nil {
+			return 0, err
+		}
+		if value < 0 || value >= int64(len(candidates)) {
+			return 0, fmt.Errorf("random generator returned an out-of-range value")
+		}
+		return int(value), nil
+	}
+	if drawType != enum.LuckyDrawTypeWeighted {
+		return 0, fmt.Errorf("invalid stored draw type")
+	}
 	var total int64
 	for _, candidate := range candidates {
-		if candidate.Weight < 1 || candidate.Weight > 1000000 {
-			return 0, fmt.Errorf("invalid stored candidate weight")
+		if candidate.Weight <= 0 || candidate.Weight > 10000 {
+			return 0, fmt.Errorf("invalid stored percentage")
 		}
-		total += candidate.Weight
+		total += int64(candidate.Weight)
+	}
+	if total != 10000 {
+		return 0, fmt.Errorf("stored percentages must total 100")
 	}
 	value, err := s.random.Int64n(total)
 	if err != nil {
@@ -235,33 +270,93 @@ func (s *luckyDrawService) pickCandidate(candidates []entity.LuckyDrawCandidate)
 		return 0, fmt.Errorf("random generator returned an out-of-range value")
 	}
 	for i, candidate := range candidates {
-		if value < candidate.Weight {
+		if value < int64(candidate.Weight) {
 			return i, nil
 		}
-		value -= candidate.Weight
+		value -= int64(candidate.Weight)
 	}
 	return 0, fmt.Errorf("could not select a lucky draw candidate")
 }
 
-func luckyDrawCandidates(input []dto.LuckyDrawCandidateInput) ([]entity.LuckyDrawCandidate, error) {
+func luckyDrawCandidates(drawType enum.LuckyDrawType, input []dto.LuckyDrawCandidateInput) ([]entity.LuckyDrawCandidate, error) {
+	if drawType != enum.LuckyDrawTypeEqual && drawType != enum.LuckyDrawTypeWeighted {
+		return nil, exception.ErrLuckyDrawInvalidType
+	}
 	if len(input) < 2 || len(input) > 100 {
 		return nil, exception.ErrLuckyDrawInvalidCandidates
 	}
 	candidates := make([]entity.LuckyDrawCandidate, 0, len(input))
 	seen := make(map[string]struct{}, len(input))
-	for _, candidate := range input {
-		title := strings.TrimSpace(candidate.Title)
-		if !validLuckyDrawText(title, 255) || candidate.Weight < 1 || candidate.Weight > 1000000 {
+	var total entity.LuckyDrawPercentage
+	for i, candidate := range input {
+		var value json.RawMessage
+		var key string
+		switch candidate.Type {
+		case enum.LuckyDrawCandidateTypeText:
+			var title string
+			if err := json.Unmarshal(candidate.Value, &title); err != nil {
+				return nil, exception.ErrLuckyDrawInvalidCandidates
+			}
+			title = strings.TrimSpace(title)
+			if !validLuckyDrawText(title, 255) {
+				return nil, exception.ErrLuckyDrawInvalidCandidates
+			}
+			value, _ = json.Marshal(title)
+			key = "TEXT:" + strings.ToLower(title)
+		case enum.LuckyDrawCandidateTypeUser:
+			var id int64
+			if err := json.Unmarshal(candidate.Value, &id); err != nil || id <= 0 {
+				return nil, exception.ErrLuckyDrawInvalidCandidates
+			}
+			value = json.RawMessage(strconv.FormatInt(id, 10))
+			key = "USER:" + strconv.FormatInt(id, 10)
+		default:
 			return nil, exception.ErrLuckyDrawInvalidCandidates
 		}
-		key := strings.ToLower(title)
 		if _, exists := seen[key]; exists {
 			return nil, exception.ErrLuckyDrawDuplicateCandidates
 		}
 		seen[key] = struct{}{}
-		candidates = append(candidates, entity.LuckyDrawCandidate{Title: title, Weight: candidate.Weight})
+		weight := entity.LuckyDrawPercentage(10000 / len(input))
+		if i < 10000%len(input) {
+			weight++
+		}
+		if drawType == enum.LuckyDrawTypeWeighted {
+			if candidate.Weight == nil || *candidate.Weight <= 0 || *candidate.Weight > 10000 {
+				return nil, exception.ErrLuckyDrawInvalidPercentages
+			}
+			weight = *candidate.Weight
+		} else if candidate.Weight != nil && *candidate.Weight != weight {
+			return nil, exception.ErrLuckyDrawInvalidPercentages
+		}
+		total += weight
+		candidates = append(candidates, entity.LuckyDrawCandidate{Type: candidate.Type, Value: value, Weight: weight})
+	}
+	if total != 10000 {
+		return nil, exception.ErrLuckyDrawInvalidPercentages
 	}
 	return candidates, nil
+}
+
+func (s *luckyDrawService) validateCandidateUsers(ctx context.Context, groupID int64, candidates []entity.LuckyDrawCandidate) error {
+	ids := make([]int64, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.Type == enum.LuckyDrawCandidateTypeUser {
+			var id int64
+			if err := json.Unmarshal(candidate.Value, &id); err != nil {
+				return exception.ErrLuckyDrawInvalidCandidates
+			}
+			ids = append(ids, id)
+		}
+	}
+	active, err := s.drawRepo.FindActiveCandidateUserIDs(ctx, groupID, ids)
+	if err != nil {
+		return err
+	}
+	if len(active) != len(ids) {
+		return exception.ErrLuckyDrawCandidateNotMember
+	}
+	return nil
 }
 
 func validLuckyDrawText(value string, maxLength int) bool {

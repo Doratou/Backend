@@ -40,6 +40,19 @@ docs {
 
   To remove a selected friend, set `friendshipId` manually in the Local environment to the selected item's `friendship_id`, then save the environment before using Remove Friend. Neither this list nor Accept Friend Request automatically changes that variable.
 
+  ### Allowed values
+
+  | Field / concept | Allowed values | Meaning |
+  | --- | --- | --- |
+  | Friendship status | `PENDING`, `ACCEPTED`, `REJECTED` | Waiting for a reply, accepted friendship, rejected request. Values are uppercase and case-sensitive. |
+  | Request direction | `incoming`, `outgoing` | Required on List Friend Requests only; values are lowercase and case-sensitive. |
+
+  There are no CANCELED or REMOVED status values. Cancel and Remove use soft deletion. An allowed resend restores the existing relationship to PENDING.
+
+  This list contains ACCEPTED relationships only; the item itself has no status field.
+
+  Avatar summaries contain only an attachment ID. For a current authorized name/avatar URL, call GET /api/v1/users/{userID}/profile with the summary user ID (not friendship_id or the request ID). Use a placeholder when avatar_url is null or the profile returns USER_NOT_FOUND for an inactive/deleted account.
+
   ## Request
 
   ### Headers
@@ -88,6 +101,17 @@ docs {
   ```
 
   This example matches `page=1&limit=20`. `total` counts all matching friendships before pagination. No results return `items: []`; `total` can remain positive on a page beyond the last result.
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `data.items[].friendship_id` | Relationship ID used by Remove Friend; different from user.id. |
+  | `data.items[].user` | Public summary: id (other user ID), name, avatar_attachment_id (integer or null). No avatar_url is included. |
+  | `data.items[].friends_since` | Acceptance timestamp (responded_at), or null on legacy data. |
+  | `data.pagination` | page and limit describe this page; total counts all matching friendships. |
+
+  Timestamps are RFC 3339 / ISO 8601 strings and may include Z or a numeric UTC offset. Parse the timestamp before formatting local dates and times.
 
   ## Errors
 

@@ -14,9 +14,10 @@ type UserService interface {
 	DeleteAccount(ctx context.Context, userID int64, tokenString string) error
 	GetWallet(ctx context.Context, userID int64) (*dto.WalletResponse, error)
 	GetUserByID(ctx context.Context, currentUserID, targetUserID int64) (*dto.UserPreviewResponse, error)
+	GetProfile(ctx context.Context, callerUserID, targetUserID int64) (*dto.UserPreviewResponse, error)
 	FindByFriendCode(ctx context.Context, userID int64, friendCode string) (*dto.UserPreviewResponse, error)
 	RegenerateFriendCode(ctx context.Context, userID int64) (*dto.UserResponse, error)
-	
+
 	// Admin operations
 	ActivateUserStatus(ctx context.Context, userID int64) (*dto.UserResponse, error)
 	AdminListUsers(ctx context.Context, filter dto.AdminUserFilterRequest, page, limit, offset int) (*dto.PaginatedResponse[dto.UserResponse], error)

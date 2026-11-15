@@ -60,13 +60,13 @@ docs {
   | --- | --- | --- | --- |
   | `object_key` | `string` | Yes | RustFS object key received during presign |
   | `original_filename` | `string` | Yes | Human-readable original filename |
-  | `type` | `string` | Yes | Attachment type |
+  | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`, `SETTLEMENT_RECEIPT`, `GALLERY_VIDEO`) |
   | `group_id` | `int64` | No | Associated squad/group ID |
   | `expense_id` | `int64` | No | Associated expense ID |
   | `is_public` | `boolean` | No | Whether the file is public |
-
+  
   ## Response
-
+  
   **`201 Created`**
   ```json
   {
@@ -84,9 +84,9 @@ docs {
     }
   }
   ```
-
+  
   ## Errors
-
+  
   * `400 Bad Request` — Missing object key or invalid input
   * `401 Unauthorized` — Missing or invalid token
   * `404 Not Found` — Object not found in storage

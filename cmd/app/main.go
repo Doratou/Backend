@@ -144,6 +144,7 @@ func main() {
 			ClientID:     cfg.Environment.Google.ClientID,
 			ClientSecret: cfg.Environment.Google.ClientSecret,
 			RedirectURL:  cfg.Environment.HttpServer.Protcol + "://" + cfg.Environment.HttpServer.Domain + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
+
 		})
 		cancelGoogle()
 		if err != nil {

@@ -1,14 +1,16 @@
 package entity
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/Doratou/Backend/internal/domain/enum"
 )
 
 type LuckyDrawCandidate struct {
-	Title  string `json:"title"`
-	Weight int64  `json:"weight"`
+	Type   enum.LuckyDrawCandidateType `json:"type"`
+	Value  json.RawMessage             `json:"value"`
+	Weight LuckyDrawPercentage         `json:"weight"`
 }
 
 type LuckyDraw struct {
@@ -18,6 +20,7 @@ type LuckyDraw struct {
 	Group             *Group               `gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"-"`
 	CreatedByMember   *GroupMember         `gorm:"foreignKey:CreatedByMemberID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"-"`
 	Title             string               `gorm:"column:title;size:200;not null" json:"title"`
+	DrawType          enum.LuckyDrawType   `gorm:"column:draw_type;type:lucky_draw_type;not null" json:"draw_type"`
 	Candidates        []LuckyDrawCandidate `gorm:"column:candidates;type:jsonb;serializer:json;not null" json:"candidates"`
 	Status            enum.LuckyDrawStatus `gorm:"column:status;type:lucky_draw_status;not null;default:'DRAFT'" json:"status"`
 	ResultIndex       *int                 `gorm:"column:result_index" json:"result_index"`

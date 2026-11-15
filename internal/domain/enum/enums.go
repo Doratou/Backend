@@ -234,7 +234,20 @@ func (p PollVisibility) IsValid() bool {
 	}
 }
 
-// ExpenseType enum values: "NORMAL", "PREMIUM".
+type LuckyDrawType string
+
+const (
+	LuckyDrawTypeEqual    LuckyDrawType = "EQUAL"
+	LuckyDrawTypeWeighted LuckyDrawType = "WEIGHTED"
+)
+
+type LuckyDrawCandidateType string
+
+const (
+	LuckyDrawCandidateTypeText LuckyDrawCandidateType = "TEXT"
+	LuckyDrawCandidateTypeUser LuckyDrawCandidateType = "USER"
+)
+
 type ExpenseType string
 
 const (

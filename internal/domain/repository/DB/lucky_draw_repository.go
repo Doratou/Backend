@@ -14,6 +14,7 @@ type LuckyDrawRepository interface {
 	FindByGroupID(ctx context.Context, groupID int64, status *enum.LuckyDrawStatus, limit, offset int) ([]*entity.LuckyDraw, int64, error)
 	FindGroupByID(ctx context.Context, groupID int64) (*entity.Group, error)
 	FindActiveMemberByUserID(ctx context.Context, groupID, userID int64) (*entity.GroupMember, error)
+	FindActiveCandidateUserIDs(ctx context.Context, groupID int64, userIDs []int64) ([]int64, error)
 	UpdateDraft(ctx context.Context, draw *entity.LuckyDraw) error
 	Complete(ctx context.Context, draw *entity.LuckyDraw) error
 }
