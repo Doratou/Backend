@@ -114,8 +114,8 @@ type Redis struct {
 }
 
 type HttpServer struct {
-	Domain string `mapstructure:"HTTP_DOMAIN"`
-	Port   string `mapstructure:"HTTP_PORT"`
+	Address string `mapstructure:"HTTP_ADDRESS"`
+	Port    string `mapstructure:"HTTP_PORT"`
 }
 
 type InvitationConfig struct {

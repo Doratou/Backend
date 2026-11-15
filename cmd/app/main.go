@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -143,7 +142,7 @@ func main() {
 		gp, err := oauthInfra.NewGoogleProvider(googleCtx, oauthInfra.GoogleConfig{
 			ClientID:     cfg.Environment.Google.ClientID,
 			ClientSecret: cfg.Environment.Google.ClientSecret,
-			RedirectURL:  "http://" + cfg.Environment.DataBase.Host + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
+			RedirectURL:  cfg.Environment.HttpServer.Address + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
 		})
 		cancelGoogle()
 		if err != nil {
@@ -283,7 +282,7 @@ func main() {
 	defer stop()
 
 	server := &http.Server{
-		Addr:              net.JoinHostPort(cfg.Environment.HttpServer.Domain, cfg.Environment.HttpServer.Port),
+		Addr:              cfg.Environment.HttpServer.Address + ":" + cfg.Environment.HttpServer.Port,
 		Handler:           engine,
 		ReadHeaderTimeout: 5 * time.Second,
 	}

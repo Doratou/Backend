@@ -4,7 +4,7 @@ package bootstrap
 
 // EnvKeys contains all environment variable keys extracted from .env
 var EnvKeys = []string{
-	"HTTP_DOMAIN",
+	"HTTP_ADDRESS",
 	"HTTP_PORT",
 	"PDB_HOST",
 	"PDB_PORT",
