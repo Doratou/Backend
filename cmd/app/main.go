@@ -143,7 +143,8 @@ func main() {
 		gp, err := oauthInfra.NewGoogleProvider(googleCtx, oauthInfra.GoogleConfig{
 			ClientID:     cfg.Environment.Google.ClientID,
 			ClientSecret: cfg.Environment.Google.ClientSecret,
-			RedirectURL:  "http://" + cfg.Environment.HttpServer.Domain + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
+			RedirectURL:  cfg.Environment.HttpServer.Protcol + "://" + cfg.Environment.HttpServer.Domain + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
+
 		})
 		cancelGoogle()
 		if err != nil {
@@ -244,7 +245,14 @@ func main() {
 		cfg.Constant,
 	)
 
-	userService := service.NewUserService(userRepo, attachmentService)
+	userService := service.NewUserService(
+		userRepo,
+		attachmentService,
+		otpService,
+		tokenRepo,
+		jwtMaker,
+		redisTrxManager,
+	)
 
 	// 8. Presentation Handlers & Routers
 	userHandler := handler.NewUserHandler(userService)

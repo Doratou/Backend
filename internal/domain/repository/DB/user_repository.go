@@ -7,6 +7,13 @@ import (
 	"github.com/Doratou/Backend/internal/domain/enum"
 )
 
+// UserFilter defines query filtering parameters for listing users.
+type UserFilter struct {
+	Role   *enum.UserRole
+	Status *enum.UserStatus
+	Search *string
+}
+
 // UserRepository defines a fully-featured, comprehensive CRUD and query interface for User entities.
 type UserRepository interface {
 	// Create persists a new user entity in the database.
@@ -14,6 +21,7 @@ type UserRepository interface {
 
 	// FindByID retrieves a user by their primary key, including avatar relations.
 	FindByID(ctx context.Context, id int64) (*entity.User, error)
+	FindByIDUnscoped(ctx context.Context, id int64) (*entity.User, error)
 	FindByFriendCode(ctx context.Context, friendCode string) (*entity.User, error)
 
 	// FindByEmail retrieves a user by their email address.
@@ -29,7 +37,7 @@ type UserRepository interface {
 	FindByTelegramUserID(ctx context.Context, telegramUserID int64) (*entity.User, error)
 
 	// FindAll returns a paginated slice of users and the total count.
-	FindAll(ctx context.Context, limit, offset int) ([]*entity.User, int64, error)
+	FindAll(ctx context.Context, filter UserFilter, limit, offset int) ([]*entity.User, int64, error)
 
 	// FindByStatus returns users filtered by user status (ACTIVE, INACTIVE).
 	FindByStatus(ctx context.Context, status enum.UserStatus, limit, offset int) ([]*entity.User, error)
@@ -42,6 +50,12 @@ type UserRepository interface {
 
 	// UpdatePassword updates only the password_hash column for the given user.
 	UpdatePassword(ctx context.Context, userID int64, passwordHash string) error
+
+	// UpdateRole updates only the system_role column for the given user.
+	UpdateRole(ctx context.Context, userID int64, role enum.UserRole) error
+
+	// RegenerateFriendCode regenerates the friend_code column using the database function.
+	RegenerateFriendCode(ctx context.Context, userID int64) (string, error)
 
 	// UpdateAvatar updates only the avatar_attachment_id column for the given user.
 	UpdateAvatar(ctx context.Context, userID int64, avatarID int64) error

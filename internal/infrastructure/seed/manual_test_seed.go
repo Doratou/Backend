@@ -31,7 +31,7 @@ func SeedManualTestData(ctx context.Context, db database.Database, h hasher.Hash
 	}
 	gdb := db.GetGormDB().WithContext(ctx)
 
-	const defaultTestPassword = "123123123"
+	const defaultTestPassword = "123123"
 	pwdHash, err := h.Hash(defaultTestPassword)
 	if err != nil {
 		return fmt.Errorf("hash test password: %w", err)

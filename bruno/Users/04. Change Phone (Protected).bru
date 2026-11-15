@@ -1,0 +1,73 @@
+meta {
+  name: 04. Change Phone (Protected)
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/users/me/phone
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "phone": "+989120000000"
+  }
+}
+
+docs {
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/users/me/phone`
+  **Auth:** Required
+
+  ## Description
+
+  Updates the authenticated user's phone number after successful OTP verification.
+
+  ## Request
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `phone` | `string` | Yes | Phone number (10-20 characters) verified via OTP |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "name": "Default User",
+      "friend_code": "DR-7K9M2X8Q4P6R",
+      "email": "user@doratou.local",
+      "phone": "+989120000000",
+      "is_email_verified": true,
+      "is_phone_verified": true,
+      "avatar_attachment_id": null,
+      "system_role": "USER",
+      "status": "ACTIVE",
+      "wallet": 0,
+      "telegram_chat_id": null,
+      "telegram_user_id": null,
+      "created_at": "2026-11-11T10:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid phone format
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Phone not verified via OTP or account deactivated
+  * `409 Conflict` — Phone number already registered by another user
+}
