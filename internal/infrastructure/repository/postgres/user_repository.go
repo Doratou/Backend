@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
@@ -40,6 +41,20 @@ func (r *userRepository) FindByID(ctx context.Context, id int64) (*entity.User, 
 	db := r.getDB(ctx)
 
 	err := db.Preload("AvatarAttachment").Where("id = ?", id).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.ErrUserNotFound
+		}
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return &user, nil
+}
+
+func (r *userRepository) FindByIDUnscoped(ctx context.Context, id int64) (*entity.User, error) {
+	var user entity.User
+	db := r.getDB(ctx)
+
+	err := db.Unscoped().Preload("AvatarAttachment").Where("id = ?", id).First(&user).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, exception.ErrUserNotFound
@@ -119,24 +134,38 @@ func (r *userRepository) FindByTelegramUserID(ctx context.Context, telegramUserI
 	return &user, nil
 }
 
-func (r *userRepository) FindAll(ctx context.Context, limit, offset int) ([]*entity.User, int64, error) {
+func (r *userRepository) FindAll(ctx context.Context, filter domain_repo.UserFilter, limit, offset int) ([]*entity.User, int64, error) {
 	var users []*entity.User
 	var total int64
 	db := r.getDB(ctx)
 
-	if err := db.Model(&entity.User{}).Count(&total).Error; err != nil {
+	query := db.Model(&entity.User{})
+
+	if filter.Status != nil {
+		query = query.Where("status = ?", *filter.Status)
+	}
+	if filter.Role != nil {
+		query = query.Where("system_role = ?", *filter.Role)
+	}
+	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
+		searchTerm := "%" + strings.TrimSpace(*filter.Search) + "%"
+		query = query.Where("name ILIKE ? OR email ILIKE ? OR phone ILIKE ? OR friend_code ILIKE ?",
+			searchTerm, searchTerm, searchTerm, searchTerm)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, exception.Wrap(exception.ErrInternal, err)
 	}
 
-	query := db.Preload("AvatarAttachment").Order("id DESC")
+	execQuery := query.Preload("AvatarAttachment").Order("id DESC")
 	if limit > 0 {
-		query = query.Limit(limit)
+		execQuery = execQuery.Limit(limit)
 	}
 	if offset > 0 {
-		query = query.Offset(offset)
+		execQuery = execQuery.Offset(offset)
 	}
 
-	if err := query.Find(&users).Error; err != nil {
+	if err := execQuery.Find(&users).Error; err != nil {
 		return nil, 0, exception.Wrap(exception.ErrInternal, err)
 	}
 
@@ -186,6 +215,18 @@ func (r *userRepository) Update(ctx context.Context, user *entity.User) error {
 func (r *userRepository) UpdatePassword(ctx context.Context, userID int64, passwordHash string) error {
 	db := r.getDB(ctx)
 	res := db.Model(&entity.User{}).Where("id = ?", userID).Update("password_hash", passwordHash)
+	if res.Error != nil {
+		return exception.Wrap(exception.ErrInternal, res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return exception.ErrUserNotFound
+	}
+	return nil
+}
+
+func (r *userRepository) UpdateRole(ctx context.Context, userID int64, role enum.UserRole) error {
+	db := r.getDB(ctx)
+	res := db.Model(&entity.User{}).Where("id = ?", userID).Update("system_role", role)
 	if res.Error != nil {
 		return exception.Wrap(exception.ErrInternal, res.Error)
 	}
