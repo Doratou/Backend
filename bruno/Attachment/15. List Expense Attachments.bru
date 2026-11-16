@@ -23,11 +23,13 @@ docs {
 
   **Method:** `GET`
   **Endpoint:** `/api/v1/attachments/expense/:expense_id`
-  **Auth:** Required (Bearer Token: active squad member or platform admin)
+  **Auth:** Required (Bearer Token: active account and active group membership)
 
   ## Description
 
   Retrieves all attachments tied to a specific expense (such as receipt images, PDF invoices, and payment confirmations).
+
+  EXPENSE_RECEIPT is never publicly readable through these APIs. An unbound receipt is accessible only to its uploader. A linked receipt requires an ACTIVE account and ACTIVE membership with left_at=null in the expense group, including when the uploader is requesting it; former members lose access. Inactive groups still allow receipt reads. Site ADMIN alone grants no bypass. Signed URLs already issued remain usable until expiry.
 
   ## Request
 
@@ -49,22 +51,27 @@ docs {
   ```json
   {
     "success": true,
-    "data": {
-      "items": [
-        {
-          "id": 1,
-          "uploader_user_id": 1,
-          "expense_id": 1,
-          "type": "EXPENSE_RECEIPT",
-          "original_filename": "receipt.pdf",
-          "file_size_bytes": 204800,
-          "mime_type": "application/pdf",
-          "access_url": "https://storage.example.com/uploads/receipt.pdf",
-          "created_at": "2026-11-02T19:00:00Z"
-        }
-      ],
-      "total": 1
-    }
+    "data": [
+      {
+        "id": 1201,
+        "uploaded_by_user_id": 3,
+        "group_id": 10,
+        "type": "EXPENSE_RECEIPT",
+        "original_filename": "receipt.png",
+        "object_key": "attachments/expense_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.png",
+        "mime_type": "image/png",
+        "file_size_bytes": 68,
+        "file_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "width": 1,
+        "height": 1,
+        "is_public": false,
+        "access_url": "https://storage.example.com/doratou-storage/attachments/expense_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.png?X-Amz-Signature=example",
+        "uploaded_at": "2026-11-16T10:00:00Z",
+        "created_at": "2026-11-16T10:00:00Z",
+        "updated_at": "2026-11-16T10:00:00Z",
+        "expense_id": 1101
+      }
+    ]
   }
   ```
 

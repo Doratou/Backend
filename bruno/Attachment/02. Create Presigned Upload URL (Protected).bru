@@ -51,6 +51,8 @@ docs {
   
   Generates a temporary presigned `PUT` URL allowing the client (web or mobile) to upload the file directly to RustFS / S3 storage without routing binary payload through the application server.
   
+  For EXPENSE_RECEIPT, omit expense_id (including in batch items). Upload/confirm first, then bind returned attachment IDs through Create/PUT/PATCH Expense attachment_ids. Receipts are always private; is_public=true is overridden. Until linked, only the uploader can read/delete them. Receipt presigned object keys are scoped to the uploader; confirm the exact key returned for that same user.
+
   ## Request
   
   ### Headers
@@ -69,7 +71,7 @@ docs {
   | `file_size_bytes` | `int64` | Yes | Expected file size in bytes |
   | `mime_type` | `string` | Yes | Declared MIME type |
   | `group_id` | `int64` | No | Associated squad/group ID |
-  | `expense_id` | `int64` | No | Associated expense ID |
+  | `expense_id` | `int64` | No | Optional association for other types; MUST be omitted for EXPENSE_RECEIPT |
   | `is_public` | `boolean` | No | Whether the object should be public |
   
   ## Response

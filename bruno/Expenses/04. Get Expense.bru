@@ -1,0 +1,107 @@
+meta {
+  name: 04. Get Expense
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{expenseGroupId}}/expenses/{{expenseId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # 04. Get Expense
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/expenses/:expenseID`
+  **Auth:** Required
+
+  ## Description
+
+  Returns one expense and its complete current allocation. attachment_ids contains active EXPENSE_RECEIPT IDs already associated using the existing Attachments API. This endpoint does not upload files or generate receipt URLs. Fetch attachment metadata/URLs using the existing authorized attachment endpoints.
+
+  All routes require a valid access token, ACTIVE account and ACTIVE membership with left_at=null. A user who left or was removed cannot read, create, edit or delete expenses, even their own. ACTIVE and INACTIVE are the membership status values currently returned by this project; left and removed members remain stored as INACTIVE, normally with left_at set.
+
+  INACTIVE groups allow reads only. is_frozen=true and can_edit/can_delete=false in that state. On an active group, only the expense creator or current group owner can edit/delete. Site ADMIN alone does not override membership or editing permissions.
+
+  Amounts are integer TOMAN. expense_type is a separate legacy enum (NORMAL, PREMIUM); new records are NORMAL. split_type is the allocation enum (EQUAL, EXACT, PERCENTAGE, WEIGHTED). No wallet charge or premium purchase is performed here.
+
+  ## Request
+
+  Path groupID is a positive BIGINT group ID. expenseID, when present, is a positive expense ID in that same group. Use the manual expenseGroupId and expenseId environment variables.
+
+  No request body.
+
+  ## Response
+
+  **200 OK**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1101,
+      "group_id": 10,
+      "created_by_member_id": 30,
+      "paid_by_member_id": 30,
+      "title": "Dinner",
+      "description": "Dinner after the trip",
+      "total_amount_toman": 100,
+      "expense_type": "NORMAL",
+      "split_type": "EQUAL",
+      "occurred_at": "2026-11-16T10:00:00Z",
+      "created_at": "2026-11-16T10:01:00Z",
+      "updated_at": "2026-11-16T10:01:00Z",
+      "is_frozen": false,
+      "can_edit": true,
+      "can_delete": true,
+      "shares": [
+        {
+          "member_id": 30,
+          "value": 1,
+          "share_amount_toman": 34
+        },
+        {
+          "member_id": 31,
+          "value": 1,
+          "share_amount_toman": 33
+        },
+        {
+          "member_id": 32,
+          "value": 1,
+          "share_amount_toman": 33
+        }
+      ],
+      "my_share_amount_toman": 34,
+      "attachment_ids": [],
+      "attachments": []
+    }
+  }
+  ```
+
+  created_by_member_id and paid_by_member_id identify the same immutable payer membership. shares[].value is 1 (EQUAL), exact toman (EXACT), numeric percent (PERCENTAGE), or integer weight (WEIGHTED). share_amount_toman is always the computed final amount. shares are ordered by member_id ascending. my_share_amount_toman is 0 if the caller is excluded. can_edit/can_delete reflect the current caller and group state. No JWTs, email addresses or phone numbers are returned here.
+
+  attachments contains receipt metadata (id, original_filename, mime_type, file_size_bytes) and access_url. attachment_ids remains the matching ID list. Both arrays are [] when empty. URLs are signed and expire (15 minutes by default); refetch this endpoint or Get Attachment Details for a fresh URL. The server never makes receipts public.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, pagination, JSON field, positive total amount, required field, title, or timestamp. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is absent or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Access token is invalid or malformed. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Authenticated account is not ACTIVE. |
+  | 403 | `EXPENSE_FORBIDDEN` | `only active group members can access expenses` | Requester is not an ACTIVE member, or left_at is not null. This also applies to a former expense creator. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Authenticated account no longer exists. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group does not exist or is soft-deleted. |
+  | 404 | `EXPENSE_NOT_FOUND` | `expense not found` | Expense does not exist, is soft-deleted, or belongs to another group. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or authentication infrastructure failed; causes remain private. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt or avatar URL generation failed. |
+}

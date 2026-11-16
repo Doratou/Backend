@@ -1,0 +1,64 @@
+meta {
+  name: Expenses
+  seq: 13
+}
+
+auth {
+  mode: none
+}
+
+script:pre-request {
+  bru.deleteVar("expenseGroupId");
+  bru.deleteVar("expenseId");
+  bru.deleteVar("expenseTotalAmountToman");
+  bru.deleteVar("expenseSplitType");
+  bru.deleteVar("expenseShares");
+  bru.deleteVar("expenseAttachmentIds");
+}
+
+docs {
+  # Expenses
+
+  Create, list, get, fully or partially update and soft-delete shared expenses. List Eligible Participants supplies current AND former group membership IDs for splitting.
+
+  Run go run ./cmd/migrate up before starting the backend. New migration: 20261116160000_add_expense_splits.sql. It adds allocation fields/table without deleting old expenses. Existing expenses keep their original amount, payer, dates and receipt relations; no shares are invented. Down drops the new share table and all allocations, so do not roll it back on data you need to retain.
+
+  ## Manual setup
+
+  Set expenseGroupId, expenseId, expenseTotalAmountToman, expenseSplitType expenseShares and expenseAttachmentIds yourself in Local and save. No response sets these identifiers. The folder clears only corresponding runtime values so manually saved values win. Login/Refresh still automatically populate token.
+
+  Start with List Eligible Participants. Copy member_id values, not user_id. For EQUAL, set expenseShares to [{"member_id":30},{"member_id":31}]. Use actual IDs from your group; documentation examples use illustrative group 10 and memberships 30/31/32.
+
+  For EXACT, set value to each member's non-negative integer amount, summing to total_amount_toman. For PERCENTAGE, values must sum to 100 with at most two decimal places. For WEIGHTED, use positive integer weights such as 2,1,1. EQUAL permits absent/null value or 1.
+
+  All number values are JSON numbers, not strings; split values do not accept exponent notation. total_amount_toman and integer values fit signed BIGINT. Amounts are TOMAN. Percentages are stored exactly as hundredths of a percent and returned as numeric percentages. Allocations use exact integer arithmetic with deterministic largest-remainder rounding and ascending member ID to break ties. All final share amounts sum exactly to the expense amount, even for very small totals.
+
+  ## Permission and lifecycle
+
+  Only ACTIVE accounts with ACTIVE membership and left_at=null can access these routes. Current group owner and original expense creator may edit/delete. Group ownership follows the current groups.created_by_user_id value; site ADMIN alone grants no bypass. Former members remain eligible for a share but lose expense access, including to expenses they originally created.
+
+  INACTIVE groups freeze POST/PUT/PATCH/DELETE and still permit GET. There is no participant approval, draft state, settlement restriction or edit/delete reason requirement. Original payer=original creator always, including after owner edits.
+
+  ## Response and updates
+
+  List items and Get/Create/Update return the same expense structure. shares[].value is the configured input value for that method; share_amount_toman is its final computed amount. my_share_amount_toman is zero when excluded. can_edit/can_delete are false for another active member and for every member of a frozen group. Receipt IDs, metadata and ready-to-use access_url values are returned in attachment_ids/attachments. Participant responses also include avatar_url; unavailable or inaccessible avatars use null.
+
+  PUT is a full replacement of title, description, total_amount_toman, split_type and shares. Omitted/null description clears it; omitted/null occurred_at preserves it. Do not send a payer ID, creator ID, group ID or expense_type. New expenses use expense_type=NORMAL; NORMAL/PREMIUM is distinct from EQUAL/EXACT/PERCENTAGE/WEIGHTED.
+
+  All expense and share writes are transactional. Invalid updates cannot partially change allocations. Concurrent PUTs produce one complete set, never a mix; the last applied update wins. This version has no optimistic version check or POST idempotency key. Prevent duplicate form submissions in the client. Deletion soft-deletes the expense and shares; it does not physically delete receipts or wipe any user's existing settlement.
+
+  PATCH changes only supplied fields; description:null clears it. Other nulls are invalid. Amount-only changes recalculate EQUAL/PERCENTAGE/WEIGHTED shares; EXACT must still sum to the new total. Changing split_type requires sending shares. PUT/PATCH preserve receipts when attachment_ids is omitted; [] detaches all; a non-empty list replaces the whole set.
+
+  ## Receipts
+
+  1. Open 07. Upload Expense Receipt, select an image or PDF and Send. Maximum size is 10 MiB. Do not send expense_id. Files are private regardless of is_public.
+  2. Copy each response data.id into the manual expenseAttachmentIds array, for example [1201,1202]. No script sets these IDs.
+  3. Create with attachment_ids or attach to an existing expense using PATCH {"attachment_ids":[1201,1202]}. The saved PUT example omits this optional field so it preserves files.
+  4. Before linking, only the uploader can access a receipt. After linking, active group members can read it; only the active expense creator or current group owner can replace/unlink/delete it. Former members lose access. Group freeze also blocks receipt changes/deletion.
+  5. Unlinking keeps the stored file private for its original uploader. Deleting an expense does not physically delete its files. Previously issued signed URLs remain usable until expiry; they are not immediately revocable.
+
+  ## Suggested manual checks
+
+  Use two active members, one outsider and one former member. Create each split type, include/exclude the payer, use a former member in shares, verify exact totals and rounding, then edit as creator and group owner. Confirm a third member cannot edit/delete and a former creator cannot access the expense after leaving. Check inactive groups, duplicate members, foreign IDs, empty shares, invalid percentages/weights, amount mismatches, bad dates, wrong-group expense IDs and repeated deletion.
+
+}

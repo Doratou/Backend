@@ -1,0 +1,187 @@
+meta {
+  name: 08. Partially Update Expense (Creator or Owner)
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/groups/{{expenseGroupId}}/expenses/{{expenseId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "description": "Updated receipt details"
+  }
+}
+
+docs {
+  # 08. Partially Update Expense (Creator or Owner)
+
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/groups/:groupID/expenses/:expenseID`
+  **Auth:** Required (Bearer token)
+
+  ## Description
+
+  Changes only the fields present in the JSON body. Active original creator or current group owner only; inactive groups are frozen. Former members have no access, including a former creator. Payer, creator, group and expense_type are immutable. All expense/share/receipt changes are atomic. Concurrent saves serialize; the last applied values win. This endpoint has no optimistic version check.
+
+  ## Request
+
+  | Field | Type | Behavior |
+  | --- | --- | --- |
+  | title | string | Trimmed, non-empty, maximum 200 Unicode characters. |
+  | description | string or null | Replace; null clears. |
+  | total_amount_toman | positive integer | Integer TOMAN. Recalculates existing EQUAL/PERCENTAGE/WEIGHTED shares; EXACT values must sum to the new amount. |
+  | split_type | string enum | EQUAL, EXACT, PERCENTAGE, WEIGHTED; uppercase and case-sensitive. Changing the method requires shares in the same request. |
+  | occurred_at | RFC3339 timestamp | Replace expense date. |
+  | shares | array | Replaces the ENTIRE set, not a delta. Unique group member IDs; current or former members accepted. Non-empty. |
+  | attachment_ids | integer array | Complete desired receipt set; [] unlinks all. New receipts must be the editor own unclaimed EXPENSE_RECEIPT uploads, in this group or unscoped. Existing expense receipts may be retained regardless of uploader. |
+
+  Omitted fields remain unchanged. Only description accepts null. An empty body or a body with no recognized editable fields returns 400 BAD_REQUEST. Unknown fields cannot change payer/creator; otherwise the project JSON binder ignores them. shares[].value follows Create Expense: EQUAL absent/null/1, EXACT non-negative integer amounts summing to total, PERCENTAGE numbers with at most two decimal places summing to 100, WEIGHTED positive integers. Number strings and exponent notation for share values are invalid.
+
+  ### Update text only
+
+  ```json
+  {
+    "description": "Updated receipt details"
+  }
+  ```
+
+  ### Add or replace receipts
+
+  Upload first with 07. Upload Expense Receipt. This list must contain every receipt to keep; omitting an existing ID detaches it without physically deleting the file.
+
+  ```json
+  {
+    "attachment_ids": [
+      1201
+    ]
+  }
+  ```
+
+  ### Clear description and remove all receipts
+
+  ```json
+  {
+    "description": null,
+    "attachment_ids": []
+  }
+  ```
+
+  ### Change financial allocation
+
+  ```json
+  {
+    "total_amount_toman": 100,
+    "split_type": "PERCENTAGE",
+    "shares": [
+      {
+        "member_id": 30,
+        "value": 50
+      },
+      {
+        "member_id": 31,
+        "value": 25
+      },
+      {
+        "member_id": 32,
+        "value": 25
+      }
+    ]
+  }
+  ```
+
+  ## Response
+
+  **200 OK**. Same structure as Get Expense. This example assumes receipt 1201 was already attached before the description-only PATCH. Existing shares and files stay intact; updated_at is the expense update time. Access URLs expire (15 minutes by default); refetch when needed.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1101,
+      "group_id": 10,
+      "created_by_member_id": 30,
+      "paid_by_member_id": 30,
+      "title": "Dinner",
+      "description": "Updated receipt details",
+      "total_amount_toman": 100,
+      "expense_type": "NORMAL",
+      "split_type": "EQUAL",
+      "occurred_at": "2026-11-16T10:00:00Z",
+      "created_at": "2026-11-16T10:01:00Z",
+      "updated_at": "2026-11-16T11:00:00Z",
+      "is_frozen": false,
+      "can_edit": true,
+      "can_delete": true,
+      "shares": [
+        {
+          "member_id": 30,
+          "value": 1,
+          "share_amount_toman": 34
+        },
+        {
+          "member_id": 31,
+          "value": 1,
+          "share_amount_toman": 33
+        },
+        {
+          "member_id": 32,
+          "value": 1,
+          "share_amount_toman": 33
+        }
+      ],
+      "my_share_amount_toman": 34,
+      "attachment_ids": [
+        1201
+      ],
+      "attachments": [
+        {
+          "id": 1201,
+          "original_filename": "receipt.png",
+          "mime_type": "image/png",
+          "file_size_bytes": 68,
+          "access_url": "https://storage.example.com/doratou-storage/attachments/expense_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.png?X-Amz-Signature=example"
+        }
+      ]
+    }
+  }
+  ```
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, pagination, JSON field, positive total amount, required field, title, or timestamp. |
+  | 400 | `EXPENSE_INVALID_SPLIT` | `provide valid split values for the selected split type` | Unknown split type, invalid value, missing non-EQUAL value, percentage precision above two decimal places, or non-positive weight. |
+  | 400 | `EXPENSE_SPLIT_TOTAL_MISMATCH` | `exact shares must sum to total_amount_toman and percentages must sum to 100` | EXACT values do not sum to the expense total or PERCENTAGE values do not sum to exactly 100. |
+  | 400 | `EXPENSE_DUPLICATE_MEMBERS` | `shares must not contain duplicate member IDs` | A member_id appears more than once. |
+  | 400 | `EXPENSE_DUPLICATE_ATTACHMENTS` | `attachment_ids must not contain duplicate IDs` | Repeated receipt IDs. |
+  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | An attachment is not an EXPENSE_RECEIPT. |
+  | 403 | `ATTACHMENT_FORBIDDEN` | `you do not have permission to access or modify this attachment` | Receipt belongs to another expense/group, or an unbound receipt was uploaded by another user. |
+  | 404 | `ATTACHMENT_NOT_FOUND` | `attachment not found` | Receipt ID does not exist or was deleted. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is absent or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Access token is invalid or malformed. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Authenticated account is not ACTIVE. |
+  | 403 | `EXPENSE_FORBIDDEN` | `only active group members can access expenses` | Requester is not an ACTIVE member, or left_at is not null. This also applies to a former expense creator. |
+  | 403 | `EXPENSE_EDITOR_REQUIRED` | `only the expense creator or current group owner can edit or delete this expense` | An active requester is neither this expense creator nor current group owner. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Authenticated account no longer exists. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group does not exist or is soft-deleted. |
+  | 404 | `EXPENSE_NOT_FOUND` | `expense not found` | Expense does not exist, is soft-deleted, or belongs to another group. |
+  | 404 | `EXPENSE_PARTICIPANT_NOT_FOUND` | `a selected participant does not belong to this group's current or former members` | An ID is unknown or belongs to another group. |
+  | 409 | `EXPENSE_GROUP_INACTIVE` | `expenses cannot be changed while the group is inactive` | Group is INACTIVE; expense creation, updates and deletion are frozen. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or authentication infrastructure failed; causes remain private. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt or avatar URL generation failed. |
+}
