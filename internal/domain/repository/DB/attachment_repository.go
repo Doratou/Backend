@@ -10,13 +10,14 @@ import (
 
 // AttachmentFilter holds query parameters for filtering attachments.
 type AttachmentFilter struct {
-	UploadedByUserID *int64
-	GroupID          *int64
-	ExpenseID        *int64
-	Type             *enum.AttachmentType
-	IsPublic         *bool
-	Search           string
-	PreloadRelations bool
+	UploadedByUserID    *int64
+	GroupID             *int64
+	ExpenseID           *int64
+	Type                *enum.AttachmentType
+	IsPublic            *bool
+	Search              string
+	PreloadRelations    bool
+	ReceiptViewerUserID *int64
 }
 
 // Pagination defines page and limit parameters.
@@ -41,6 +42,7 @@ type AttachmentRepository interface {
 
 	// FindByIDs retrieves multiple attachments by primary keys.
 	FindByIDs(ctx context.Context, ids []int64) ([]*entity.Attachment, error)
+	FindAccessibleByIDs(ctx context.Context, userID int64, ids []int64) ([]*entity.Attachment, error)
 
 	// FindByObjectKey retrieves an attachment by its object storage key.
 	FindByObjectKey(ctx context.Context, objectKey string) (*entity.Attachment, error)

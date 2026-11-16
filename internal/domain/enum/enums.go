@@ -264,6 +264,24 @@ func (e ExpenseType) IsValid() bool {
 	}
 }
 
+type ExpenseSplitType string
+
+const (
+	ExpenseSplitTypeEqual      ExpenseSplitType = "EQUAL"
+	ExpenseSplitTypeExact      ExpenseSplitType = "EXACT"
+	ExpenseSplitTypePercentage ExpenseSplitType = "PERCENTAGE"
+	ExpenseSplitTypeWeighted   ExpenseSplitType = "WEIGHTED"
+)
+
+func (e ExpenseSplitType) IsValid() bool {
+	switch e {
+	case ExpenseSplitTypeEqual, ExpenseSplitTypeExact, ExpenseSplitTypePercentage, ExpenseSplitTypeWeighted:
+		return true
+	default:
+		return false
+	}
+}
+
 // LuckyDrawStatus enum values: "DRAFT", "COMPLETED".
 type LuckyDrawStatus string
 
