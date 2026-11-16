@@ -33,15 +33,19 @@ docs {
 
   ## Description
 
-  Lists non-deleted polls belonging to this group, ordered by created_at descending, then ID descending. The optional status filter applies to the poll's own ACTIVE/INACTIVE state, independently of the group's status.
+  Lists non-deleted polls in this group, ordered by created_at DESC, id DESC. The optional status filter accepts ACTIVE or INACTIVE and applies to the poll itself, independently of group freezing.
 
-  Each item includes the same fields as Get Poll: options with id, title and vote_count, total_votes, and my_option_id for the authenticated caller. Cards can display questions, results and the caller's selection without requesting every poll separately. Options are ordered by ID ascending; options without votes have vote_count=0. Polls without votes return total_votes=0 and my_option_id=null.
+  Every item has the same fields as Get Poll: allow_multiple_choices, ordered options with vote_count, total_votes, total_voters and my_option_ids. Selected IDs are sorted ascending; no selection returns []. No votes means both totals are zero. The example uses the same poll and option IDs as Create/Get.
 
-  Both PUBLIC and PRIVATE polls expose aggregate counts and only the caller's own selection. Other voters' identities are never included in this response. Use List Poll Voters to see identities for PUBLIC polls. Percentages are calculated by the client as vote_count / total_votes * 100; use zero when total_votes is zero.
+  total_votes is the sum of active selections; total_voters counts distinct participating memberships. One person selecting two options contributes 2 votes but 1 voter. Votes from members who later leave remain counted. Other voters' identities are not returned.
 
-  It works while the group is inactive and returns is_frozen=true. closed_at is null until closing and contains the actual closing timestamp afterward. Empty results return items: []; a page beyond the last page can have a positive total with no items. The list does not overwrite the saved pollId; copy the desired item ID into that variable.
+  Selection-share percentages divide vote_count by total_votes and sum to 100 before rounding. Participant percentages divide by total_voters and can sum above 100 for multi-choice. Use zero for a zero denominator and label the chosen meaning in the UI.
 
-  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+  Inactive groups remain readable with is_frozen=true. Closed polls remain readable with status=INACTIVE and closed_at populated. Empty pages return items=[], including pages past the end even when pagination.total is positive. IDs remain manually configured in Bruno.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
 
   ## Request
 
@@ -86,6 +90,7 @@ docs {
           "created_by_member_id": 30,
           "question": "Which day works best?",
           "visibility": "PUBLIC",
+          "allow_multiple_choices": true,
           "status": "ACTIVE",
           "is_frozen": false,
           "closed_at": null,
@@ -93,18 +98,27 @@ docs {
           "updated_at": "2026-11-05T10:00:00Z",
           "options": [
             {
-              "id": 901,
+              "id": 801,
               "title": "Friday",
+              "vote_count": 1
+            },
+            {
+              "id": 802,
+              "title": "Saturday",
               "vote_count": 2
             },
             {
-              "id": 902,
-              "title": "Saturday",
-              "vote_count": 1
+              "id": 803,
+              "title": "Sunday",
+              "vote_count": 0
             }
           ],
           "total_votes": 3,
-          "my_option_id": 901
+          "total_voters": 2,
+          "my_option_ids": [
+            801,
+            802
+          ]
         }
       ],
       "pagination": {

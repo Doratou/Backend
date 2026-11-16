@@ -32,13 +32,17 @@ docs {
 
   ## Description
 
-  Lists active vote records with the selected option, membership ID and a minimal user summary. Available only for PUBLIC polls and only to active group members. A PRIVATE poll returns POLL_PRIVATE for everyone, including its creator, the group owner and system administrators.
+  Lists active SELECTION records of a PUBLIC poll. Every item represents one membership choosing one option, with member_id, option_id, timestamps and a minimal user summary. A member choosing several options appears in several items.
 
-  Votes are ordered by created_at ascending, then ID ascending. A changed vote keeps its original position because created_at is preserved; updated_at represents the latest vote write. Withdrawn votes are excluded. Votes cast before a member left the group remain counted and can still appear here. If the voter account is soft-deleted, the user ID remains and its name can be empty with a null avatar. No email, phone or credentials are returned.
+  pagination.total counts selection rows, not people. It corresponds to total_votes in List/Get for the same state; total_voters is the distinct participant count. One member's choices can be split across pages. This example has three selections by two people and matches List/Get counts.
 
-  Closing a poll or freezing its group does not hide the public results. Empty results return items: [].
+  Order is created_at ASC, id ASC per selection. Retained choices preserve timestamps on repeated PUT. New options get new rows; restored options keep first created_at and update updated_at. Withdrawn rows are excluded. Votes remain counted after the voter leaves. A deleted voter can have empty name/null avatar, but its user ID remains. No email, phone or credentials are returned.
 
-  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+  PRIVATE returns POLL_PRIVATE for everyone, including the creator, group owner and administrators. Closing or freezing does not hide public results. Empty pages return items=[].
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
 
   ## Request
 
@@ -87,12 +91,34 @@ docs {
           "option_id": 801,
           "created_at": "2026-11-05T10:05:00Z",
           "updated_at": "2026-11-05T10:05:00Z"
+        },
+        {
+          "member_id": 32,
+          "user": {
+            "id": 2,
+            "name": "Group member",
+            "avatar_attachment_id": null
+          },
+          "option_id": 802,
+          "created_at": "2026-11-05T10:06:00Z",
+          "updated_at": "2026-11-05T10:06:00Z"
+        },
+        {
+          "member_id": 33,
+          "user": {
+            "id": 3,
+            "name": "Another member",
+            "avatar_attachment_id": null
+          },
+          "option_id": 802,
+          "created_at": "2026-11-05T10:07:00Z",
+          "updated_at": "2026-11-05T10:07:00Z"
         }
       ],
       "pagination": {
         "page": 1,
         "limit": 20,
-        "total": 1
+        "total": 3
       }
     }
   }

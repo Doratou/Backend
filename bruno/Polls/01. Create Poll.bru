@@ -22,9 +22,11 @@ body:json {
   {
     "question": "Which day works best?",
     "visibility": "PUBLIC",
+    "allow_multiple_choices": true,
     "options": [
       "Friday",
-      "Saturday"
+      "Saturday",
+      "Sunday"
     ]
   }
 }
@@ -38,11 +40,15 @@ docs {
 
   ## Description
 
-  Creates an ACTIVE poll and all options in one transaction. The creator is the authenticated user's active membership in this group; creator and group IDs cannot be supplied through the body. At least two options are required. Visibility must be explicitly PUBLIC or PRIVATE and cannot be changed later. Questions and option titles are trimmed; duplicate option titles are rejected after trimming and case folding.
+  Creates an ACTIVE poll and all options in one transaction. The creator is the authenticated caller's group membership. At least two distinct options are required. Question and option titles are trimmed; duplicate titles are rejected after trimming and case folding.
 
-  Set `pollGroupId` manually to an actual group ID in the Local environment. Log in through Auth to populate `token`. After a successful response, copy `data.id` into `pollId` and the desired `options[].id` into `pollOptionId` in the Local environment, then save it before sending other poll requests. This request does not automatically populate or change any identifier. To create a private poll, change the saved body visibility to PRIVATE.
+  allow_multiple_choices=false permits exactly one selected option per member. true permits one or more distinct selected options, up to the number of options in this poll. Missing or null uses false. This setting, question, visibility and options cannot be edited after creation. Existing polls remain single-choice after migration.
 
-  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+  Set pollGroupId manually in Local. After creation, copy data.id into pollId and put actual options[].id values in pollOptionIds as a JSON array, e.g. [801] or [801,802]. Save the environment. No poll response auto-fills these variables. This saved example creates a multi-choice PUBLIC poll; use false to test single-choice and PRIVATE to test privacy.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
 
   ## Request
 
@@ -65,17 +71,20 @@ docs {
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `question` | `string` | `Yes` | `Question, 1 to 500 Unicode characters after trimming` |
-  | `visibility` | `string` | `Yes` | `Exactly PUBLIC or PRIVATE` |
-  | `options` | `array of strings` | `Yes` | `At least two distinct, non-empty titles, each at most 255 Unicode characters after trimming` |
+  | question | string | Yes | 1..500 Unicode characters both before and after trimming. |
+  | visibility | string | Yes | Exactly PUBLIC or PRIVATE. |
+  | allow_multiple_choices | boolean | No | true for multi-choice, false for single-choice; missing/null defaults to false. Immutable. |
+  | options | array of strings | Yes | At least two titles, each 1..255 Unicode characters before/after trimming; non-blank and unique after trim/case folding. |
 
   ```json
   {
     "question": "Which day works best?",
     "visibility": "PUBLIC",
+    "allow_multiple_choices": true,
     "options": [
       "Friday",
-      "Saturday"
+      "Saturday",
+      "Sunday"
     ]
   }
   ```
@@ -93,6 +102,7 @@ docs {
       "created_by_member_id": 30,
       "question": "Which day works best?",
       "visibility": "PUBLIC",
+      "allow_multiple_choices": true,
       "status": "ACTIVE",
       "is_frozen": false,
       "closed_at": null,
@@ -108,10 +118,16 @@ docs {
           "id": 802,
           "title": "Saturday",
           "vote_count": 0
+        },
+        {
+          "id": 803,
+          "title": "Sunday",
+          "vote_count": 0
         }
       ],
       "total_votes": 0,
-      "my_option_id": null
+      "total_voters": 0,
+      "my_option_ids": []
     }
   }
   ```

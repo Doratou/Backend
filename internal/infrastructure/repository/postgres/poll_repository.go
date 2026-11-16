@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"sort"
 
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
@@ -115,65 +116,60 @@ func (r *pollRepository) FindActiveMemberByUserID(ctx context.Context, groupID, 
 	return &member, nil
 }
 
-func (r *pollRepository) FindOptionByID(ctx context.Context, pollID, optionID int64) (*entity.PollOption, error) {
-	var option entity.PollOption
-	err := r.getDB(ctx).Select("poll_options.*").
-		Joins("JOIN polls ON polls.id = poll_options.poll_id AND polls.deleted_at IS NULL").
-		Joins("JOIN groups ON groups.id = polls.group_id AND groups.deleted_at IS NULL").
-		Where("poll_options.poll_id = ? AND poll_options.id = ?", pollID, optionID).First(&option).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, exception.ErrPollOptionNotFound
+func (r *pollRepository) ReplaceVotes(ctx context.Context, pollID, memberID int64, optionIDs []int64) ([]*entity.PollVote, error) {
+	if pollID <= 0 || memberID <= 0 || len(optionIDs) == 0 {
+		return nil, exception.ErrBadRequest
 	}
-	if err != nil {
-		return nil, pollPersistenceError(err)
+	selected := append([]int64(nil), optionIDs...)
+	sort.Slice(selected, func(i, j int) bool { return selected[i] < selected[j] })
+	for i, optionID := range selected {
+		if optionID <= 0 {
+			return nil, exception.ErrBadRequest
+		}
+		if i > 0 && optionID == selected[i-1] {
+			return nil, exception.ErrPollDuplicateVoteOptions
+		}
 	}
-	return &option, nil
-}
-
-func (r *pollRepository) FindVoteByMemberID(ctx context.Context, pollID, memberID int64) (*entity.PollVote, error) {
-	var vote entity.PollVote
-	err := r.voteQuery(r.getDB(ctx)).Select("poll_votes.*").
-		Where("poll_votes.poll_id = ? AND poll_votes.member_id = ?", pollID, memberID).First(&vote).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, exception.ErrPollVoteNotFound
-	}
-	if err != nil {
-		return nil, pollPersistenceError(err)
-	}
-	return &vote, nil
-}
-
-func (r *pollRepository) UpsertVote(ctx context.Context, vote *entity.PollVote) error {
-	if vote == nil || vote.PollID <= 0 || vote.MemberID <= 0 || vote.OptionID <= 0 {
-		return exception.ErrBadRequest
-	}
-	return r.withPollWrite(ctx, 0, vote.PollID, func(tx *gorm.DB, poll *entity.Poll) error {
+	votes := make([]*entity.PollVote, 0, len(selected))
+	err := r.withPollWrite(ctx, 0, pollID, func(tx *gorm.DB, poll *entity.Poll) error {
 		if poll.Status != enum.PollStatusActive {
 			return exception.ErrPollClosed
 		}
-		if err := r.requireActiveMember(tx, poll.GroupID, vote.MemberID); err != nil {
+		if !poll.AllowMultipleChoices && len(selected) != 1 {
+			return exception.ErrPollSingleChoiceRequired
+		}
+		if err := r.requireActiveMember(tx, poll.GroupID, memberID); err != nil {
 			return err
 		}
-		var option entity.PollOption
-		err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
-			Where("poll_id = ? AND id = ?", vote.PollID, vote.OptionID).First(&option).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		var options []entity.PollOption
+		if err := tx.Select("id").Clauses(clause.Locking{Strength: "SHARE"}).
+			Where("poll_id = ? AND id IN ?", pollID, selected).Order("id ASC").Find(&options).Error; err != nil {
+			return err
+		}
+		if len(options) != len(selected) {
 			return exception.ErrPollOptionNotFound
 		}
-		if err != nil {
+		if err := tx.Where("poll_id = ? AND member_id = ? AND option_id NOT IN ?", pollID, memberID, selected).
+			Delete(&entity.PollVote{}).Error; err != nil {
 			return err
 		}
-		row := entity.PollVote{PollID: vote.PollID, MemberID: vote.MemberID, OptionID: vote.OptionID}
-		err = tx.Omit(clause.Associations).Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "poll_id"}, {Name: "member_id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"option_id", "updated_at", "deleted_at"}),
-		}, clause.Returning{}).Create(&row).Error
-		if err != nil {
+		rows := make([]entity.PollVote, len(selected))
+		for i, optionID := range selected {
+			rows[i] = entity.PollVote{PollID: pollID, MemberID: memberID, OptionID: optionID}
+		}
+		if err := tx.Omit(clause.Associations).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "poll_id"}, {Name: "member_id"}, {Name: "option_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"updated_at", "deleted_at"}),
+			Where:     clause.Where{Exprs: []clause.Expression{clause.Expr{SQL: "poll_votes.deleted_at IS NOT NULL"}}},
+		}).CreateInBatches(&rows, 1000).Error; err != nil {
 			return err
 		}
-		vote.BaseEntity = row.BaseEntity
-		return nil
+		return tx.Where("poll_id = ? AND member_id = ?", pollID, memberID).Order("option_id ASC").Find(&votes).Error
 	})
+	if err != nil {
+		return nil, err
+	}
+	return votes, nil
 }
 
 func (r *pollRepository) DeleteVote(ctx context.Context, pollID, memberID int64) error {
@@ -195,27 +191,6 @@ func (r *pollRepository) DeleteVote(ctx context.Context, pollID, memberID int64)
 	})
 }
 
-func (r *pollRepository) CountVotesByOption(ctx context.Context, pollID int64) (map[int64]int64, error) {
-	db := r.getDB(ctx)
-	if _, err := r.findPoll(db, 0, pollID); err != nil {
-		return nil, err
-	}
-	var counts []struct {
-		OptionID  int64
-		VoteCount int64
-	}
-	err := r.voteQuery(db).Select("poll_votes.option_id, COUNT(*) AS vote_count").
-		Where("poll_votes.poll_id = ?", pollID).Group("poll_votes.option_id").Scan(&counts).Error
-	if err != nil {
-		return nil, pollPersistenceError(err)
-	}
-	result := make(map[int64]int64, len(counts))
-	for _, count := range counts {
-		result[count.OptionID] = count.VoteCount
-	}
-	return result, nil
-}
-
 func (r *pollRepository) FindVoteSummaries(ctx context.Context, groupID, memberID int64, pollIDs []int64) (map[int64]domain_repo.PollVoteSummary, error) {
 	if groupID <= 0 || memberID <= 0 {
 		return nil, exception.ErrBadRequest
@@ -225,15 +200,26 @@ func (r *pollRepository) FindVoteSummaries(ctx context.Context, groupID, memberI
 		return result, nil
 	}
 	var counts []struct {
-		PollID    int64
-		OptionID  int64
-		VoteCount int64
-		IsMyVote  bool
+		PollID      int64
+		OptionID    int64
+		VoteCount   int64
+		IsMyVote    bool
+		TotalVoters int64
 	}
-	err := r.voteQuery(r.getDB(ctx)).
-		Select("poll_votes.poll_id, poll_votes.option_id, COUNT(*) AS vote_count, BOOL_OR(poll_votes.member_id = ?) AS is_my_vote", memberID).
-		Where("polls.group_id = ? AND poll_votes.poll_id IN ?", groupID, pollIDs).
-		Group("poll_votes.poll_id, poll_votes.option_id").Scan(&counts).Error
+	db := r.getDB(ctx)
+	activeVotes := r.voteQuery(db).
+		Select("poll_votes.poll_id, poll_votes.member_id, poll_votes.option_id").
+		Where("polls.group_id = ? AND poll_votes.poll_id IN ?", groupID, pollIDs)
+	err := db.Raw(`WITH active_votes AS (?)
+		SELECT votes.poll_id, votes.option_id, COUNT(*) AS vote_count,
+			BOOL_OR(votes.member_id = ?) AS is_my_vote, voters.total_voters
+		FROM active_votes AS votes
+		JOIN (
+			SELECT poll_id, COUNT(DISTINCT member_id) AS total_voters
+			FROM active_votes GROUP BY poll_id
+		) AS voters ON voters.poll_id = votes.poll_id
+		GROUP BY votes.poll_id, votes.option_id, voters.total_voters
+		ORDER BY votes.poll_id, votes.option_id`, activeVotes, memberID).Scan(&counts).Error
 	if err != nil {
 		return nil, pollPersistenceError(err)
 	}
@@ -243,9 +229,9 @@ func (r *pollRepository) FindVoteSummaries(ctx context.Context, groupID, memberI
 			summary.OptionCounts = make(map[int64]int64)
 		}
 		summary.OptionCounts[count.OptionID] = count.VoteCount
+		summary.TotalVoters = count.TotalVoters
 		if count.IsMyVote {
-			optionID := count.OptionID
-			summary.MyOptionID = &optionID
+			summary.MyOptionIDs = append(summary.MyOptionIDs, count.OptionID)
 		}
 		result[count.PollID] = summary
 	}
