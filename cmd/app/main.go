@@ -243,7 +243,14 @@ func main() {
 		cfg.Constant,
 	)
 
-	userService := service.NewUserService(userRepo, attachmentService)
+	userService := service.NewUserService(
+		userRepo,
+		attachmentService,
+		otpService,
+		tokenRepo,
+		jwtMaker,
+		redisTrxManager,
+	)
 
 	// 8. Presentation Handlers & Routers
 	userHandler := handler.NewUserHandler(userService)
