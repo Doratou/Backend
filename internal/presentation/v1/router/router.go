@@ -22,6 +22,7 @@ type Dependencies struct {
 	FriendshipHandler  *handler.FriendshipHandler
 	GroupHandler       *handler.GroupHandler
 	PollHandler        *handler.PollHandler
+	ExpenseHandler     *handler.ExpenseHandler
 	LuckyDrawHandler   *handler.LuckyDrawHandler
 	InviteHandler      *handler.InviteHandler
 	CaptchaService     adapter.CaptchaService
@@ -83,6 +84,9 @@ func New(deps Dependencies) *gin.Engine {
 	}
 	if deps.LuckyDrawHandler != nil {
 		RegisterLuckyDrawRoutes(v1, deps.LuckyDrawHandler, authMiddleware)
+	}
+	if deps.ExpenseHandler != nil {
+		RegisterExpenseRoutes(v1, deps.ExpenseHandler, authMiddleware)
 	}
 
 	return engine

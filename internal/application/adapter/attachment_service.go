@@ -12,6 +12,7 @@ import (
 
 // AttachmentService defines the application boundary for handling media and attachments.
 type AttachmentService interface {
+	AttachmentURLResolver
 	// --- Single-item operations ---
 
 	// Upload processes a multipart file, validates mime/size/magic bytes, uploads to storage, and persists metadata.
@@ -59,11 +60,15 @@ type AttachmentService interface {
 	ConfirmPresignedUploadBatch(ctx context.Context, userID int64, req dto.BatchConfirmUploadRequest) (*dto.BatchUploadResponse, error)
 
 	// GetBatchURLs generates active access URLs for multiple attachment IDs.
-	GetBatchURLs(ctx context.Context, ids []int64, expiry time.Duration) (*dto.BatchURLsResponse, error)
+	GetBatchURLs(ctx context.Context, userID int64, ids []int64, expiry time.Duration) (*dto.BatchURLsResponse, error)
 
 	// DownloadZipStream streams an on-the-fly zip archive containing the requested attachments.
-	DownloadZipStream(ctx context.Context, ids []int64, w io.Writer) error
+	DownloadZipStream(ctx context.Context, userID int64, ids []int64, w io.Writer) error
 
 	// DeleteBatch deletes multiple attachments (soft or hard, with group owner moderation support).
 	DeleteBatch(ctx context.Context, userID int64, ids []int64, hardDelete bool) error
+}
+
+type AttachmentURLResolver interface {
+	ResolveAccessURLs(ctx context.Context, userID int64, ids []int64) (map[int64]string, error)
 }

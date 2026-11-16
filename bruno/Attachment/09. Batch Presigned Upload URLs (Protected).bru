@@ -61,6 +61,8 @@ docs {
 
   Requests direct upload URLs for multiple files simultaneously (up to 50 items).
 
+  For EXPENSE_RECEIPT, omit expense_id (including in batch items). Upload/confirm first, then bind returned attachment IDs through Create/PUT/PATCH Expense attachment_ids. Receipts are always private; is_public=true is overridden. Until linked, only the uploader can read/delete them. Receipt presigned object keys are scoped to the uploader; confirm the exact key returned for that same user.
+
   ## Request
 
   ### Headers
@@ -80,7 +82,7 @@ docs {
   | `files[].file_size_bytes` | `int64` | Yes | File size in bytes |
   | `files[].mime_type` | `string` | Yes | Declared MIME type |
   | `files[].group_id` | `int64` | No | Associated group ID |
-  | `files[].expense_id` | `int64` | No | Associated expense ID |
+  | `files[].expense_id` | `int64` | No | Optional association for other types; MUST be omitted for EXPENSE_RECEIPT |
   | `files[].is_public` | `boolean` | No | Whether the object is public |
 
   ## Response

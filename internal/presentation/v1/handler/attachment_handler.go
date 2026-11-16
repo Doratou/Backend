@@ -355,6 +355,11 @@ func (h *AttachmentHandler) ConfirmPresignedUploadBatch(c *gin.Context) {
 
 // GetBatchURLs handles POST /api/v1/attachments/batch/urls
 func (h *AttachmentHandler) GetBatchURLs(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
 	var req dto.BatchGetURLsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, exception.Wrap(exception.ErrBadRequest, err))
@@ -368,7 +373,7 @@ func (h *AttachmentHandler) GetBatchURLs(c *gin.Context) {
 		}
 	}
 
-	res, err := h.attachmentService.GetBatchURLs(c.Request.Context(), req.IDs, expiry)
+	res, err := h.attachmentService.GetBatchURLs(c.Request.Context(), userID, req.IDs, expiry)
 	if err != nil {
 		fail(c, err)
 		return
@@ -379,6 +384,11 @@ func (h *AttachmentHandler) GetBatchURLs(c *gin.Context) {
 
 // DownloadZipStream handles POST /api/v1/attachments/batch/download
 func (h *AttachmentHandler) DownloadZipStream(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
 	var req dto.BatchDownloadZipRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, exception.Wrap(exception.ErrBadRequest, err))
@@ -396,8 +406,12 @@ func (h *AttachmentHandler) DownloadZipStream(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", archiveName))
 	c.Header("Content-Type", "application/zip")
 
-	if err := h.attachmentService.DownloadZipStream(c.Request.Context(), req.IDs, c.Writer); err != nil {
-		// Response streaming may already have started; log if unable to write header
+	if err := h.attachmentService.DownloadZipStream(c.Request.Context(), userID, req.IDs, c.Writer); err != nil {
+		if !c.Writer.Written() {
+			c.Header("Content-Disposition", "")
+			c.Header("Content-Type", "")
+			fail(c, err)
+		}
 		return
 	}
 }

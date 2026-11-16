@@ -34,6 +34,8 @@ docs {
 
   Permanently deletes the attachment record from PostgreSQL and completely removes the physical file object (and any associated thumbnail) from RustFS / S3 storage.
 
+  For EXPENSE_RECEIPT, an unbound receipt can be deleted only by its active uploader. A linked receipt can be deleted only by the active expense creator or current group owner with active membership; former members cannot delete, and an inactive group blocks deletion with 409 EXPENSE_GROUP_INACTIVE. Other active members get 403 EXPENSE_EDITOR_REQUIRED. This receipt-specific rule overrides the general uploader/moderator rule below.
+
   ## Request
 
   ### Path Parameters

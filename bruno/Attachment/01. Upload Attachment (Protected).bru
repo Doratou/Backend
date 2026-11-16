@@ -48,6 +48,8 @@ docs {
   
   Uploads a file directly through the backend server using `multipart/form-data`. The server inspects the binary content for MIME sniffing, validates the file size against configured limits for the attachment type, extracts dimensions if it is an image, generates a SHA-256 hash, stores the object in storage, and records metadata in PostgreSQL.
   
+  For EXPENSE_RECEIPT, omit expense_id (including in batch items). Upload/confirm first, then bind returned attachment IDs through Create/PUT/PATCH Expense attachment_ids. Receipts are always private; is_public=true is overridden. Until linked, only the uploader can read/delete them. Receipt presigned object keys are scoped to the uploader; confirm the exact key returned for that same user.
+
   ## Request
   
   ### Headers
@@ -64,7 +66,7 @@ docs {
   | `file` | `file` | Yes | Binary media file |
   | `type` | `string` | Yes | Attachment type (`PROFILE_IMAGE`, `GROUP_COVER`, `GALLERY_IMAGE`, `EXPENSE_RECEIPT`, `SETTLEMENT_RECEIPT`, `GALLERY_VIDEO`) |
   | `group_id` | `int64` | No | Associated squad/group ID (required when uploading for a group or group gallery) |
-  | `expense_id` | `int64` | No | Associated expense ID (required when uploading expense receipts) |
+  | `expense_id` | `int64` | No | Optional association for other types; MUST be omitted for EXPENSE_RECEIPT |
   | `is_public` | `boolean` | No | Whether the file is publicly readable |
 
   ## Response

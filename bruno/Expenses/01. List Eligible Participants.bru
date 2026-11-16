@@ -1,0 +1,106 @@
+meta {
+  name: 01. List Eligible Participants
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{expenseGroupId}}/expenses/participants?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # 01. List Eligible Participants
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/expenses/participants`
+  **Auth:** Required
+
+  ## Description
+
+  Returns EVERY current or former membership of this group, paginated by member_id ascending. Use items[].member_id in shares; user_id is only for profile lookup. A group invitation alone is not membership. A person who never belonged to this group is never eligible. Former members are selectable for shares but cannot themselves access the expense endpoints.
+
+  All routes require a valid access token, ACTIVE account and ACTIVE membership with left_at=null. A user who left or was removed cannot read, create, edit or delete expenses, even their own. ACTIVE and INACTIVE are the membership status values currently returned by this project; left and removed members remain stored as INACTIVE, normally with left_at set.
+
+  INACTIVE groups allow reads only. is_frozen=true and can_edit/can_delete=false in that state. On an active group, only the expense creator or current group owner can edit/delete. Site ADMIN alone does not override membership or editing permissions.
+
+  Amounts are integer TOMAN. expense_type is a separate legacy enum (NORMAL, PREMIUM); new records are NORMAL. split_type is the allocation enum (EQUAL, EXACT, PERCENTAGE, WEIGHTED). No wallet charge or premium purchase is performed here.
+
+  ## Request
+
+  Path groupID is a positive BIGINT group ID. expenseID, when present, is a positive expense ID in that same group. Use the manual expenseGroupId and expenseId environment variables.
+
+  List endpoints accept page (default 1) and limit (default 20, max 100), both positive integers.
+
+  ## Response
+
+  **200 OK**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "member_id": 30,
+          "user_id": 3,
+          "name": "Alice Owner",
+          "avatar_attachment_id": null,
+          "status": "ACTIVE",
+          "joined_at": "2026-11-01T10:00:00Z",
+          "left_at": null,
+          "avatar_url": null
+        },
+        {
+          "member_id": 31,
+          "user_id": 4,
+          "name": "Bob Member",
+          "avatar_attachment_id": null,
+          "status": "ACTIVE",
+          "joined_at": "2026-11-01T10:00:00Z",
+          "left_at": null,
+          "avatar_url": null
+        },
+        {
+          "member_id": 32,
+          "user_id": 5,
+          "name": "Former Member",
+          "avatar_attachment_id": null,
+          "status": "INACTIVE",
+          "joined_at": "2026-11-01T10:00:00Z",
+          "left_at": "2026-11-10T12:00:00Z",
+          "avatar_url": null
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 3
+      }
+    }
+  }
+  ```
+
+  avatar_url is a ready-to-use image URL when an accessible avatar exists; otherwise null. avatar_attachment_id is retained for compatibility. Private URLs expire (15 minutes by default); refetch the list when needed. A private avatar that the caller cannot access is not disclosed.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, pagination, JSON field, positive total amount, required field, title, or timestamp. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is absent or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Access token is invalid or malformed. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Authenticated account is not ACTIVE. |
+  | 403 | `EXPENSE_FORBIDDEN` | `only active group members can access expenses` | Requester is not an ACTIVE member, or left_at is not null. This also applies to a former expense creator. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Authenticated account no longer exists. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group does not exist or is soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or authentication infrastructure failed; causes remain private. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt or avatar URL generation failed. |
+}
