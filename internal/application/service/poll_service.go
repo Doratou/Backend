@@ -37,7 +37,7 @@ func (s *pollService) Create(ctx context.Context, userID, groupID int64, req dto
 		if err := s.pollRepo.CreateWithOptions(trxCtx, poll); err != nil {
 			return err
 		}
-		response = dto.ToPollResponse(poll, nil, nil, false)
+		response = dto.ToPollResponse(poll, domain_db.PollVoteSummary{}, false)
 		return nil
 	})
 	if err != nil {
@@ -79,7 +79,7 @@ func (s *pollService) List(ctx context.Context, userID, groupID int64, req dto.L
 		items := make([]dto.PollListItem, 0, len(polls))
 		for _, poll := range polls {
 			summary := summaries[poll.ID]
-			items = append(items, dto.ToPollListItem(poll, summary.OptionCounts, summary.MyOptionID, group.Status != enum.GroupStatusActive))
+			items = append(items, dto.ToPollListItem(poll, summary, group.Status != enum.GroupStatusActive))
 		}
 		response = dto.PollListResponse{
 			Items: items, Pagination: dto.PollPaginationResponse{Page: page, Limit: limit, Total: total},
@@ -106,22 +106,32 @@ func (s *pollService) Get(ctx context.Context, userID, groupID, pollID int64) (*
 }
 
 func (s *pollService) Vote(ctx context.Context, userID, groupID, pollID int64, req dto.VotePollRequest) (*dto.PollVoteResponse, error) {
-	if req.OptionID <= 0 {
+	if len(req.OptionIDs) == 0 {
 		return nil, exception.ErrBadRequest
+	}
+	seen := make(map[int64]struct{}, len(req.OptionIDs))
+	for _, optionID := range req.OptionIDs {
+		if optionID <= 0 {
+			return nil, exception.ErrBadRequest
+		}
+		if _, exists := seen[optionID]; exists {
+			return nil, exception.ErrPollDuplicateVoteOptions
+		}
+		seen[optionID] = struct{}{}
 	}
 	var response dto.PollVoteResponse
 	err := s.withPollAccess(ctx, userID, groupID, pollID, true, func(trxCtx context.Context, group *entity.Group, member *entity.GroupMember, poll *entity.Poll) error {
 		if poll.Status != enum.PollStatusActive {
 			return exception.ErrPollClosed
 		}
-		if _, err := s.pollRepo.FindOptionByID(trxCtx, poll.ID, req.OptionID); err != nil {
+		if !poll.AllowMultipleChoices && len(req.OptionIDs) != 1 {
+			return exception.ErrPollSingleChoiceRequired
+		}
+		votes, err := s.pollRepo.ReplaceVotes(trxCtx, poll.ID, member.ID, req.OptionIDs)
+		if err != nil {
 			return err
 		}
-		vote := &entity.PollVote{PollID: poll.ID, MemberID: member.ID, OptionID: req.OptionID}
-		if err := s.pollRepo.UpsertVote(trxCtx, vote); err != nil {
-			return err
-		}
-		response = dto.ToPollVoteResponse(vote)
+		response = dto.ToPollVoteResponse(poll.ID, votes)
 		return nil
 	})
 	if err != nil {
@@ -245,15 +255,11 @@ func (s *pollService) withPollAccess(ctx context.Context, userID, groupID, pollI
 }
 
 func (s *pollService) pollResponse(ctx context.Context, group *entity.Group, member *entity.GroupMember, poll *entity.Poll) (*dto.PollResponse, error) {
-	counts, err := s.pollRepo.CountVotesByOption(ctx, poll.ID)
+	summaries, err := s.pollRepo.FindVoteSummaries(ctx, group.ID, member.ID, []int64{poll.ID})
 	if err != nil {
 		return nil, err
 	}
-	vote, err := s.pollRepo.FindVoteByMemberID(ctx, poll.ID, member.ID)
-	if err != nil && !errors.Is(err, exception.ErrPollVoteNotFound) {
-		return nil, err
-	}
-	response := dto.ToPollResponse(poll, counts, vote, group.Status != enum.GroupStatusActive)
+	response := dto.ToPollResponse(poll, summaries[poll.ID], group.Status != enum.GroupStatusActive)
 	return &response, nil
 }
 
@@ -282,7 +288,7 @@ func newPoll(req dto.CreatePollRequest) (*entity.Poll, error) {
 		seen[key] = struct{}{}
 		options = append(options, &entity.PollOption{Title: title})
 	}
-	return &entity.Poll{Question: question, Visibility: req.Visibility, Status: enum.PollStatusActive, Options: options}, nil
+	return &entity.Poll{Question: question, Visibility: req.Visibility, AllowMultipleChoices: req.AllowMultipleChoices, Status: enum.PollStatusActive, Options: options}, nil
 }
 
 func validPollText(value string, maxLength int) bool {

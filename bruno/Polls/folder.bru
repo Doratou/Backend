@@ -11,28 +11,53 @@ script:pre-request {
   bru.deleteVar("pollGroupId");
   bru.deleteVar("pollId");
   bru.deleteVar("pollOptionId");
+  bru.deleteVar("pollOptionIds");
 }
 
 docs {
   # Polls
 
-  Run project migrations with `go run ./cmd/migrate up` before testing. This includes `20261105014613_create_polls_tables.sql`.
+  Run go run ./cmd/migrate up before starting this version, including 20261116120000_add_poll_multiple_choices.sql. Existing polls default to allow_multiple_choices=false and all votes are preserved. The unique key becomes (poll_id,member_id,option_id), including soft-deleted rows. Down refuses rollback if a membership has multiple stored option rows in a poll, even deleted ones; it never silently discards votes.
 
-  In the Local environment set pollGroupId manually to a group you belong to, pollId to data.id from Create Poll or a selected poll, and pollOptionId to an options[].id from Create Poll, List Polls or Get Poll. Save the environment before sending a request. The example IDs are placeholders, not seeded records. Login through Auth to populate token. No poll response automatically populates or changes these identifiers. The folder pre-request script clears legacy runtime poll identifiers so the manually configured Local values are used.
+  ## Enum values and voting mode
 
-  All eight endpoints require an ACTIVE account and ACTIVE group membership. Only the poll creator may close or delete; group owners and system administrators have no override. If the creator leaves, the poll stays open and other active members can continue participating.
+  | Field | Allowed values |
+  | --- | --- |
+  | visibility | PUBLIC, PRIVATE |
+  | status | ACTIVE, INACTIVE |
+  | allow_multiple_choices | JSON boolean true or false; missing/null on Create means false. |
 
-  PUBLIC lets active members of this group see who chose each option through List Poll Voters. PRIVATE returns aggregate results and each caller's own choice without revealing other voters, even to the creator. Member identifiers remain stored in the database to enforce one vote per membership.
+  Enums are uppercase and case-sensitive. The creator fixes the mode at creation. Single-choice accepts exactly one option ID; multi-choice accepts one or more distinct option IDs. Question, options, visibility and mode cannot be edited later. All eight route paths and HTTP methods stay the same.
 
-  Results are visible from the start, including before voting and after closing. Options and visibility cannot be edited. An active member can change or withdraw their own vote while the poll is open.
+  ## API changes
 
-  List Polls includes options, vote_count per option, total_votes and my_option_id for each item. Get Poll provides the same fields for a single poll. Calculate percentages on the client; all percentages are zero when total_votes=0. Listing PRIVATE polls never exposes other voters' identities.
+  PUT /api/v1/groups/{groupID}/polls/{pollID}/vote now takes option_ids, the ENTIRE desired non-empty set. It atomically replaces previous choices, never toggles or appends. [801,802] followed by [802,803] leaves only [802,803]. Repeating a set has no extra effect. Empty arrays are invalid; DELETE /vote withdraws all of this member's choices. To remove some choices, PUT the non-empty list to keep.
 
-  INACTIVE groups freeze creation, voting, vote changes, withdrawal, closing and deletion. Lists and results remain readable. is_frozen is computed from group status; polls keep their own status. Reactivating a group enables previously open polls again; closed polls stay closed.
+  Create/List/Get return allow_multiple_choices, total_votes, total_voters and my_option_ids. my_option_ids is always an ascending array, including [] when no vote exists. my_option_id is removed. PUT returns poll_id, option_ids and votes[], with option_id/created_at/updated_at per selection. Old option_id bodies and top-level vote timestamps are not supported; frontend consumers must update together.
 
-  For a manual scenario: create a poll as member A; login as member B and vote; inspect Get Poll and List Poll Voters as A; change or withdraw B's vote; close as A; check that B can still read but cannot vote. Create a separate PRIVATE poll and confirm List Poll Voters returns POLL_PRIVATE for both A and B. Delete only after completing the other checks.
+  total_votes is the sum of active option selections; total_voters counts distinct participating memberships. A person choosing two options means 2 votes and 1 voter. vote_count counts people selecting that option. Selection shares divide by total_votes and sum to 100 before rounding. Participant percentages divide by total_voters and can sum above 100. Use zero when the denominator is zero and label the meaning in the UI.
 
-  Login replaces token while manually configured environment IDs remain unchanged. Update and save pollGroupId, pollId and pollOptionId when changing groups or choosing a different poll. Closing and deleting are separate actions: closed polls retain readable history, while deletion soft-deletes the entire poll aggregate.
+  PUBLIC voter lists have one row per selection. A member can appear several times and across pages; pagination.total counts selections. PRIVATE hides other voter identities, including from the creator. Aggregate results and the caller's own selections remain available.
 
-  An inactive group is checked before a write operation loads its poll; a write can return POLL_GROUP_INACTIVE before poll-specific state or creator errors. Malformed HTTP input and authentication are validated first.
+  ## Dates and concurrent requests
+
+  Each (poll,member,option) has one reusable row. Unchanged selections retain both timestamps. A new option gets a new row; removing it soft-deletes it. Reselecting restores it, keeps the first created_at and updates updated_at. Poll updated_at is not the latest vote time; closed_at records closing time.
+
+  Replacements, withdrawal, closing/deletion serialize using poll row locks and transactions. An invalid ID leaves all old choices untouched. Concurrent saves result in a complete set, never a partial union; last applied set wins. Frontends should serialize saves or disable submission while one is pending.
+
+  ## Access and lifecycle
+
+  All endpoints require an ACTIVE account and ACTIVE group membership. Only the creator may close/delete, without owner/admin override. A creator leaving does not close the poll. Votes by departed members remain counted.
+
+  INACTIVE groups freeze creation, voting, replacement, withdrawal, closing and deletion. Reads remain available with is_frozen=true. Closed polls reject vote changes but retain results; no reopen route exists. Reactivating a group enables open polls but never reopens closed ones. Deletion soft-deletes the poll, options and selections.
+
+  ## Manual Bruno setup
+
+  Set pollGroupId, pollId and pollOptionIds manually in Local and save. pollOptionIds is a JSON array, e.g. [801] or [801,802]. Initial [] is a placeholder: fill actual option IDs before voting. Legacy pollOptionId is ignored. No response auto-fills identifiers; the folder clears runtime IDs so saved values are used. Auth Login/Refresh retain automatic token behavior.
+
+  Create returns poll and option IDs. Copy them into the environment yourself. Login as another member replaces token without changing manual poll variables. Example IDs are illustrative, not seeded records.
+
+  Test single-choice by omitting allow_multiple_choices: vote [A], replace with [B], check [A,B] fails without changing B, then withdraw. Test multi-choice with true: [A,B], [B,C], repeat, inspect Get/List and PUBLIC voters using another member, then withdraw all. Check duplicate/foreign/deleted IDs are rejected atomically. Also test PRIVATE, outsider/inactive access, group freezing, creator-only Close/Delete and writes after closing. Withdrawal without an active selection returns POLL_VOTE_NOT_FOUND.
+
+  HTTP errors use the shared success/code/error envelope. Invalid input and authentication are checked first; group freezing can precede poll-specific state or creator errors.
 }
