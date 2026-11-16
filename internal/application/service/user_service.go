@@ -66,6 +66,46 @@ func (s *userService) FindByFriendCode(ctx context.Context, userID int64, friend
 	return response, nil
 }
 
+func (s *userService) UpdateProfile(ctx context.Context, userID int64, req dto.UpdateProfileRequest) (*dto.UserResponse, error) {
+	return nil, nil
+}
+
+func (s *userService) ChangeEmail(ctx context.Context, userID int64, req dto.ChangeEmailRequest) (*dto.UserResponse, error) {
+	return nil, nil
+}
+
+func (s *userService) ChangePhone(ctx context.Context, userID int64, req dto.ChangePhoneRequest) (*dto.UserResponse, error) {
+	return nil, nil
+}
+
+func (s *userService) DeleteAccount(ctx context.Context, userID int64, tokenString string) error {
+	return nil
+}
+
+func (s *userService) GetWallet(ctx context.Context, userID int64) (*dto.WalletResponse, error) {
+	return nil, nil
+}
+
+func (s *userService) TopUpWallet(ctx context.Context, userID int64, req dto.TopUpWalletRequest) (*dto.WalletResponse, error) {
+	return nil, nil
+}
+
+func (s *userService) GetUserByID(ctx context.Context, currentUserID, targetUserID int64) (*dto.UserPreviewResponse, error) {
+	return nil, nil
+}
+
+func (s *userService) AdminListUsers(ctx context.Context, filter dto.AdminUserFilterRequest, page, limit, offset int) (*dto.PaginatedResponse[dto.UserResponse], error) {
+	return nil, nil
+}
+
+func (s *userService) AdminGetUserByID(ctx context.Context, targetUserID int64) (*dto.UserResponse, error) {
+	return nil, nil
+}
+
+func (s *userService) AdminUpdateUserRole(ctx context.Context, adminUserID, targetUserID int64, req dto.ChangeUserRoleRequest) (*dto.UserResponse, error) {
+	return nil, nil
+}
+
 func (s *userService) activeUser(ctx context.Context, userID int64) (*entity.User, error) {
 	if userID <= 0 {
 		return nil, exception.ErrBadRequest
