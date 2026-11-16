@@ -27,7 +27,7 @@ type enumType struct {
 	// extraMethods holds the source text of any method on this type other
 	// than IsValid (e.g. String(), MarshalJSON()), preserved verbatim.
 	extraMethods []string
-	firstSeen   int // order of first appearance in the file
+	firstSeen    int // order of first appearance in the file
 }
 
 func main() {
@@ -66,7 +66,7 @@ func processFile(path string, dry bool) error {
 	}
 
 	enums := map[string]*enumType{}
-	var order []string // enum type names, in first-seen order
+	var order []string        // enum type names, in first-seen order
 	var otherDecls []ast.Decl // non-enum, non-IsValid-method decls, kept as-is
 
 	getEnum := func(name string) *enumType {
