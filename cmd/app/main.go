@@ -113,6 +113,7 @@ func main() {
 	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	pollRepo := postgresRepo.NewPollRepository(postgresDB)
+	expenseRepo := postgresRepo.NewExpenseRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	oauthRepo := postgresRepo.NewOAuthRepository(postgresDB)
@@ -144,7 +145,6 @@ func main() {
 			ClientID:     cfg.Environment.Google.ClientID,
 			ClientSecret: cfg.Environment.Google.ClientSecret,
 			RedirectURL:  cfg.Environment.HttpServer.Protcol + "://" + cfg.Environment.HttpServer.Domain + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
-
 		})
 		cancelGoogle()
 		if err != nil {
@@ -237,6 +237,9 @@ func main() {
 	attachmentService := service.NewAttachmentService(
 		attachmentRepo,
 		groupRepo,
+		expenseRepo,
+		userRepo,
+		dbTrxManager,
 		rustfsStorage,
 		service.AttachmentServiceConfig{
 			PublicURLPrefix:     rustfsEnv.PublicURLPrefix,
@@ -244,6 +247,7 @@ func main() {
 		},
 		cfg.Constant,
 	)
+	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
 
 	userService := service.NewUserService(
 		userRepo,
@@ -266,6 +270,7 @@ func main() {
 	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
 	pollHandler := handler.NewPollHandler(pollService)
+	expenseHandler := handler.NewExpenseHandler(expenseService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
@@ -278,6 +283,7 @@ func main() {
 		InviteHandler:      inviteHandler,
 		FriendshipHandler:  friendshipHandler,
 		PollHandler:        pollHandler,
+		ExpenseHandler:     expenseHandler,
 		LuckyDrawHandler:   luckyDrawHandler,
 		CaptchaService:     captchaService,
 		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
