@@ -1,48 +1,122 @@
 package pow
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"time"
 )
 
+// Server handles stateless Proof-of-Work challenge generation and verification.
+//
+// Challenges are HMAC-signed with a secret key, so the server can verify
+// authenticity without any server-side storage (fully stateless).
+//
+// HMAC payload: "<salt>:<timestamp>:<difficulty>"
+// PoW payload:  "<salt>:<timestamp>:<nonce>"   (same buildKey helper)
 type Server struct {
-	maxTTL time.Duration
+	maxTTL    time.Duration
+	secretKey []byte
 }
 
-func NewPOWServer(
-	maxTTL time.Duration,
-) *Server {
+// Challenge is the JSON-serialisable challenge issued to a client.
+// All fields needed to solve and later verify the puzzle are embedded here.
+type Challenge struct {
+	// Salt is a 16-byte random hex string; prevents precomputed solutions.
+	Salt string `json:"salt"`
+
+	// Timestamp is the Unix second at which the challenge was issued.
+	// Used to enforce the TTL window on the server side.
+	Timestamp int64 `json:"timestamp"`
+
+	// HMAC is HMAC-SHA256 over "<salt>:<timestamp>:<difficulty>" with the
+	// server's secret key.  It proves the challenge was issued by this server
+	// and that the difficulty value has not been tampered with.
+	HMAC string `json:"hmac"`
+
+	// Target is the upper bound (exclusive) the hash must be below.
+	// Encoded as a 64-character lowercase hex string (256-bit big-endian).
+	// Derived from Difficulty: target = 2^(256 - Difficulty).
+	Target string `json:"target"`
+
+	// Difficulty is the number of leading zero bits required in the solution hash.
+	Difficulty int `json:"difficulty"`
+}
+
+// NewPOWServer returns a Server.
+//
+//   - maxTTL: how long an issued challenge remains valid (0 = no limit).
+//   - secretKey: HMAC signing key; keep it secret and rotate periodically.
+func NewPOWServer(maxTTL time.Duration, secretKey string) *Server {
 	return &Server{
-		maxTTL: maxTTL,
+		maxTTL:    maxTTL,
+		secretKey: []byte(secretKey),
 	}
 }
 
+// GenerateSalt returns a 16-byte cryptographically random hex string.
 func (s *Server) GenerateSalt() string {
-	bytes := make([]byte, 16)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
-func (s *Server) VerifyPoW(salt string, timestamp int64, nonce string, targetHex string) bool {
-	challengeTime := time.Unix(timestamp, 0)
-	if s.maxTTL != 0 && time.Since(challengeTime) > s.maxTTL {
+// GenerateChallenge issues a fresh stateless challenge.
+//
+// The HMAC covers salt, timestamp, and difficulty together so a client
+// cannot substitute a lower difficulty from a different challenge.
+func (s *Server) GenerateChallenge(difficulty int) Challenge {
+	salt := s.GenerateSalt()
+	ts := time.Now().Unix()
+	return Challenge{
+		Salt:       salt,
+		Timestamp:  ts,
+		HMAC:       s.computeHMAC(salt, ts, difficulty),
+		Target:     computeTarget(difficulty),
+		Difficulty: difficulty,
+	}
+}
+
+// VerifyChallenge performs a fully stateless three-step verification:
+//
+//  1. TTL check   – challenge must not be older than maxTTL.
+//  2. HMAC check  – ensures the challenge was issued by this server and that
+//                   salt, timestamp, and difficulty have not been tampered with.
+//     Comparison is done in constant time to resist timing attacks.
+//  3. PoW check   – SHA-256(salt:timestamp:nonce) must be strictly less than
+//                   the target derived from the HMAC-authenticated difficulty.
+func (s *Server) VerifyChallenge(salt string, timestamp int64, hmacHex string, difficulty int, nonce string) bool {
+	// 1. TTL
+	if s.maxTTL != 0 && time.Since(time.Unix(timestamp, 0)) > s.maxTTL {
 		return false
 	}
 
-	rawInput := buildKey(salt, timestamp, nonce)
+	// 2. HMAC integrity (constant-time comparison)
+	expected := s.computeHMAC(salt, timestamp, difficulty)
+	if !hmac.Equal([]byte(hmacHex), []byte(expected)) {
+		return false
+	}
 
-	hashBytes := sha256.Sum256([]byte(rawInput))
+	// 3. PoW: re-derive the target from the HMAC-authenticated difficulty so the
+	//    client cannot use a weaker target than the server originally issued.
+	targetInt, ok := new(big.Int).SetString(computeTarget(difficulty), 16)
+	if !ok {
+		return false
+	}
 
+	hashBytes := sha256.Sum256([]byte(buildKey(salt, timestamp, nonce)))
 	hashInt := new(big.Int).SetBytes(hashBytes[:])
 
-	targetInt, success := new(big.Int).SetString(targetHex, 16)
-	if !success {
-		return false
-	}
-
-	//  Hash < Target
+	// Hash must be strictly less than target.
 	return hashInt.Cmp(targetInt) < 0
+}
+
+// computeHMAC returns HMAC-SHA256("<salt>:<timestamp>:<difficulty>") as hex.
+func (s *Server) computeHMAC(salt string, timestamp int64, difficulty int) string {
+	h := hmac.New(sha256.New, s.secretKey)
+	h.Write([]byte(fmt.Sprintf("%s:%d:%d", salt, timestamp, difficulty)))
+	return hex.EncodeToString(h.Sum(nil))
 }
