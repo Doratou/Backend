@@ -1,0 +1,32 @@
+meta {
+  name: 07. Top Up Wallet
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/users/me/wallet/top-up
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "amount": 100000
+  }
+}
+
+docs {
+  # Top Up Wallet (Dev Mode)
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/users/me/wallet/top-up`
+  **Auth:** Bearer access token
+
+  Increases user wallet balance directly without a payment gateway.
+}

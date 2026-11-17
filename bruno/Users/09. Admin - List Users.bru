@@ -1,0 +1,33 @@
+meta {
+  name: 09. Admin - List Users
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/users?page=1&limit=20
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~status: ACTIVE
+  ~role: USER
+  ~search: 
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+docs {
+  # Admin - List Users
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/admin/users`
+  **Auth:** Bearer access token (Requires ADMIN role)
+
+  Retrieves paginated, filterable list of users.
+}

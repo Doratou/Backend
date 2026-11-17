@@ -1,0 +1,36 @@
+meta {
+  name: 11. Admin - Update User Role
+  type: http
+  seq: 11
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/users/:id/role
+  body: json
+  auth: none
+}
+
+params:path {
+  id: 2
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "role": "ADMIN"
+  }
+}
+
+docs {
+  # Admin - Update User Role
+
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/admin/users/:id/role`
+  **Auth:** Bearer access token (Requires ADMIN role)
+
+  Updates system role of a user between USER and ADMIN. Admins cannot change their own role.
+}

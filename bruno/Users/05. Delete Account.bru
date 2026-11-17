@@ -1,0 +1,25 @@
+meta {
+  name: 05. Delete Account
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/users/me
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+docs {
+  # Delete Account
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/users/me`
+  **Auth:** Bearer access token
+
+  Soft-deletes user account, revokes current access token and clears active refresh sessions.
+}
