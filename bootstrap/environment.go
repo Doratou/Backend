@@ -20,10 +20,40 @@ type Environment struct {
 	Invite     InvitationConfig `mapstructure:",squash"`
 	Friendship FriendshipConfig `mapstructure:",squash"`
 	RustFS     RustFSConfig     `mapstructure:",squash"`
+	PoW        PoWConfig        `mapstructure:",squash"`
 }
 
 type FriendshipConfig struct {
 	RequestCooldown time.Duration `mapstructure:"FRIENDSHIP_REQUEST_COOLDOWN"`
+}
+
+// PoWConfig holds settings for the two-layer rate limiter and stateless
+// Proof-of-Work challenge system.
+type PoWConfig struct {
+	// HMACSecret is the signing key used to authenticate PoW challenges.
+	// Must be kept secret; rotate it to invalidate all outstanding challenges.
+	HMACSecret string `mapstructure:"POW_HMAC_SECRET" json:"-"`
+
+	// ChallengeTTL is the maximum age of a challenge the server will accept.
+	// Challenges older than this are rejected regardless of correctness.
+	ChallengeTTL time.Duration `mapstructure:"POW_CHALLENGE_TTL"`
+
+	// BlockTTL is how long a client remains blocked after hitting the L2
+	// rate limit, unless they successfully solve a PoW challenge earlier.
+	BlockTTL time.Duration `mapstructure:"POW_BLOCK_TTL"`
+
+	// Difficulty is the number of leading zero bits required in a valid
+	// solution hash.  Higher values mean more CPU work for the client.
+	Difficulty int `mapstructure:"POW_DIFFICULTY"`
+
+	// L1Limit is the outer (permissive) rate limit in requests per second.
+	// Clients exceeding this receive a plain 429 with no challenge.
+	L1Limit int `mapstructure:"POW_L1_LIMIT"`
+
+	// L2Limit is the inner (strict) rate limit in requests per second.
+	// L2Limit must be lower than L1Limit.
+	// Clients exceeding this receive a 423 with a PoW challenge.
+	L2Limit int `mapstructure:"POW_L2_LIMIT"`
 }
 
 type RustFSConfig struct {
