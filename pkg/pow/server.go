@@ -10,11 +10,6 @@ import (
 	"time"
 )
 
-// Server handles stateless Proof-of-Work challenge generation and verification.
-//
-// Challenges are HMAC-signed with a secret key, so the server can verify
-// authenticity without any server-side storage (fully stateless).
-//
 // HMAC payload: "<salt>:<timestamp>:<difficulty>"
 // PoW payload:  "<salt>:<timestamp>:<nonce>"   (same buildKey helper)
 type Server struct {
@@ -46,10 +41,8 @@ type Challenge struct {
 	Difficulty int `json:"difficulty"`
 }
 
-// NewPOWServer returns a Server.
-//
-//   - maxTTL: how long an issued challenge remains valid (0 = no limit).
-//   - secretKey: HMAC signing key; keep it secret and rotate periodically.
+// maxTTL: how long an issued challenge remains valid (0 = no limit).
+// secretKey: HMAC signing key; keep it secret and rotate periodically.
 func NewPOWServer(maxTTL time.Duration, secretKey string) *Server {
 	return &Server{
 		maxTTL:    maxTTL,
@@ -65,9 +58,6 @@ func (s *Server) GenerateSalt() string {
 }
 
 // GenerateChallenge issues a fresh stateless challenge.
-//
-// The HMAC covers salt, timestamp, and difficulty together so a client
-// cannot substitute a lower difficulty from a different challenge.
 func (s *Server) GenerateChallenge(difficulty int) Challenge {
 	salt := s.GenerateSalt()
 	ts := time.Now().Unix()
@@ -84,10 +74,10 @@ func (s *Server) GenerateChallenge(difficulty int) Challenge {
 //
 //  1. TTL check   – challenge must not be older than maxTTL.
 //  2. HMAC check  – ensures the challenge was issued by this server and that
-//                   salt, timestamp, and difficulty have not been tampered with.
+//     salt, timestamp, and difficulty have not been tampered with.
 //     Comparison is done in constant time to resist timing attacks.
 //  3. PoW check   – SHA-256(salt:timestamp:nonce) must be strictly less than
-//                   the target derived from the HMAC-authenticated difficulty.
+//     the target derived from the HMAC-authenticated difficulty.
 func (s *Server) VerifyChallenge(salt string, timestamp int64, hmacHex string, difficulty int, nonce string) bool {
 	// 1. TTL
 	if s.maxTTL != 0 && time.Since(time.Unix(timestamp, 0)) > s.maxTTL {
@@ -117,6 +107,6 @@ func (s *Server) VerifyChallenge(salt string, timestamp int64, hmacHex string, d
 // computeHMAC returns HMAC-SHA256("<salt>:<timestamp>:<difficulty>") as hex.
 func (s *Server) computeHMAC(salt string, timestamp int64, difficulty int) string {
 	h := hmac.New(sha256.New, s.secretKey)
-	h.Write([]byte(fmt.Sprintf("%s:%d:%d", salt, timestamp, difficulty)))
+	h.Write(fmt.Appendf(nil, "%s:%d:%d", salt, timestamp, difficulty))
 	return hex.EncodeToString(h.Sum(nil))
 }

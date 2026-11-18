@@ -45,7 +45,6 @@ var EnvKeys = []string{
 	"RUSTFS_REGION",
 	"RUSTFS_PUBLIC_URL_PREFIX",
 	"RUSTFS_MAX_CONCURRENCY",
-	// PoW two-layer rate limiter
 	"POW_HMAC_SECRET",
 	"POW_CHALLENGE_TTL",
 	"POW_BLOCK_TTL",
