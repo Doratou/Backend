@@ -20,6 +20,13 @@ type Environment struct {
 	Invite     InvitationConfig `mapstructure:",squash"`
 	Friendship FriendshipConfig `mapstructure:",squash"`
 	RustFS     RustFSConfig     `mapstructure:",squash"`
+	AvalAI     AvalAIConfig     `mapstructure:",squash"`
+}
+
+type AvalAIConfig struct {
+	APIKey  string `mapstructure:"AVALAI_API_KEY" json:"-"`
+	BaseURL string `mapstructure:"AVALAI_BASE_URL"`
+	Model   string `mapstructure:"AVALAI_MODEL"`
 }
 
 type FriendshipConfig struct {
