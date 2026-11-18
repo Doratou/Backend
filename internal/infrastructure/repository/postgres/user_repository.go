@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 
@@ -234,6 +235,19 @@ func (r *userRepository) UpdateRole(ctx context.Context, userID int64, role enum
 		return exception.ErrUserNotFound
 	}
 	return nil
+}
+
+func (r *userRepository) RegenerateFriendCode(ctx context.Context, userID int64) (string, error) {
+	db := r.getDB(ctx)
+	var newCode string
+	row := db.Raw("UPDATE users SET friend_code = generate_user_friend_code() WHERE id = ? AND deleted_at IS NULL RETURNING friend_code", userID).Row()
+	if err := row.Scan(&newCode); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", exception.ErrUserNotFound
+		}
+		return "", exception.Wrap(exception.ErrInternal, err)
+	}
+	return newCode, nil
 }
 
 func (r *userRepository) UpdateAvatar(ctx context.Context, userID int64, avatarID int64) error {

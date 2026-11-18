@@ -319,6 +319,23 @@ func (s *userService) FindByFriendCode(ctx context.Context, userID int64, friend
 	return response, nil
 }
 
+func (s *userService) RegenerateFriendCode(ctx context.Context, userID int64) (*dto.UserResponse, error) {
+	if _, err := s.activeUser(ctx, userID); err != nil {
+		return nil, err
+	}
+	newCode, err := s.userRepo.RegenerateFriendCode(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	user.FriendCode = newCode
+	response := dto.ToUserResponse(user)
+	return &response, nil
+}
+
 func (s *userService) AdminListUsers(ctx context.Context, filter dto.AdminUserFilterRequest, page, limit, offset int) (*dto.PaginatedResponse[dto.UserResponse], error) {
 	repoFilter := domain_db.UserFilter{
 		Role:   filter.Role,

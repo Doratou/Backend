@@ -54,6 +54,9 @@ type UserRepository interface {
 	// UpdateRole updates only the system_role column for the given user.
 	UpdateRole(ctx context.Context, userID int64, role enum.UserRole) error
 
+	// RegenerateFriendCode regenerates the friend_code column using the database function.
+	RegenerateFriendCode(ctx context.Context, userID int64) (string, error)
+
 	// UpdateAvatar updates only the avatar_attachment_id column for the given user.
 	UpdateAvatar(ctx context.Context, userID int64, avatarID int64) error
 

@@ -16,6 +16,7 @@ type UserService interface {
 	TopUpWallet(ctx context.Context, userID int64, req dto.TopUpWalletRequest) (*dto.WalletResponse, error)
 	GetUserByID(ctx context.Context, currentUserID, targetUserID int64) (*dto.UserPreviewResponse, error)
 	FindByFriendCode(ctx context.Context, userID int64, friendCode string) (*dto.UserPreviewResponse, error)
+	RegenerateFriendCode(ctx context.Context, userID int64) (*dto.UserResponse, error)
 
 	// Admin operations
 	AdminListUsers(ctx context.Context, filter dto.AdminUserFilterRequest, page, limit, offset int) (*dto.PaginatedResponse[dto.UserResponse], error)
