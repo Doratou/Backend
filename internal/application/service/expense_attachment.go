@@ -13,12 +13,16 @@ import (
 	"github.com/Doratou/Backend/internal/domain/exception"
 )
 
-func (s *attachmentService) validateExpenseReceiptUpload(ctx context.Context, userID int64, attType enum.AttachmentType, expenseID *int64) error {
-	if attType != enum.AttachmentTypeExpenseReceipt {
-		return nil
-	}
-	if expenseID != nil {
+func isReceipt(attType enum.AttachmentType) bool {
+	return attType == enum.AttachmentTypeExpenseReceipt || attType == enum.AttachmentTypeSettlementReceipt
+}
+
+func (s *attachmentService) validateReceiptUpload(ctx context.Context, userID int64, attType enum.AttachmentType, expenseID, settlementID *int64) error {
+	if settlementID != nil || (isReceipt(attType) && expenseID != nil) {
 		return exception.ErrBadRequest
+	}
+	if !isReceipt(attType) {
+		return nil
 	}
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
@@ -30,13 +34,24 @@ func (s *attachmentService) validateExpenseReceiptUpload(ctx context.Context, us
 	return nil
 }
 
-func (s *attachmentService) validateExpenseReceiptObjectKey(userID int64, attType enum.AttachmentType, key string) error {
-	if attType != enum.AttachmentTypeExpenseReceipt {
+func (s *attachmentService) validateReceiptObjectKey(ctx context.Context, userID int64, attType enum.AttachmentType, key string) error {
+	if strings.HasPrefix(key, "attachments/confirmed_settlement_receipt/") {
+		return exception.ErrAttachmentForbidden
+	}
+	if !isReceipt(attType) {
+		if strings.HasPrefix(key, "attachments/expense_receipt/") || strings.HasPrefix(key, "attachments/settlement_receipt/") {
+			return exception.ErrAttachmentForbidden
+		}
 		return nil
 	}
-	prefix := "attachments/expense_receipt/" + strconv.FormatInt(userID, 10) + "/"
+	prefix := "attachments/" + strings.ToLower(string(attType)) + "/" + strconv.FormatInt(userID, 10) + "/"
 	if !strings.HasPrefix(key, prefix) || path.Clean(key) != key || strings.ContainsAny(key, "\\\r\n\x00") {
 		return exception.ErrAttachmentForbidden
+	}
+	if _, err := s.attachmentRepo.FindByObjectKey(ctx, key); err == nil {
+		return exception.ErrAttachmentForbidden
+	} else if !errors.Is(err, exception.ErrAttachmentNotFound) {
+		return err
 	}
 	return nil
 }
@@ -89,7 +104,7 @@ func (s *attachmentService) validateExpenseReceiptAccess(ctx context.Context, at
 }
 
 func (s *attachmentService) lockExpenseReceipt(ctx context.Context, attachment *entity.Attachment) error {
-	if attachment.Type != enum.AttachmentTypeExpenseReceipt {
+	if !isReceipt(attachment.Type) {
 		return nil
 	}
 	locked, err := s.expenseRepo.FindAttachmentsByIDs(ctx, []int64{attachment.ID})
@@ -100,6 +115,9 @@ func (s *attachmentService) lockExpenseReceipt(ctx context.Context, attachment *
 		return exception.ErrAttachmentNotFound
 	}
 	current := locked[0]
+	if !sameReceiptBinding(current.SettlementID, attachment.SettlementID) {
+		return exception.ErrBadRequest
+	}
 	if (current.ExpenseID == nil) != (attachment.ExpenseID == nil) || (current.ExpenseID != nil && *current.ExpenseID != *attachment.ExpenseID) {
 		return exception.ErrBadRequest
 	}

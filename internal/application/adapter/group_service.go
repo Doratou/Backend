@@ -8,6 +8,7 @@ import (
 )
 
 type GroupService interface {
+	ChangeStatus(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.ChangeGroupStatusRequest) (*dto.GroupResponse, error)
 	Create(ctx context.Context, userID int64, req dto.CreateGroupRequest) (*dto.GroupResponse, error)
 	ListMine(ctx context.Context, userID int64, status *string, limit, offset int) ([]dto.GroupResponse, int64, error)
 	ListAll(ctx context.Context, status *string, limit, offset int) ([]dto.GroupResponse, int64, error)

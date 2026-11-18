@@ -45,6 +45,7 @@ type attachmentService struct {
 	cfg            AttachmentServiceConfig
 	consts         *bootstrap.Constant
 	expenseRepo    domain_db.ExpenseRepository
+	settlementRepo domain_db.SettlementRepository
 	userRepo       domain_db.UserRepository
 	dbTrx          database.TrxManager
 }
@@ -53,6 +54,7 @@ func NewAttachmentService(
 	attachmentRepo domain_db.AttachmentRepository,
 	groupRepo domain_db.GroupRepository,
 	expenseRepo domain_db.ExpenseRepository,
+	settlementRepo domain_db.SettlementRepository,
 	userRepo domain_db.UserRepository,
 	dbTrx database.TrxManager,
 	storageRepo domain_storage.StorageRepository,
@@ -71,13 +73,13 @@ func NewAttachmentService(
 		storageRepo:    storageRepo,
 		cfg:            cfg,
 		consts:         consts,
-		expenseRepo:    expenseRepo, userRepo: userRepo, dbTrx: dbTrx,
+		expenseRepo:    expenseRepo, settlementRepo: settlementRepo, userRepo: userRepo, dbTrx: dbTrx,
 	}
 }
 
 // Upload handles receiving a multipart file, validating, uploading to storage, and storing in DB.
 func (s *attachmentService) Upload(ctx context.Context, userID int64, fileHeader *multipart.FileHeader, req dto.UploadAttachmentRequest) (*dto.AttachmentResponse, error) {
-	if err := s.validateExpenseReceiptUpload(ctx, userID, req.Type, req.ExpenseID); err != nil {
+	if err := s.validateReceiptUpload(ctx, userID, req.Type, req.ExpenseID, req.SettlementID); err != nil {
 		return nil, err
 	}
 	if fileHeader == nil {
@@ -179,10 +181,10 @@ func (s *attachmentService) UploadBatch(
 	userID int64,
 	files []*multipart.FileHeader,
 	defaultType enum.AttachmentType,
-	groupID, expenseID *int64,
+	groupID, expenseID, settlementID *int64,
 	isPublic *bool,
 ) (*dto.BatchUploadResponse, error) {
-	if err := s.validateExpenseReceiptUpload(ctx, userID, defaultType, expenseID); err != nil {
+	if err := s.validateReceiptUpload(ctx, userID, defaultType, expenseID, settlementID); err != nil {
 		return nil, err
 	}
 	if len(files) == 0 {
@@ -329,7 +331,7 @@ func (s *attachmentService) UploadBatch(
 
 // CreatePresignedUpload generates a presigned PUT URL allowing clients to upload directly to RustFS.
 func (s *attachmentService) CreatePresignedUpload(ctx context.Context, userID int64, req dto.PresignedUploadRequest) (*dto.PresignedUploadResponse, error) {
-	if err := s.validateExpenseReceiptUpload(ctx, userID, req.Type, req.ExpenseID); err != nil {
+	if err := s.validateReceiptUpload(ctx, userID, req.Type, req.ExpenseID, req.SettlementID); err != nil {
 		return nil, err
 	}
 	if err := s.validateFile(req.Type, req.FileSizeBytes, req.MimeType); err != nil {
@@ -358,7 +360,7 @@ func (s *attachmentService) CreatePresignedUploadBatch(ctx context.Context, user
 	items := make([]dto.BatchPresignedUploadItemResponse, 0, len(req.Items))
 
 	for _, item := range req.Items {
-		if err := s.validateExpenseReceiptUpload(ctx, userID, item.Type, item.ExpenseID); err != nil {
+		if err := s.validateReceiptUpload(ctx, userID, item.Type, item.ExpenseID, item.SettlementID); err != nil {
 			return nil, err
 		}
 		if err := s.validateFile(item.Type, item.FileSizeBytes, item.MimeType); err != nil {
@@ -390,10 +392,10 @@ func (s *attachmentService) CreatePresignedUploadBatch(ctx context.Context, user
 
 // ConfirmPresignedUpload registers the metadata in Postgres after client completes direct upload to RustFS.
 func (s *attachmentService) ConfirmPresignedUpload(ctx context.Context, userID int64, req dto.ConfirmPresignedUploadRequest) (*dto.AttachmentResponse, error) {
-	if err := s.validateExpenseReceiptUpload(ctx, userID, req.Type, req.ExpenseID); err != nil {
+	if err := s.validateReceiptUpload(ctx, userID, req.Type, req.ExpenseID, req.SettlementID); err != nil {
 		return nil, err
 	}
-	if err := s.validateExpenseReceiptObjectKey(userID, req.Type, req.ObjectKey); err != nil {
+	if err := s.validateReceiptObjectKey(ctx, userID, req.Type, req.ObjectKey); err != nil {
 		return nil, err
 	}
 	if err := s.validateGroupContext(ctx, userID, req.GroupID, req.Type); err != nil {
@@ -405,8 +407,8 @@ func (s *attachmentService) ConfirmPresignedUpload(ctx context.Context, userID i
 		return nil, exception.Wrap(exception.ErrAttachmentNotFound, fmt.Errorf("uploaded file not found in storage: %w", err))
 	}
 
-	if req.Type == enum.AttachmentTypeExpenseReceipt {
-		if err := s.validateFile(req.Type, stat.Size, stat.ContentType); err != nil {
+	if isReceipt(req.Type) {
+		if err := s.validateStoredReceipt(ctx, req.Type, req.ObjectKey, stat.Size); err != nil {
 			return nil, err
 		}
 	}
@@ -415,13 +417,20 @@ func (s *attachmentService) ConfirmPresignedUpload(ctx context.Context, userID i
 	fileSize := stat.Size
 	mimeType := stat.ContentType
 
+	storedKey := req.ObjectKey
+	if req.Type == enum.AttachmentTypeSettlementReceipt {
+		storedKey, mimeType, err = s.snapshotSettlementReceipt(ctx, req.ObjectKey, fileSize)
+		if err != nil {
+			return nil, err
+		}
+	}
 	attachment := &entity.Attachment{
 		UploadedByUserID: &userID,
 		GroupID:          req.GroupID,
 		ExpenseID:        req.ExpenseID,
 		Type:             req.Type,
 		OriginalFilename: &req.OriginalFilename,
-		ObjectKey:        &req.ObjectKey,
+		ObjectKey:        &storedKey,
 		MimeType:         &mimeType,
 		FileSizeBytes:    &fileSize,
 		FileHash:         &stat.ETag,
@@ -430,10 +439,16 @@ func (s *attachmentService) ConfirmPresignedUpload(ctx context.Context, userID i
 	}
 
 	if err := s.attachmentRepo.Create(ctx, attachment); err != nil {
+		if storedKey != req.ObjectKey {
+			_ = s.storageRepo.DeleteFile(ctx, storedKey)
+		}
 		return nil, err
 	}
 
-	accessURL, _ := s.buildAccessURL(ctx, req.ObjectKey, isPublic)
+	if storedKey != req.ObjectKey {
+		_ = s.storageRepo.DeleteFile(ctx, req.ObjectKey)
+	}
+	accessURL, _ := s.buildAccessURL(ctx, storedKey, isPublic)
 	return dto.ToAttachmentResponse(attachment, accessURL), nil
 }
 
@@ -441,16 +456,18 @@ func (s *attachmentService) ConfirmPresignedUpload(ctx context.Context, userID i
 func (s *attachmentService) ConfirmPresignedUploadBatch(ctx context.Context, userID int64, req dto.BatchConfirmUploadRequest) (*dto.BatchUploadResponse, error) {
 	var (
 		validEntities []*entity.Attachment
+		snapshots     []string
+		originals     []string
 		failures      []dto.BatchUploadItemFailure
 	)
 
 	now := time.Now().UTC()
 	for _, item := range req.Items {
-		if err := s.validateExpenseReceiptUpload(ctx, userID, item.Type, item.ExpenseID); err != nil {
+		if err := s.validateReceiptUpload(ctx, userID, item.Type, item.ExpenseID, item.SettlementID); err != nil {
 			failures = append(failures, dto.BatchUploadItemFailure{Filename: item.OriginalFilename, Error: err.Error()})
 			continue
 		}
-		if err := s.validateExpenseReceiptObjectKey(userID, item.Type, item.ObjectKey); err != nil {
+		if err := s.validateReceiptObjectKey(ctx, userID, item.Type, item.ObjectKey); err != nil {
 			failures = append(failures, dto.BatchUploadItemFailure{Filename: item.OriginalFilename, Error: err.Error()})
 			continue
 		}
@@ -471,8 +488,8 @@ func (s *attachmentService) ConfirmPresignedUploadBatch(ctx context.Context, use
 			continue
 		}
 
-		if item.Type == enum.AttachmentTypeExpenseReceipt {
-			if err := s.validateFile(item.Type, stat.Size, stat.ContentType); err != nil {
+		if isReceipt(item.Type) {
+			if err := s.validateStoredReceipt(ctx, item.Type, item.ObjectKey, stat.Size); err != nil {
 				failures = append(failures, dto.BatchUploadItemFailure{Filename: item.OriginalFilename, Error: err.Error()})
 				continue
 			}
@@ -481,13 +498,23 @@ func (s *attachmentService) ConfirmPresignedUploadBatch(ctx context.Context, use
 		size := stat.Size
 		mime := stat.ContentType
 
+		storedKey := item.ObjectKey
+		if item.Type == enum.AttachmentTypeSettlementReceipt {
+			storedKey, mime, err = s.snapshotSettlementReceipt(ctx, item.ObjectKey, size)
+			if err != nil {
+				failures = append(failures, dto.BatchUploadItemFailure{Filename: item.OriginalFilename, Error: err.Error()})
+				continue
+			}
+			snapshots = append(snapshots, storedKey)
+			originals = append(originals, item.ObjectKey)
+		}
 		validEntities = append(validEntities, &entity.Attachment{
 			UploadedByUserID: &userID,
 			GroupID:          item.GroupID,
 			ExpenseID:        item.ExpenseID,
 			Type:             item.Type,
 			OriginalFilename: &item.OriginalFilename,
-			ObjectKey:        &item.ObjectKey,
+			ObjectKey:        &storedKey,
 			MimeType:         &mime,
 			FileSizeBytes:    &size,
 			FileHash:         &stat.ETag,
@@ -498,10 +525,14 @@ func (s *attachmentService) ConfirmPresignedUploadBatch(ctx context.Context, use
 
 	if len(validEntities) > 0 {
 		if err := s.attachmentRepo.CreateBatch(ctx, validEntities); err != nil {
+			_ = s.storageRepo.DeleteFilesBatch(ctx, snapshots)
 			return nil, err
 		}
 	}
 
+	if len(originals) > 0 {
+		_ = s.storageRepo.DeleteFilesBatch(ctx, originals)
+	}
 	items := make([]*dto.AttachmentResponse, len(validEntities))
 	for i, ent := range validEntities {
 		url, _ := s.buildAccessURL(ctx, *ent.ObjectKey, ent.IsPublic)
@@ -586,7 +617,7 @@ func (s *attachmentService) listForUser(ctx context.Context, filter dto.Attachme
 
 	responses := make([]*dto.AttachmentResponse, len(items))
 	for i, item := range items {
-		accessURL, _ := s.buildAccessURL(ctx, *item.ObjectKey, item.IsPublic && item.Type != enum.AttachmentTypeExpenseReceipt)
+		accessURL, _ := s.buildAccessURL(ctx, *item.ObjectKey, item.IsPublic && !isReceipt(item.Type))
 		responses[i] = dto.ToAttachmentResponse(item, accessURL)
 	}
 
@@ -759,7 +790,7 @@ func (s *attachmentService) Delete(ctx context.Context, userID int64, id int64, 
 	if err != nil {
 		return err
 	}
-	if attachment.Type == enum.AttachmentTypeExpenseReceipt {
+	if isReceipt(attachment.Type) || attachment.GroupID != nil {
 		return s.dbTrx.WithTransaction(ctx, func(txCtx context.Context) error { return s.deleteAttachment(txCtx, userID, id, hardDelete) })
 	}
 	return s.deleteAttachment(ctx, userID, id, hardDelete)
@@ -798,7 +829,7 @@ func (s *attachmentService) DeleteBatch(ctx context.Context, userID int64, ids [
 		return err
 	}
 	for _, attachment := range attachments {
-		if attachment.Type == enum.AttachmentTypeExpenseReceipt {
+		if isReceipt(attachment.Type) || attachment.GroupID != nil {
 			return s.dbTrx.WithTransaction(ctx, func(txCtx context.Context) error { return s.deleteAttachmentBatch(txCtx, userID, ids, hardDelete) })
 		}
 	}
@@ -932,6 +963,9 @@ func (s *attachmentService) validateFile(attType enum.AttachmentType, size int64
 		return exception.ErrInvalidFileType
 	}
 
+	if size <= 0 {
+		return exception.ErrBadRequest
+	}
 	if maxAllowed > 0 && size > maxAllowed {
 		return exception.ErrFileTooLarge
 	}
@@ -940,7 +974,7 @@ func (s *attachmentService) validateFile(attType enum.AttachmentType, size int64
 }
 
 func (s *attachmentService) resolveIsPublic(attType enum.AttachmentType, isPublicReq *bool) bool {
-	if attType == enum.AttachmentTypeExpenseReceipt {
+	if isReceipt(attType) {
 		return false
 	}
 	if isPublicReq != nil {
@@ -964,7 +998,7 @@ func (s *attachmentService) generateObjectKey(userID int64, attType enum.Attachm
 	uniqueID := uuid.New().String()
 
 	directory := strings.ToLower(string(attType))
-	if attType == enum.AttachmentTypeExpenseReceipt {
+	if isReceipt(attType) {
 		directory = fmt.Sprintf("%s/%d", directory, userID)
 	}
 	return fmt.Sprintf("attachments/%s/%04d/%02d/%s_%s%s",
@@ -994,7 +1028,7 @@ func (s *attachmentService) validateGroupContext(ctx context.Context, userID int
 	if err != nil {
 		return err
 	}
-	if group.Status != enum.GroupStatusActive {
+	if group.Status != enum.GroupStatusActive && !(attType == enum.AttachmentTypeSettlementReceipt && group.Status == enum.GroupStatusSettling) {
 		return exception.ErrGroupInvalidStatus
 	}
 
@@ -1014,6 +1048,13 @@ func (s *attachmentService) validateGroupContext(ctx context.Context, userID int
 }
 
 func (s *attachmentService) validateAttachmentAccess(ctx context.Context, att *entity.Attachment, callerUserID *int64) error {
+	if att.Type == enum.AttachmentTypeSettlementReceipt {
+		att.IsPublic = false
+		if callerUserID == nil {
+			return exception.ErrAttachmentForbidden
+		}
+		return s.validateSettlementReceiptAccess(ctx, att, *callerUserID, false)
+	}
 	if att.Type == enum.AttachmentTypeExpenseReceipt {
 		att.IsPublic = false
 		if callerUserID == nil {
@@ -1044,8 +1085,20 @@ func (s *attachmentService) validateAttachmentAccess(ctx context.Context, att *e
 }
 
 func (s *attachmentService) validateDeletePermission(ctx context.Context, att *entity.Attachment, userID int64) error {
+	if att.Type == enum.AttachmentTypeSettlementReceipt {
+		return s.validateSettlementReceiptAccess(ctx, att, userID, true)
+	}
 	if att.Type == enum.AttachmentTypeExpenseReceipt {
 		return s.validateExpenseReceiptAccess(ctx, att, userID, true)
+	}
+	if att.GroupID != nil {
+		group, err := s.expenseRepo.FindGroupByID(ctx, *att.GroupID)
+		if err != nil {
+			return err
+		}
+		if group.Status == enum.GroupStatusClosed {
+			return exception.ErrGroupClosed
+		}
 	}
 	if att.UploadedByUserID != nil && *att.UploadedByUserID == userID {
 		return nil
