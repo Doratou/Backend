@@ -298,7 +298,11 @@ func (h *AttachmentHandler) UploadBatch(c *gin.Context) {
 		isPublic = &pVal
 	}
 
-	res, err := h.attachmentService.UploadBatch(c.Request.Context(), userID, files, attType, groupID, expenseID, isPublic)
+	if c.PostForm("settlement_id") != "" {
+		fail(c, exception.ErrBadRequest)
+		return
+	}
+	res, err := h.attachmentService.UploadBatch(c.Request.Context(), userID, files, attType, groupID, expenseID, nil, isPublic)
 	if err != nil {
 		fail(c, err)
 		return
