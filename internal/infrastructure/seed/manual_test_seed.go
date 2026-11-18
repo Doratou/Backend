@@ -265,7 +265,7 @@ func SeedManualTestData(ctx context.Context, db database.Database, h hasher.Hash
 
 	// --- Group 8: Archived / Inactive Group (for testing group freeze and read-only guards) ---
 	g8Desc := "گروه آرشیو و فریز شده پس از پایان مسابقات هکاتون (وضعیت: غیرفعال)"
-	g8, err := getOrCreateGroup(gdb, "هکاتون استارتاپی پاییز ۱۴۰۲", &g8Desc, primaryUserID, enum.GroupStatusInactive, &sevenDaysAgo)
+	g8, err := getOrCreateGroup(gdb, "هکاتون استارتاپی پاییز ۱۴۰۲", &g8Desc, primaryUserID, enum.GroupStatusSettling, &sevenDaysAgo)
 	if err != nil {
 		return fmt.Errorf("seed group 8: %w", err)
 	}

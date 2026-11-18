@@ -172,6 +172,9 @@ func (r *inviteRepository) CreateLink(ctx context.Context, groupID, creatorUserI
 			return err
 		}
 
+		if group.Status == enum.GroupStatusClosed {
+			return exception.ErrGroupClosed
+		}
 		var activeInvite entity.LinkInvite
 		err := tx.Where("group_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) AND (max_uses IS NULL OR used_count < max_uses)", groupID).
 			First(&activeInvite).Error
@@ -234,51 +237,57 @@ func (r *inviteRepository) FindLinkByTokenHash(ctx context.Context, tokenHash st
 }
 
 func (r *inviteRepository) RevokeLink(ctx context.Context, groupID, inviteID int64) error {
-	result := r.getDB(ctx).Model(&entity.LinkInvite{}).Where("group_id = ? AND id = ? AND revoked_at IS NULL", groupID, inviteID).
-		Update("revoked_at", gorm.Expr("CURRENT_TIMESTAMP"))
-	if result.Error != nil {
-		return exception.Wrap(exception.ErrInternal, result.Error)
-	}
-	if result.RowsAffected == 0 {
-		if _, err := r.FindLinkByID(ctx, groupID, inviteID); err != nil {
-			return err
+	return r.withOpenGroup(ctx, groupID, func(tx *gorm.DB) error {
+		result := tx.Model(&entity.LinkInvite{}).Where("group_id = ? AND id = ? AND revoked_at IS NULL", groupID, inviteID).
+			Update("revoked_at", gorm.Expr("CURRENT_TIMESTAMP"))
+		if result.Error != nil {
+			return exception.Wrap(exception.ErrInternal, result.Error)
 		}
-	}
-	return nil
+		if result.RowsAffected == 0 {
+			if _, err := r.FindLinkByID(ctx, groupID, inviteID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *inviteRepository) UpdateLinkPassword(ctx context.Context, groupID, inviteID int64, passwordHash string) error {
-	result := r.getDB(ctx).Model(&entity.LinkInvite{}).Where("group_id = ? AND id = ?", groupID, inviteID).
-		Update("password_hash", passwordHash)
-	if result.Error != nil {
-		return exception.Wrap(exception.ErrInternal, result.Error)
-	}
-	if result.RowsAffected == 0 {
-		if _, err := r.FindLinkByID(ctx, groupID, inviteID); err != nil {
-			return err
+	return r.withOpenGroup(ctx, groupID, func(tx *gorm.DB) error {
+		result := tx.Model(&entity.LinkInvite{}).Where("group_id = ? AND id = ?", groupID, inviteID).
+			Update("password_hash", passwordHash)
+		if result.Error != nil {
+			return exception.Wrap(exception.ErrInternal, result.Error)
 		}
-	}
-	return nil
+		if result.RowsAffected == 0 {
+			if _, err := r.FindLinkByID(ctx, groupID, inviteID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *inviteRepository) UpdateLink(ctx context.Context, invite *entity.LinkInvite) error {
-	updates := map[string]interface{}{}
-	if invite.ExpiresAt != nil {
-		updates["expires_at"] = invite.ExpiresAt
-	}
-	if invite.MaxUses != nil {
-		updates["max_uses"] = invite.MaxUses
-	}
-	result := r.getDB(ctx).Model(&entity.LinkInvite{}).Where("group_id = ? AND id = ?", invite.GroupID, invite.ID).Updates(updates)
-	if result.Error != nil {
-		return exception.Wrap(exception.ErrInternal, result.Error)
-	}
-	if result.RowsAffected == 0 {
-		if _, err := r.FindLinkByID(ctx, invite.GroupID, invite.ID); err != nil {
-			return err
+	return r.withOpenGroup(ctx, invite.GroupID, func(tx *gorm.DB) error {
+		updates := map[string]interface{}{}
+		if invite.ExpiresAt != nil {
+			updates["expires_at"] = invite.ExpiresAt
 		}
-	}
-	return nil
+		if invite.MaxUses != nil {
+			updates["max_uses"] = invite.MaxUses
+		}
+		result := tx.Model(&entity.LinkInvite{}).Where("group_id = ? AND id = ?", invite.GroupID, invite.ID).Updates(updates)
+		if result.Error != nil {
+			return exception.Wrap(exception.ErrInternal, result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if _, err := r.FindLinkByID(ctx, invite.GroupID, invite.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *inviteRepository) JoinGroupWithLink(ctx context.Context, inviteID, userID int64) (int64, error) {
@@ -351,4 +360,21 @@ func (r *inviteRepository) JoinGroupWithLink(ctx context.Context, inviteID, user
 		return 0, exception.Wrap(exception.ErrInternal, err)
 	}
 	return groupID, nil
+}
+
+func (r *inviteRepository) withOpenGroup(ctx context.Context, groupID int64, fn func(*gorm.DB) error) error {
+	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var group entity.Group
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&group, groupID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return exception.ErrGroupNotFound
+			}
+			return err
+		}
+		if group.Status == enum.GroupStatusClosed {
+			return exception.ErrGroupClosed
+		}
+		return fn(tx)
+	})
+	return settlementPersistenceError(err)
 }
