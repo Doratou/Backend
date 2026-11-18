@@ -202,6 +202,22 @@ func (h *UserHandler) FindByFriendCode(c *gin.Context) {
 	success(c, http.StatusOK, response)
 }
 
+// RegenerateFriendCode handles POST /api/v1/users/me/friend-code/regenerate
+func (h *UserHandler) RegenerateFriendCode(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	response, err := h.userService.RegenerateFriendCode(c.Request.Context(), userID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, response)
+}
+
 // ==========================================
 // Admin Endpoints
 // ==========================================

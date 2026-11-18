@@ -30,6 +30,7 @@ func RegisterUserRoutes(rg *gin.RouterGroup, userHandler *handler.UserHandler, a
 		users.POST("/me/wallet/top-up", userHandler.TopUpWallet)
 
 		users.GET("/by-friend-code/:friendCode", userHandler.FindByFriendCode)
+		users.POST("/me/friend-code/regenerate", userHandler.RegenerateFriendCode)
 		users.GET("/:id", userHandler.GetUserByID)
 	}
 

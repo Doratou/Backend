@@ -1,0 +1,25 @@
+meta {
+  name: 12. Regenerate Friend Code
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/users/me/friend-code/regenerate
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+docs {
+  # Regenerate Friend Code
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/users/me/friend-code/regenerate`
+  **Auth:** Bearer access token
+
+  Generates a new unique `friend_code` for the authenticated user using PostgreSQL's `generate_user_friend_code()` function and returns the updated user profile.
+}
