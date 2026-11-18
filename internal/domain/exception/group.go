@@ -15,7 +15,7 @@ var (
 	ErrDomainGroupTransferTargetNotMember = errors.New("new group owner must be an active member")
 	ErrDomainAlreadyGroupMember           = errors.New("user is already an active group member")
 	ErrDomainGroupInactive                = errors.New("group is inactive")
-	ErrDomainGroupMustBeInactiveToClone   = errors.New("only inactive groups can be cloned")
+	ErrDomainGroupMustBeInactiveToClone   = errors.New("only SETTLING or CLOSED groups can be cloned")
 )
 
 // Group & Group member
@@ -33,9 +33,9 @@ var (
 	ErrGroupInvalidID               = &AppError{Code: "GROUP_INVALID_ID", Message: "groupID must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidMemberID         = &AppError{Code: "GROUP_INVALID_MEMBER_ID", Message: "memberID must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidPagination       = &AppError{Code: "GROUP_INVALID_PAGINATION", Message: "page must be a positive integer and limit must be an integer from 1 to 100", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
-	ErrGroupInvalidStatus           = &AppError{Code: "GROUP_INVALID_STATUS", Message: "status must be ACTIVE or INACTIVE", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrGroupInvalidStatus           = &AppError{Code: "GROUP_INVALID_STATUS", Message: "status must be ACTIVE, SETTLING or CLOSED", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidTransferOwner    = &AppError{Code: "GROUP_INVALID_TRANSFER_OWNER", Message: "new_owner_id must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrAlreadyGroupMember           = &AppError{Code: "ALREADY_GROUP_MEMBER", Message: "you are already an active member of this group", HTTPStatus: http.StatusConflict, Err: ErrDomainAlreadyGroupMember}
 	ErrGroupInactive                = &AppError{Code: "GROUP_INACTIVE", Message: "group is inactive and cannot accept new members", HTTPStatus: http.StatusConflict, Err: ErrDomainGroupInactive}
-	ErrGroupMustBeInactiveToClone   = &AppError{Code: "GROUP_MUST_BE_INACTIVE_TO_CLONE", Message: "only inactive groups can be cloned", HTTPStatus: http.StatusConflict, Err: ErrDomainGroupMustBeInactiveToClone}
+	ErrGroupMustBeInactiveToClone   = &AppError{Code: "GROUP_MUST_BE_INACTIVE_TO_CLONE", Message: "only SETTLING or CLOSED groups can be cloned", HTTPStatus: http.StatusConflict, Err: ErrDomainGroupMustBeInactiveToClone}
 )

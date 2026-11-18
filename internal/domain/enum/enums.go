@@ -34,17 +34,17 @@ func (u UserStatus) IsValid() bool {
 	}
 }
 
-// GroupStatus enum values: "ACTIVE", "INACTIVE".
 type GroupStatus string
 
 const (
 	GroupStatusActive   GroupStatus = "ACTIVE"
-	GroupStatusInactive GroupStatus = "INACTIVE"
+	GroupStatusSettling GroupStatus = "SETTLING"
+	GroupStatusClosed   GroupStatus = "CLOSED"
 )
 
 func (g GroupStatus) IsValid() bool {
 	switch g {
-	case GroupStatusActive, GroupStatusInactive:
+	case GroupStatusActive, GroupStatusSettling, GroupStatusClosed:
 		return true
 	default:
 		return false
@@ -298,3 +298,37 @@ func (l LuckyDrawStatus) IsValid() bool {
 		return false
 	}
 }
+
+type SettlementStatus string
+
+const (
+	SettlementStatusPending  SettlementStatus = "PENDING"
+	SettlementStatusSuccess  SettlementStatus = "SUCCESS"
+	SettlementStatusReject   SettlementStatus = "REJECT"
+	SettlementStatusCanceled SettlementStatus = "CANCELED"
+)
+
+func (s SettlementStatus) IsValid() bool {
+	switch s {
+	case SettlementStatusPending, SettlementStatusSuccess, SettlementStatusReject, SettlementStatusCanceled:
+		return true
+	default:
+		return false
+	}
+}
+
+type SettlementDirection string
+
+const (
+	SettlementDirectionAll      SettlementDirection = "all"
+	SettlementDirectionIncoming SettlementDirection = "incoming"
+	SettlementDirectionOutgoing SettlementDirection = "outgoing"
+)
+
+func (s SettlementDirection) IsValid() bool {
+	return s == SettlementDirectionAll || s == SettlementDirectionIncoming || s == SettlementDirectionOutgoing
+}
+
+type SettlementCancelReason string
+
+const SettlementCancelReasonRecipientLeft SettlementCancelReason = "RECIPIENT_LEFT"
