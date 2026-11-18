@@ -1,0 +1,86 @@
+meta {
+  name: 02. Get Weather Forecast
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{hamyarGroupId}}/hamyar/weather?lat=35.6892&lng=51.3890
+  body: none
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Authentication
+
+  `GET /api/v1/groups/{groupID}/hamyar/weather?lat=<latitude>&lng=<longitude>` — requires a Bearer access token; requester must own the group.
+
+  Returns the current conditions and a 7-day forecast from Open-Meteo for the given WGS84 coordinates. Daily values use local dates for the coordinate's resolved timezone. Temperatures are Celsius, wind speed is km/h, and precipitation is mm.
+
+  ## Query parameters
+
+  | Parameter | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `lat` | `number` | Yes | Latitude from -90 through 90. |
+  | `lng` | `number` | Yes | Longitude from -180 through 180. |
+
+  ## Successful response
+
+  **`200 OK`** — includes current temperature, WMO weather code, wind speed, and daily maximum/minimum temperatures, maximum precipitation probability, precipitation sum, and weather code for each forecast date.
+
+  ```json
+  {
+    "latitude": 35.69,
+    "longitude": 51.39,
+    "timezone": "Asia/Tehran",
+    "timezone_abbreviation": "IRST",
+    "current": {
+      "time": "2026-11-17T12:00",
+      "temperature_2m": 12.4,
+      "weather_code": 3,
+      "wind_speed_10m": 8.2
+    },
+    "current_units": {
+      "temperature_2m": "°C",
+      "weather_code": "wmo code",
+      "wind_speed_10m": "km/h"
+    },
+    "daily": {
+      "time": ["2026-11-17"],
+      "temperature_2m_max": [15.1],
+      "temperature_2m_min": [8.0],
+      "precipitation_probability_max": [10],
+      "precipitation_sum": [0.0],
+      "weather_code": [3]
+    },
+    "daily_units": {
+      "temperature_2m_max": "°C",
+      "temperature_2m_min": "°C",
+      "precipitation_probability_max": "%",
+      "precipitation_sum": "mm",
+      "weather_code": "wmo code"
+    }
+  }
+  ```
+
+  ## Errors
+
+  - `400` — `lat` or `lng` is missing, not numeric, or outside its valid coordinate range.
+  - `401` — access token is missing or invalid.
+  - `403` — requester is not the owner of the specified group.
+  - `502` — Open-Meteo is unavailable or returns an unsuccessful response.
+}
