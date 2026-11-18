@@ -14,6 +14,7 @@ import (
 
 	"github.com/Doratou/Backend/bootstrap"
 	"github.com/Doratou/Backend/internal/application/service"
+	"github.com/Doratou/Backend/internal/infrastructure/ai"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	emailInfra "github.com/Doratou/Backend/internal/infrastructure/email"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
@@ -23,6 +24,7 @@ import (
 	redisRepo "github.com/Doratou/Backend/internal/infrastructure/repository/redis"
 	"github.com/Doratou/Backend/internal/infrastructure/seed"
 	"github.com/Doratou/Backend/internal/infrastructure/storage"
+	weatherInfra "github.com/Doratou/Backend/internal/infrastructure/weather"
 	"github.com/Doratou/Backend/internal/presentation/v1/handler"
 	"github.com/Doratou/Backend/internal/presentation/v1/router"
 	"github.com/Doratou/Backend/pkg/captcha"
@@ -206,6 +208,10 @@ func main() {
 		adminReportRepo,
 		userRepo,
 	)
+	weatherService := service.NewWeatherService(weatherInfra.NewOpenMeteoClient())
+	tripSuggestionService := service.NewTripSuggestionService(ai.NewAvalAIClient(ai.AvalAIConfig{
+		APIKey: cfg.Environment.AvalAI.APIKey, BaseURL: cfg.Environment.AvalAI.BaseURL, Model: cfg.Environment.AvalAI.Model,
+	}), weatherService)
 
 	attachmentService := service.NewAttachmentService(
 		attachmentRepo,
@@ -228,6 +234,7 @@ func main() {
 	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
 
 	adminReportHandler := handler.NewAdminReportHandler(adminReportService)
+	hamyarHandler := handler.NewHamyarHandler(tripSuggestionService, weatherService, groupService)
 
 	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
@@ -245,6 +252,7 @@ func main() {
 		FriendshipHandler:  friendshipHandler,
 		PollHandler:        pollHandler,
 		LuckyDrawHandler:   luckyDrawHandler,
+		HamyarHandler:      hamyarHandler,
 		CaptchaService:     captchaService,
 		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
 		TokenMaker:         jwtMaker,
