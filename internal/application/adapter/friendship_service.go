@@ -13,5 +13,6 @@ type FriendshipService interface {
 	RejectRequest(ctx context.Context, userID, requestID int64) (*dto.FriendRequestStatusResponse, error)
 	CancelRequest(ctx context.Context, userID, requestID int64) error
 	ListFriends(ctx context.Context, userID int64, req dto.ListFriendsRequest) (*dto.FriendListResponse, error)
+	ListMutualGroups(ctx context.Context, userID, friendshipID int64, req dto.ListFriendsRequest) (*dto.PaginatedResponse[dto.MutualGroupResponse], error)
 	RemoveFriend(ctx context.Context, userID, friendshipID int64) error
 }

@@ -250,11 +250,13 @@ func main() {
 	)
 	settlementService := service.NewSettlementService(settlementRepo, userRepo, dbTrxManager, attachmentService)
 	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
-	checklistService := service.NewChecklistService(checklistRepo, dbTrxManager, database.NewReadSnapshotTrxManager(postgresDB), attachmentService)
+	readTrxManager := database.NewReadSnapshotTrxManager(postgresDB)
+	checklistService := service.NewChecklistService(checklistRepo, dbTrxManager, readTrxManager, attachmentService)
 	friendshipService := service.NewFriendshipService(
 		friendshipRepo,
 		userRepo,
 		dbTrxManager,
+		readTrxManager,
 		attachmentService,
 		service.FriendshipServiceConfig{
 			RequestCooldown: cfg.Environment.Friendship.RequestCooldown,

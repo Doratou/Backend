@@ -24,6 +24,7 @@ type friendshipService struct {
 	friendshipRepo domain_db.FriendshipRepository
 	userRepo       domain_db.UserRepository
 	dbTrx          database.TrxManager
+	readTrx        database.TrxManager
 	attachmentURLs adapter.AttachmentURLResolver
 	cfg            FriendshipServiceConfig
 }
@@ -31,7 +32,7 @@ type friendshipService struct {
 func NewFriendshipService(
 	friendshipRepo domain_db.FriendshipRepository,
 	userRepo domain_db.UserRepository,
-	dbTrx database.TrxManager,
+	dbTrx, readTrx database.TrxManager,
 	attachmentURLs adapter.AttachmentURLResolver,
 	cfg FriendshipServiceConfig,
 	consts *bootstrap.Constant,
@@ -45,6 +46,7 @@ func NewFriendshipService(
 		friendshipRepo: friendshipRepo,
 		userRepo:       userRepo,
 		dbTrx:          dbTrx,
+		readTrx:        readTrx,
 		attachmentURLs: attachmentURLs,
 		cfg:            cfg,
 	}
@@ -201,6 +203,70 @@ func (s *friendshipService) ListFriends(ctx context.Context, userID int64, req d
 	}, nil
 }
 
+func (s *friendshipService) ListMutualGroups(ctx context.Context, userID, friendshipID int64, req dto.ListFriendsRequest) (*dto.PaginatedResponse[dto.MutualGroupResponse], error) {
+	page, limit, offset, err := friendshipPagination(req.Page, req.Limit)
+	if err != nil || friendshipID <= 0 {
+		return nil, exception.ErrBadRequest
+	}
+
+	var groups []domain_db.MutualGroup
+	var total int64
+	err = s.readTrx.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.ensureActiveUser(txCtx, userID); err != nil {
+			return err
+		}
+		friendship, err := s.friendshipRepo.FindByID(txCtx, friendshipID, false)
+		if err != nil {
+			return err
+		}
+
+		var friendID int64
+		switch userID {
+		case friendship.RequesterUserID:
+			friendID = friendship.ReceiverUserID
+		case friendship.ReceiverUserID:
+			friendID = friendship.RequesterUserID
+		default:
+			return exception.ErrFriendshipForbidden
+		}
+		if friendship.Status != enum.FriendshipStatusAccepted {
+			return exception.ErrFriendshipInvalidStatus
+		}
+
+		groups, total, err = s.friendshipRepo.FindMutualGroups(txCtx, userID, friendID, limit, offset)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	coverIDs := make([]int64, 0, len(groups))
+	for _, group := range groups {
+		if group.CoverAttachmentID != nil {
+			coverIDs = append(coverIDs, *group.CoverAttachmentID)
+		}
+	}
+	coverURLs, err := s.resolveAttachmentURLs(ctx, userID, coverIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]dto.MutualGroupResponse, 0, len(groups))
+	for _, group := range groups {
+		item := dto.MutualGroupResponse{ID: group.ID, Title: group.Title, MemberCount: group.MemberCount}
+		if group.CoverAttachmentID != nil {
+			if url := coverURLs[*group.CoverAttachmentID]; url != "" {
+				item.CoverURL = &url
+			}
+		}
+		items = append(items, item)
+	}
+	return &dto.PaginatedResponse[dto.MutualGroupResponse]{
+		Items:      items,
+		Pagination: dto.PaginationResponse{Page: page, Limit: limit, Total: total},
+	}, nil
+}
+
 func (s *friendshipService) resolveAvatarURLs(ctx context.Context, userID int64, friendships []*entity.Friendship) (map[int64]string, error) {
 	ids := make([]int64, 0, len(friendships))
 	seen := make(map[int64]struct{})
@@ -217,6 +283,10 @@ func (s *friendshipService) resolveAvatarURLs(ctx context.Context, userID int64,
 			ids = append(ids, id)
 		}
 	}
+	return s.resolveAttachmentURLs(ctx, userID, ids)
+}
+
+func (s *friendshipService) resolveAttachmentURLs(ctx context.Context, userID int64, ids []int64) (map[int64]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -243,7 +313,7 @@ func (s *friendshipService) respondToRequest(ctx context.Context, userID, reques
 	var friendship *entity.Friendship
 	err := s.dbTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
 		var err error
-		friendship, err = s.friendshipRepo.FindByID(trxCtx, requestID)
+		friendship, err = s.friendshipRepo.FindByID(trxCtx, requestID, true)
 		if err != nil {
 			return err
 		}
@@ -276,7 +346,7 @@ func (s *friendshipService) deleteFriendship(ctx context.Context, userID, friend
 	}
 
 	return s.dbTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
-		friendship, err := s.friendshipRepo.FindByID(trxCtx, friendshipID)
+		friendship, err := s.friendshipRepo.FindByID(trxCtx, friendshipID, true)
 		if err != nil {
 			return err
 		}

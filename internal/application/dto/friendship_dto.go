@@ -75,6 +75,13 @@ type FriendListResponse struct {
 	Pagination FriendshipPaginationResponse `json:"pagination"`
 }
 
+type MutualGroupResponse struct {
+	ID          int64   `json:"id"`
+	Title       string  `json:"title"`
+	CoverURL    *string `json:"cover_url"`
+	MemberCount int64   `json:"member_count"`
+}
+
 func ToFriendRequestResponse(friendship *entity.Friendship) FriendRequestResponse {
 	return FriendRequestResponse{
 		ID:              friendship.ID,

@@ -40,6 +40,7 @@ docs {
   2. Look up the other user's full friend code, show the returned public name/avatar, and send receiver_user_id=data.id only after the user confirms.
   3. Use the recipient's session for Accept/Reject and the sender's session for Cancel. Either participant may Remove an accepted friendship.
   4. Refresh lists after an action. A relationship ID is reused after an allowed resend; the same ID can later have a new direction and request time.
+  5. When a user opens a friend's shared groups, use that item's friendship_id with List Mutual Groups. Render the returned group's title, cover_url, and member_count. Use id to open the group.
 
   Friend and pending-request summaries include `avatar_attachment_id` and `avatar_url`. Render the URL directly and use a fallback for null values. Each List Friends item also includes `mutual_group_count` across `ACTIVE`, `SETTLING`, and `CLOSED` groups where both users are active members. Deleted groups and former memberships are excluded.
 
