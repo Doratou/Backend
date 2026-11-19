@@ -34,7 +34,7 @@ docs {
 
   Payments cannot be edited. Only the active sender may soft-delete PENDING. Only the active recipient may confirm/reject PENDING. Confirmation records a successful external payment; this endpoint does not perform a bank transfer. Rejection/cancellation never count as successful payments. Owner/admin cannot override either party.
 
-  A sender who leaves loses access; their existing PENDING payment remains answerable by its active recipient. If the recipient leaves/is removed before responding, incoming PENDING payments become CANCELED atomically with `cancel_reason=RECIPIENT_LEFT`. Rejoining does not revive them. Former-member financial relationships are outside the active-member balance calculation; history remains stored. `is_external` is true when either party currently has inactive membership/left_at. Membership status values remain ACTIVE/INACTIVE.
+  A sender who leaves loses access; their existing PENDING payment remains answerable by its active recipient. If the recipient leaves/is removed before responding, incoming PENDING payments become `CANCELED` and record `canceled_at` in the same transaction. Rejoining does not revive them. Former-member financial relationships are outside the active-member balance calculation; history remains stored. `is_external` is true when either party currently has inactive membership/left_at. Membership status values remain ACTIVE/INACTIVE.
 
   IDs are manual environment variables. No response script sets or overwrites settlement IDs. Set settlementGroupId, settlementToMemberId (from Get Group Members), settlementId, and settlementAttachmentIds yourself. Auth login/refresh keeps its existing token behavior.
 
@@ -53,7 +53,6 @@ docs {
   | amount_toman | Positive signed BIGINT integer in TOMAN. |
   | paid_at | User-supplied RFC3339 external payment date, or server time when omitted/null. |
   | confirmed_at / rejected_at / canceled_at | Server decision time; other outcome timestamps stay null. |
-  | cancel_reason | null or RECIPIENT_LEFT. |
   | created_at / updated_at | Registration time / last state change time. |
   | is_frozen | True only when the group is CLOSED. |
   | is_external | Either party has left/is no longer active; retained history. |
@@ -90,7 +89,6 @@ docs {
       "confirmed_at": "2026-11-18T10:05:00Z",
       "rejected_at": null,
       "canceled_at": null,
-      "cancel_reason": null,
       "created_at": "2026-11-18T10:00:00Z",
       "updated_at": "2026-11-18T10:05:00Z",
       "is_frozen": false,

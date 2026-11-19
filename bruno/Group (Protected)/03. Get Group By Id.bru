@@ -32,7 +32,7 @@ docs {
 
   ## Description
 
-  Returns group details, active members with their roles, and invitation links.
+  Returns group details and active members with their roles. Group `status` is `ACTIVE`, `SETTLING`, or `CLOSED`. The response includes `archived_at` or `closed_at` when the corresponding timestamp is set.
 
   ## Request
 
@@ -58,16 +58,17 @@ docs {
       "id": 42,
       "title": "Weekend trip",
       "created_by_user_id": 7,
-      "status": "ACTIVE",
+      "status": "CLOSED",
       "is_premium": false,
+      "archived_at": "2026-11-05T10:00:00Z",
+      "closed_at": "2026-11-06T10:00:00Z",
       "created_at": "2026-11-04T10:00:00Z",
-      "updated_at": "2026-11-04T10:00:00Z",
+      "updated_at": "2026-11-06T10:00:00Z",
       "member_count": 2,
       "members": [
         {"member_id": 11, "user_id": 7, "name": "Owner", "role": "OWNER", "joined_at": "2026-11-04T10:00:00Z"},
         {"member_id": 12, "user_id": 8, "name": "Member", "role": "MEMBER", "joined_at": "2026-11-04T10:10:00Z"}
-      ],
-      "invites": []
+      ]
     }
   }
   ```

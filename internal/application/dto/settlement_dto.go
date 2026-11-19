@@ -34,30 +34,29 @@ type SettlementWarning struct {
 }
 
 type SettlementResponse struct {
-	ID            int64                        `json:"id"`
-	GroupID       int64                        `json:"group_id"`
-	FromMemberID  int64                        `json:"from_member_id"`
-	ToMemberID    int64                        `json:"to_member_id"`
-	FromMember    SettlementMemberResponse     `json:"from_member"`
-	ToMember      SettlementMemberResponse     `json:"to_member"`
-	AmountToman   int64                        `json:"amount_toman"`
-	Status        enum.SettlementStatus        `json:"status"`
-	Note          *string                      `json:"note"`
-	PaidAt        time.Time                    `json:"paid_at"`
-	ConfirmedAt   *time.Time                   `json:"confirmed_at"`
-	RejectedAt    *time.Time                   `json:"rejected_at"`
-	CanceledAt    *time.Time                   `json:"canceled_at"`
-	CancelReason  *enum.SettlementCancelReason `json:"cancel_reason"`
-	CreatedAt     time.Time                    `json:"created_at"`
-	UpdatedAt     time.Time                    `json:"updated_at"`
-	IsFrozen      bool                         `json:"is_frozen"`
-	IsExternal    bool                         `json:"is_external"`
-	CanConfirm    bool                         `json:"can_confirm"`
-	CanReject     bool                         `json:"can_reject"`
-	CanDelete     bool                         `json:"can_delete"`
-	AttachmentIDs []int64                      `json:"attachment_ids"`
-	Attachments   []ExpenseAttachmentResponse  `json:"attachments"`
-	Warnings      []SettlementWarning          `json:"warnings"`
+	ID            int64                       `json:"id"`
+	GroupID       int64                       `json:"group_id"`
+	FromMemberID  int64                       `json:"from_member_id"`
+	ToMemberID    int64                       `json:"to_member_id"`
+	FromMember    SettlementMemberResponse    `json:"from_member"`
+	ToMember      SettlementMemberResponse    `json:"to_member"`
+	AmountToman   int64                       `json:"amount_toman"`
+	Status        enum.SettlementStatus       `json:"status"`
+	Note          *string                     `json:"note"`
+	PaidAt        time.Time                   `json:"paid_at"`
+	ConfirmedAt   *time.Time                  `json:"confirmed_at"`
+	RejectedAt    *time.Time                  `json:"rejected_at"`
+	CanceledAt    *time.Time                  `json:"canceled_at"`
+	CreatedAt     time.Time                   `json:"created_at"`
+	UpdatedAt     time.Time                   `json:"updated_at"`
+	IsFrozen      bool                        `json:"is_frozen"`
+	IsExternal    bool                        `json:"is_external"`
+	CanConfirm    bool                        `json:"can_confirm"`
+	CanReject     bool                        `json:"can_reject"`
+	CanDelete     bool                        `json:"can_delete"`
+	AttachmentIDs []int64                     `json:"attachment_ids"`
+	Attachments   []ExpenseAttachmentResponse `json:"attachments"`
+	Warnings      []SettlementWarning         `json:"warnings"`
 }
 
 type SettlementListResponse struct {
@@ -70,7 +69,7 @@ func ToSettlementResponse(payment *entity.Settlement, group *entity.Group, membe
 	pending := payment.Status == enum.SettlementStatusPending && !frozen
 	res := SettlementResponse{ID: payment.ID, GroupID: payment.GroupID, FromMemberID: payment.FromMemberID, ToMemberID: payment.ToMemberID,
 		AmountToman: payment.AmountToman, Status: payment.Status, Note: payment.Note, PaidAt: payment.PaidAt, ConfirmedAt: payment.ConfirmedAt, RejectedAt: payment.RejectedAt,
-		CanceledAt: payment.CanceledAt, CancelReason: payment.CancelReason, CreatedAt: payment.CreatedAt, UpdatedAt: payment.UpdatedAt,
+		CanceledAt: payment.CanceledAt, CreatedAt: payment.CreatedAt, UpdatedAt: payment.UpdatedAt,
 		IsFrozen: frozen, CanConfirm: pending && member.ID == payment.ToMemberID, CanReject: pending && member.ID == payment.ToMemberID, CanDelete: pending && member.ID == payment.FromMemberID,
 		AttachmentIDs: make([]int64, 0, len(payment.Attachments)), Attachments: make([]ExpenseAttachmentResponse, 0, len(payment.Attachments)), Warnings: make([]SettlementWarning, 0)}
 	for _, pair := range []struct {

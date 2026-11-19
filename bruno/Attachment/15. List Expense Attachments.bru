@@ -35,7 +35,7 @@ docs {
 
   Retrieves all attachments tied to a specific expense (such as receipt images, PDF invoices, and payment confirmations).
 
-  EXPENSE_RECEIPT is never publicly readable through these APIs. An unbound receipt is accessible only to its uploader. A linked receipt requires an ACTIVE account and ACTIVE membership with left_at=null in the expense group, including when the uploader is requesting it; former members lose access. Inactive groups still allow receipt reads. Site ADMIN alone grants no bypass. Signed URLs already issued remain usable until expiry.
+  EXPENSE_RECEIPT is never publicly readable through these APIs. An unbound receipt is accessible only to its uploader. A linked receipt requires an ACTIVE account and ACTIVE membership with left_at=null in the expense group, including when the uploader is requesting it; former members lose access. `SETTLING` and `CLOSED` groups still allow receipt reads. Site ADMIN alone grants no bypass. Signed URLs already issued remain usable until expiry.
 
   ## Request
 

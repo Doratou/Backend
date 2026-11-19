@@ -15,7 +15,7 @@ docs {
 
   Payments cannot be edited. Only the active sender may soft-delete PENDING. Only the active recipient may confirm/reject PENDING. Confirmation records a successful external payment; this endpoint does not perform a bank transfer. Rejection/cancellation never count as successful payments. Owner/admin cannot override either party.
 
-  A sender who leaves loses access; their existing PENDING payment remains answerable by its active recipient. If the recipient leaves/is removed before responding, incoming PENDING payments become CANCELED atomically with `cancel_reason=RECIPIENT_LEFT`. Rejoining does not revive them. Former-member financial relationships are outside the active-member balance calculation; history remains stored. `is_external` is true when either party currently has inactive membership/left_at. Membership status values remain ACTIVE/INACTIVE.
+  A sender who leaves loses access; their existing PENDING payment remains answerable by its active recipient. If the recipient leaves/is removed before responding, incoming PENDING payments become `CANCELED` and record `canceled_at` in the same transaction. Rejoining does not revive them. Former-member financial relationships are outside the active-member balance calculation; history remains stored. `is_external` is true when either party currently has inactive membership/left_at. Membership status values remain ACTIVE/INACTIVE.
 
   IDs are manual environment variables. No response script sets or overwrites settlement IDs. Set settlementGroupId, settlementToMemberId (from Get Group Members), settlementId, and settlementAttachmentIds yourself. Auth login/refresh keeps its existing token behavior.
 
@@ -27,7 +27,7 @@ docs {
   3. Create Settlement, copy data.id into settlementId yourself. Check A outgoing and B incoming lists in separate Bruno/Postman sessions.
   4. Check C/owner cannot see this pending record or its receipt. B can confirm or reject; only A can delete while pending.
   5. Confirm one payment, reject a second, delete a third. Confirm/reject history and receipts become visible to C; deleted records disappear. No final record can be edited/deleted.
-  6. Try a sender leaving after Create: B can still confirm. Try recipient leaving/removal: payment becomes CANCELED, cancel_reason=RECIPIENT_LEFT, even if B later rejoins.
+  6. Try a sender leaving after Create: B can still confirm. Try recipient leaving/removal: payment becomes `CANCELED` with `canceled_at` set and stays canceled if B rejoins.
   7. Move group ACTIVE -> SETTLING: settlement writes still work, expense/poll/draw writes stop. Resolve all pending payments, then move SETTLING -> CLOSED: all settlement writes stop. Reopening is not supported by this workflow.
 
   ## Receipt privacy

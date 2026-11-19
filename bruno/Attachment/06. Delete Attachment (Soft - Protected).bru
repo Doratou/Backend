@@ -35,7 +35,7 @@ docs {
 
   Performs a soft delete on an attachment record. The metadata record is marked as deleted in PostgreSQL, but the physical file object remains in RustFS / S3 storage.
 
-  For EXPENSE_RECEIPT, an unbound receipt can be deleted only by its active uploader. A linked receipt can be deleted only by the active expense creator or current group owner with active membership; former members cannot delete, and an inactive group blocks deletion with 409 EXPENSE_GROUP_INACTIVE. Other active members get 403 EXPENSE_EDITOR_REQUIRED. This receipt-specific rule overrides the general uploader/moderator rule below.
+  For EXPENSE_RECEIPT, an unbound receipt can be deleted only by its active uploader. A linked receipt can be deleted only by the active expense creator or current group owner with active membership; former members cannot delete, and a `SETTLING` or `CLOSED` group blocks deletion with 409 EXPENSE_GROUP_INACTIVE. Other active members get 403 EXPENSE_EDITOR_REQUIRED. This receipt-specific rule overrides the general uploader/moderator rule below.
 
   ## Request
 

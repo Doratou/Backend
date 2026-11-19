@@ -79,7 +79,7 @@ docs {
   | --- | --- | --- | --- |
   | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Missing file, invalid form, or expense_id supplied for EXPENSE_RECEIPT. |
   | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | Unsupported receipt format. |
-  | 400 | `GROUP_INVALID_STATUS` | `status must be ACTIVE, SETTLING or CLOSED` | Supplied group is inactive; this existing attachment error/message is reused. |
+  | 400 | `GROUP_INVALID_STATUS` | `status must be ACTIVE, SETTLING or CLOSED` | The supplied group is `SETTLING` or `CLOSED`; uploading a new expense receipt requires an `ACTIVE` group. |
   | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Bearer token. |
   | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid token. |
   | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Expired token. |

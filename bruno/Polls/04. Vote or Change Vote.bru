@@ -133,7 +133,7 @@ docs {
   | 404 | `POLL_NOT_FOUND` | `poll not found` | The poll does not exist, is soft-deleted, or belongs to another group. |
   | 404 | `POLL_OPTION_NOT_FOUND` | `option not found in this poll` | The option does not exist, is deleted, or belongs to another poll. |
   | 409 | `POLL_CLOSED` | `poll is closed and cannot accept vote changes` | The poll is closed; votes cannot be added or changed. |
-  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is inactive; vote changes are frozen. |
+  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is `SETTLING` or `CLOSED`; vote changes are frozen. |
   | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
 
   **Example: 404**

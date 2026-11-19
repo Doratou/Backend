@@ -31,7 +31,13 @@ docs {
 
   Body status is the uppercase case-sensitive enum ACTIVE, SETTLING, CLOSED. Forward transitions: ACTIVE -> SETTLING -> CLOSED. Sending the current state is harmless. Reopening and skipping SETTLING are forbidden. POST /groups/:groupID/archive is retained as an alias for moving to SETTLING.
 
-  ACTIVE permits normal operations. SETTLING freezes expenses/polls/draws while still accepting payment registration/confirmation/rejection/pending deletion. CLOSED freezes writes; active members can read history. Close only after all PENDING payments have been confirmed, rejected, deleted or canceled. Existing INACTIVE group rows migrate to SETTLING; membership ACTIVE/INACTIVE and poll ACTIVE/INACTIVE are unchanged.
+  | Group status | Expense, poll, and draw writes | Payment writes |
+  | --- | --- | --- |
+  | `ACTIVE` | Allowed | Allowed |
+  | `SETTLING` | Frozen | Allowed |
+  | `CLOSED` | Frozen | Frozen |
+
+  Active members can read history in all three states. Close the group after all pending payments have been resolved. Existing group rows with the former status `INACTIVE` migrate to `SETTLING`. Member and poll statuses use their own enums.
 
   200 success envelope with the existing GroupResponse. status contains the new state. archived_at records transition to SETTLING, closed_at records transition to CLOSED (omitted before closure). No settlement is auto-confirmed. Closing a group with remaining net debts is permitted once no PENDING payment remains; this endpoint does not enforce zero debt.
 

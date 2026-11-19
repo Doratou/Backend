@@ -25,7 +25,7 @@ docs {
 
   Returns the full current saved configuration and stored result, if any. The example shows a DRAFT; after Run the same ID returns COMPLETED with result and completed_at. Lists/history do not contain candidates, so use this endpoint to inspect all options.
 
-  Every endpoint requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group. All active members can see the shared draft/history and run the draw. Only the original creator can edit; a group owner or system admin has no editing override. The group must be ACTIVE for Create, Update and Run. Inactive groups remain readable with is_frozen=true.
+  Every endpoint requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group. All active members can see the shared draft/history and run the draw. Only the original creator can edit; a group owner or system admin has no editing override. The group must be ACTIVE for Create, Update and Run. Draws in `SETTLING` or `CLOSED` groups remain readable with `is_frozen=true`.
 
   A group has at most one non-deleted DRAFT. Completing it makes room for a new draft. There are no delete, cancel, reset or new-winner rerun routes. Run retries return the original result and completed_at while the group is active. Update and Run lock the same row; concurrent Run calls cannot store different winners. Always animate using the final candidates and zero-based result.index returned by Run.
 
@@ -58,7 +58,7 @@ docs {
   | `groupID` | Positive group ID; Bruno variable drawGroupId. |
   | `drawID` | Positive draw ID in this group; Bruno variable drawId. Not present on Create/List. |
 
-  All path IDs are integers from 1 to 9223372036854775807. Authentication and HTTP input validation run before business checks. For writes, an inactive group can return DRAW_GROUP_INACTIVE before missing-draw or creator/state errors.
+  All path IDs are integers from 1 to 9223372036854775807. Authentication and HTTP input validation run before business checks. For writes, a `SETTLING` or `CLOSED` group can return `DRAW_GROUP_INACTIVE` before missing-draw or creator/state errors.
 
   No request body is required.
 

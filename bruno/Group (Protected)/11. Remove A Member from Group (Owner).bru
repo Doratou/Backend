@@ -50,7 +50,7 @@ docs {
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | `Bearer <access-token>` |
   
-  Incoming PENDING settlements to the departing member are canceled atomically with status=CANCELED and cancel_reason=RECIPIENT_LEFT. Outgoing PENDING settlements remain answerable by their active recipients. Final history remains. CLOSED groups are read-only (409 GROUP_CLOSED).
+  Incoming PENDING settlements to the departing member are canceled atomically with `status=CANCELED` and `canceled_at` set. Outgoing PENDING settlements remain answerable by their active recipients. Final history remains. CLOSED groups are read-only (409 GROUP_CLOSED).
 
   ## Response
   

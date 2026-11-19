@@ -340,7 +340,3 @@ const (
 func (s SettlementDirection) IsValid() bool {
 	return s == SettlementDirectionAll || s == SettlementDirectionIncoming || s == SettlementDirectionOutgoing
 }
-
-type SettlementCancelReason string
-
-const SettlementCancelReasonRecipientLeft SettlementCancelReason = "RECIPIENT_LEFT"

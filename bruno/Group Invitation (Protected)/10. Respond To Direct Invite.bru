@@ -90,6 +90,6 @@ docs {
   - `404 GROUP_NOT_FOUND` — Group was deleted before acceptance.
   - `409 DIRECT_INVITE_NOT_PENDING` — Invitation has already been answered.
   - `409 ALREADY_GROUP_MEMBER` — Recipient is already an active group member.
-  - `409 GROUP_INACTIVE` — Group is inactive and cannot accept members.
+  - `409 GROUP_INACTIVE` — A `SETTLING` or `CLOSED` group cannot accept members.
   - `500 INTERNAL_SERVER_ERROR` — Response could not be saved.
 }

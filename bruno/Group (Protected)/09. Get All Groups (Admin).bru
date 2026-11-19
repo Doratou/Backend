@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/v1/groups/admin?page=1&limit=20
+  url: {{baseUrl}}/api/v1/groups/admin
   body: none
   auth: inherit
 }
@@ -17,6 +17,7 @@ headers {
 params:query {
   page: 1
   limit: 20
+  ~status: ACTIVE
 }
 
 vars:pre-request {
@@ -52,7 +53,7 @@ docs {
   | --- | --- | --- | --- |
   | `page` | `integer` | No | 1-based page number; defaults to 1. |
   | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20. |
-  | `status` | `string` | No | `ACTIVE`, `SETTLING` or `CLOSED`. |
+  | `status` | `string` | No | `ACTIVE`, `SETTLING` or `CLOSED`. Omit to list all three states. |
 
   ## Response
 
