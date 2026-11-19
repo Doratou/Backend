@@ -32,7 +32,7 @@ docs {
 
   ## Description
 
-  Marks the group inactive and records its archive time.
+  Moves ACTIVE to SETTLING and records archived_at. Expenses, polls and draws become read-only, but settlement creation/confirm/reject/pending-delete remain allowed. CLOSED cannot be reopened. Repeating archive on SETTLING is harmless.
 
   ## Request
 
@@ -56,6 +56,8 @@ docs {
   ```
 
   ## Errors
+
+  - `409 GROUP_STATUS_TRANSITION` — A `CLOSED` group cannot move to `SETTLING`.
 
   - `400 GROUP_INVALID_ID` — `groupID` is not a positive integer.
   - `401 MISSING_TOKEN` — Access token is missing or invalid.

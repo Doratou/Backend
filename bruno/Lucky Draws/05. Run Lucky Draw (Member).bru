@@ -25,7 +25,7 @@ docs {
 
   Any active group member may execute the shared DRAFT, even when they are not its creator. No body is required. The server securely selects exactly one winner and stores COMPLETED, the winner index and completed_at. The client animates this stored result; it must not pick a winner itself.
 
-  Every endpoint requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group. All active members can see the shared draft/history and run the draw. Only the original creator can edit; a group owner or system admin has no editing override. The group must be ACTIVE for Create, Update and Run. Inactive groups remain readable with is_frozen=true.
+  Every endpoint requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group. All active members can see the shared draft/history and run the draw. Only the original creator can edit; a group owner or system admin has no editing override. The group must be ACTIVE for Create, Update and Run. Draws in `SETTLING` or `CLOSED` groups remain readable with `is_frozen=true`.
 
   A group has at most one non-deleted DRAFT. Completing it makes room for a new draft. There are no delete, cancel, reset or new-winner rerun routes. Run retries return the original result and completed_at while the group is active. Update and Run lock the same row; concurrent Run calls cannot store different winners. Always animate using the final candidates and zero-based result.index returned by Run.
 
@@ -60,7 +60,7 @@ docs {
   | `groupID` | Positive group ID; Bruno variable drawGroupId. |
   | `drawID` | Positive draw ID in this group; Bruno variable drawId. Not present on Create/List. |
 
-  All path IDs are integers from 1 to 9223372036854775807. Authentication and HTTP input validation run before business checks. For writes, an inactive group can return DRAW_GROUP_INACTIVE before missing-draw or creator/state errors.
+  All path IDs are integers from 1 to 9223372036854775807. Authentication and HTTP input validation run before business checks. For writes, a `SETTLING` or `CLOSED` group can return `DRAW_GROUP_INACTIVE` before missing-draw or creator/state errors.
 
   No request body is required.
 
@@ -145,7 +145,7 @@ docs {
   | 404 | `DRAW_NOT_FOUND` | `lucky draw not found` | The draw is missing, soft-deleted or belongs to a different group. |
   | 404 | `GROUP_NOT_FOUND` | `group not found` | The group is missing or soft-deleted. |
   | 404 | `USER_NOT_FOUND` | `user not found` | The caller account is missing or soft-deleted. |
-  | 409 | `DRAW_GROUP_INACTIVE` | `lucky draws cannot be changed while the group is inactive` | The group is inactive; even a Run retry is rejected until the group is active again. |
+  | 409 | `DRAW_GROUP_INACTIVE` | `lucky draws cannot be changed while the group is inactive` | The group is `SETTLING` or `CLOSED`; Run and its retries are blocked. |
   | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, transaction, randomness or token-blacklist infrastructure fails. Internal details are not returned. |
 
   The error envelope contains success=false, code and error; internal causes are not exposed. Example:

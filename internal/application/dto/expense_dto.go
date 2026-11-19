@@ -51,9 +51,14 @@ type PatchExpenseRequest struct {
 	AttachmentIDs    ExpenseField[[]int64]               `json:"attachment_ids"`
 }
 
-type ListExpensesRequest struct {
+type ExpensePaginationRequest struct {
 	Page  int `form:"page,default=1" binding:"min=1"`
 	Limit int `form:"limit,default=20" binding:"min=1,max=100"`
+}
+
+type ListExpensesRequest struct {
+	ExpensePaginationRequest
+	Scope enum.ExpenseListScope `form:"scope,default=all" binding:"oneof=all created_by_me owed_by_me"`
 }
 
 type ExpenseParticipantResponse struct {

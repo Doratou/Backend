@@ -31,6 +31,12 @@ body:json {
 }
 
 docs {
+  ## Settlement receipt access
+
+  SETTLEMENT_RECEIPT is always private. Unbound files are uploader-only. Bound PENDING/CANCELED files are visible only to the active sender/recipient; SUCCESS/REJECT files are visible to all active group members. Former/inactive members have no access. This applies to metadata, streams, batch URLs, ZIP and group lists. No owner/admin override. Direct deletion of any bound payment receipt returns 409 SETTLEMENT_RECEIPT_LOCKED; delete its PENDING payment first. No receipt edits are supported.
+
+  Upload/confirm omit settlement_id and expense_id; link uploaded IDs through Create Settlement. SETTLING groups allow settlement receipt uploads; CLOSED does not. Presigned confirmation validates actual MIME and size, then creates a separate server-controlled object. Never re-confirm an already registered receipt key. See the Settlements folder for the complete workflow and errors.
+
   # Batch Delete Attachments (Protected)
 
   **Method:** `DELETE`
@@ -41,7 +47,7 @@ docs {
 
   Deletes multiple attachments in bulk. By default performs a soft delete. When `?hard=true` is passed, permanently purges metadata from PostgreSQL and bulk-deletes the physical file objects from RustFS / S3 storage in a single network operation.
 
-  For EXPENSE_RECEIPT, an unbound receipt can be deleted only by its active uploader. A linked receipt can be deleted only by the active expense creator or current group owner with active membership; former members cannot delete, and an inactive group blocks deletion with 409 EXPENSE_GROUP_INACTIVE. Other active members get 403 EXPENSE_EDITOR_REQUIRED. This receipt-specific rule overrides the general uploader/moderator rule below.
+  For EXPENSE_RECEIPT, an unbound receipt can be deleted only by its active uploader. A linked receipt can be deleted only by the active expense creator or current group owner with active membership; former members cannot delete, and a `SETTLING` or `CLOSED` group blocks deletion with 409 EXPENSE_GROUP_INACTIVE. Other active members get 403 EXPENSE_EDITOR_REQUIRED. This receipt-specific rule overrides the general uploader/moderator rule below.
 
   ## Request
 

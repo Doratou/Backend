@@ -39,6 +39,12 @@ body:json {
 }
 
 docs {
+  ## Settlement receipt access
+
+  SETTLEMENT_RECEIPT is always private. Unbound files are uploader-only. Bound PENDING/CANCELED files are visible only to the active sender/recipient; SUCCESS/REJECT files are visible to all active group members. Former/inactive members have no access. This applies to metadata, streams, batch URLs, ZIP and group lists. No owner/admin override. Direct deletion of any bound payment receipt returns 409 SETTLEMENT_RECEIPT_LOCKED; delete its PENDING payment first. No receipt edits are supported.
+
+  Upload/confirm omit settlement_id and expense_id; link uploaded IDs through Create Settlement. SETTLING groups allow settlement receipt uploads; CLOSED does not. Presigned confirmation validates actual MIME and size, then creates a separate server-controlled object. Never re-confirm an already registered receipt key. See the Settlements folder for the complete workflow and errors.
+
   # Batch Confirm Presigned Uploads (Protected)
 
   **Method:** `POST`

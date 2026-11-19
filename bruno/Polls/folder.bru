@@ -49,7 +49,7 @@ docs {
 
   All endpoints require an ACTIVE account and ACTIVE group membership. Only the creator may close/delete, without owner/admin override. A creator leaving does not close the poll. Votes by departed members remain counted.
 
-  INACTIVE groups freeze creation, voting, replacement, withdrawal, closing and deletion. Reads remain available with is_frozen=true. Closed polls reject vote changes but retain results; no reopen route exists. Reactivating a group enables open polls but never reopens closed ones. Deletion soft-deletes the poll, options and selections.
+  `SETTLING` and `CLOSED` groups freeze creation, voting, replacement, withdrawal, closing and deletion. Reads remain available with is_frozen=true. Closed polls reject vote changes but retain results; no reopen route exists. Deletion soft-deletes the poll, options and selections.
 
   ## Manual Bruno setup
 

@@ -37,7 +37,7 @@ docs {
 
   Only ACTIVE accounts with ACTIVE membership and left_at=null can access these routes. Current group owner and original expense creator may edit/delete. Group ownership follows the current groups.created_by_user_id value; site ADMIN alone grants no bypass. Former members remain eligible for a share but lose expense access, including to expenses they originally created.
 
-  INACTIVE groups freeze POST/PUT/PATCH/DELETE and still permit GET. There is no participant approval, draft state, settlement restriction or edit/delete reason requirement. Original payer=original creator always, including after owner edits.
+  SETTLING and CLOSED groups freeze POST/PUT/PATCH/DELETE and still permit GET. There is no participant approval, draft state, settlement restriction or edit/delete reason requirement. Original payer=original creator always, including after owner edits.
 
   ## Response and updates
 
@@ -59,6 +59,6 @@ docs {
 
   ## Suggested manual checks
 
-  Use two active members, one outsider and one former member. Create each split type, include/exclude the payer, use a former member in shares, verify exact totals and rounding, then edit as creator and group owner. Confirm a third member cannot edit/delete and a former creator cannot access the expense after leaving. Check inactive groups, duplicate members, foreign IDs, empty shares, invalid percentages/weights, amount mismatches, bad dates, wrong-group expense IDs and repeated deletion.
+  Use two active members, one outsider and one former member. Create each split type, include/exclude the payer, use a former member in shares, verify exact totals and rounding, then edit as creator and group owner. Confirm a third member cannot edit/delete and a former creator cannot access the expense after leaving. Check `SETTLING` and `CLOSED` groups, duplicate members, foreign IDs, empty shares, invalid percentages/weights, amount mismatches, bad dates, wrong-group expense IDs and repeated deletion.
 
 }

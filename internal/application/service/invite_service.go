@@ -379,6 +379,9 @@ func requireInviteManager(group *entity.Group, userID int64, role enum.UserRole)
 	if role != enum.UserRoleAdmin && group.CreatedByUserID != userID {
 		return exception.ErrGroupOwnerRequired
 	}
+	if group.Status == enum.GroupStatusClosed {
+		return exception.ErrGroupClosed
+	}
 	return nil
 }
 

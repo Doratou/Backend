@@ -15,6 +15,7 @@ func RegisterGroupRoutes(rg *gin.RouterGroup, groupHandler *handler.GroupHandler
 		groups.GET("/admin", authMiddleware, middleware.RequireRole(enum.UserRoleAdmin), groupHandler.ListAll)
 		groups.GET("/:groupID", authMiddleware, groupHandler.Get)
 		groups.PATCH("/:groupID", authMiddleware, groupHandler.Update)
+		groups.PATCH("/:groupID/status", authMiddleware, groupHandler.ChangeStatus)
 		groups.PATCH("/:groupID/cover", authMiddleware, groupHandler.ChangeCover)
 		groups.POST("/:groupID/archive", authMiddleware, groupHandler.Archive)
 		groups.DELETE("/:groupID", authMiddleware, groupHandler.Delete)

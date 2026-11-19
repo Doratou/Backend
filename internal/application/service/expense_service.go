@@ -68,13 +68,19 @@ func (s *expenseService) Create(ctx context.Context, userID, groupID int64, req 
 }
 
 func (s *expenseService) List(ctx context.Context, userID, groupID int64, req dto.ListExpensesRequest) (*dto.ExpenseListResponse, error) {
-	page, limit, offset, err := expensePagination(req)
+	page, limit, offset, err := expensePagination(req.Page, req.Limit)
 	if err != nil {
 		return nil, err
 	}
+	if req.Scope == "" {
+		req.Scope = enum.ExpenseListScopeAll
+	}
+	if !req.Scope.IsValid() {
+		return nil, exception.ErrBadRequest
+	}
 	var response dto.ExpenseListResponse
 	err = s.withGroupAccess(ctx, userID, groupID, false, func(txCtx context.Context, group *entity.Group, member *entity.GroupMember) error {
-		expenses, total, err := s.expenseRepo.FindByGroupID(txCtx, group.ID, limit, offset)
+		expenses, total, err := s.expenseRepo.FindByGroupID(txCtx, group.ID, member.ID, req.Scope, limit, offset)
 		if err != nil {
 			return err
 		}
@@ -224,8 +230,8 @@ func (s *expenseService) Delete(ctx context.Context, userID, groupID, expenseID 
 	})
 }
 
-func (s *expenseService) ListParticipants(ctx context.Context, userID, groupID int64, req dto.ListExpensesRequest) (*dto.ExpenseParticipantListResponse, error) {
-	page, limit, offset, err := expensePagination(req)
+func (s *expenseService) ListParticipants(ctx context.Context, userID, groupID int64, req dto.ExpensePaginationRequest) (*dto.ExpenseParticipantListResponse, error) {
+	page, limit, offset, err := expensePagination(req.Page, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -500,8 +506,7 @@ func expenseSplitValue(splitType enum.ExpenseSplitType, raw []byte) (int64, erro
 	return value, nil
 }
 
-func expensePagination(req dto.ListExpensesRequest) (int, int, int, error) {
-	page, limit := req.Page, req.Limit
+func expensePagination(page, limit int) (int, int, int, error) {
 	if page < 0 || limit < 0 || limit > 100 {
 		return 0, 0, 0, exception.ErrBadRequest
 	}

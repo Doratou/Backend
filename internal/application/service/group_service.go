@@ -84,7 +84,7 @@ func parseGroupStatus(status *string) (*enum.GroupStatus, error) {
 		return nil, nil
 	}
 	value := strings.ToUpper(*status)
-	if value != string(enum.GroupStatusActive) && value != string(enum.GroupStatusInactive) {
+	if !enum.GroupStatus(value).IsValid() {
 		return nil, exception.ErrGroupInvalidStatus
 	}
 	parsed := enum.GroupStatus(value)
@@ -109,6 +109,9 @@ func (s *groupService) Update(ctx context.Context, userID int64, role enum.UserR
 	group, err := s.ownedGroup(ctx, userID, role, groupID)
 	if err != nil {
 		return nil, err
+	}
+	if group.Status == enum.GroupStatusClosed {
+		return nil, exception.ErrGroupClosed
 	}
 	if req.Title != nil {
 		group.Title = *req.Title
@@ -143,6 +146,9 @@ func (s *groupService) ChangeCover(ctx context.Context, userID int64, role enum.
 		return nil, err
 	}
 
+	if group.Status == enum.GroupStatusClosed {
+		return nil, exception.ErrGroupClosed
+	}
 	att, err := s.attachmentRepo.FindByID(ctx, coverAttachmentID)
 	if err != nil {
 		return nil, err
@@ -168,7 +174,7 @@ func (s *groupService) Archive(ctx context.Context, userID int64, role enum.User
 	if _, err := s.ownedGroup(ctx, userID, role, groupID); err != nil {
 		return err
 	}
-	return s.groups.SetStatus(ctx, groupID, enum.GroupStatusInactive)
+	return s.groups.SetStatus(ctx, groupID, enum.GroupStatusSettling)
 }
 
 func (s *groupService) Delete(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error {
@@ -183,7 +189,7 @@ func (s *groupService) Clone(ctx context.Context, userID int64, role enum.UserRo
 	if err != nil {
 		return nil, err
 	}
-	if source.Status != enum.GroupStatusInactive {
+	if source.Status == enum.GroupStatusActive {
 		return nil, exception.ErrGroupMustBeInactiveToClone
 	}
 	clone := &entity.Group{Title: req.Title, Description: req.Description, CreatedByUserID: userID, Status: enum.GroupStatusActive}
@@ -308,6 +314,24 @@ func toGroupMemberResponses(members []entity.GroupMember, ownerID int64) []dto.G
 func toGroupResponse(group *entity.Group, count int64) dto.GroupResponse {
 	return dto.GroupResponse{ID: group.ID, Title: group.Title, Description: group.Description,
 		CreatedByUserID: group.CreatedByUserID, CoverAttachmentID: group.CoverAttachmentID,
-		Status: string(group.Status), IsPremium: group.IsPremium, ArchivedAt: group.ArchivedAt,
+		Status: string(group.Status), IsPremium: group.IsPremium, ArchivedAt: group.ArchivedAt, ClosedAt: group.ClosedAt,
 		CreatedAt: group.CreatedAt, UpdatedAt: group.UpdatedAt, MemberCount: count}
+}
+
+func (s *groupService) ChangeStatus(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.ChangeGroupStatusRequest) (*dto.GroupResponse, error) {
+	if !req.Status.IsValid() {
+		return nil, exception.ErrGroupInvalidStatus
+	}
+	if _, err := s.ownedGroup(ctx, userID, role, groupID); err != nil {
+		return nil, err
+	}
+	if err := s.groups.SetStatus(ctx, groupID, req.Status); err != nil {
+		return nil, err
+	}
+	group, count, err := s.groups.FindByID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	res := toGroupResponse(group, count)
+	return &res, nil
 }

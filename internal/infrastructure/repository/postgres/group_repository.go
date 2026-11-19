@@ -10,6 +10,7 @@ import (
 	domainrepo "github.com/Doratou/Backend/internal/domain/repository/DB"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type groupRepository struct{ db database.Database }
@@ -32,7 +33,7 @@ func (r *groupRepository) CreateWithOwner(ctx context.Context, group *entity.Gro
 		return tx.Create(&member).Error
 	})
 	if err != nil {
-		return exception.Wrap(exception.ErrInternal, err)
+		return settlementPersistenceError(err)
 	}
 	return nil
 }
@@ -82,28 +83,43 @@ func (r *groupRepository) SetMemberInactiveByID(ctx context.Context, groupID, me
 }
 
 func (r *groupRepository) setMemberInactive(ctx context.Context, groupID int64, idColumn string, id int64) error {
-	result := r.getDB(ctx).Model(&entity.GroupMember{}).
-		Where("group_id = ? AND "+idColumn+" = ? AND status = ?", groupID, id, enum.GroupMemberStatusActive).
-		Updates(map[string]interface{}{"status": enum.GroupMemberStatusInactive, "left_at": gorm.Expr("CURRENT_TIMESTAMP")})
-	if result.Error != nil {
-		return exception.Wrap(exception.ErrInternal, result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return exception.ErrGroupMemberNotFound
-	}
-	return nil
+	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var group entity.Group
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&group, groupID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return exception.ErrGroupNotFound
+			}
+			return err
+		}
+		if group.Status == enum.GroupStatusClosed {
+			return exception.ErrGroupClosed
+		}
+		result := tx.Model(&entity.GroupMember{}).Where("group_id = ? AND "+idColumn+" = ? AND status = ?", groupID, id, enum.GroupMemberStatusActive).
+			Updates(map[string]any{"status": enum.GroupMemberStatusInactive, "left_at": gorm.Expr("CURRENT_TIMESTAMP")})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return exception.ErrGroupMemberNotFound
+		}
+		return nil
+	})
+	return settlementPersistenceError(err)
 }
 
 func (r *groupRepository) TransferOwnership(ctx context.Context, groupID, newOwnerID int64) error {
 	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var group entity.Group
-		if err := tx.Where("id = ? AND deleted_at IS NULL", groupID).First(&group).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", groupID).First(&group).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return exception.ErrGroupNotFound
 			}
 			return err
 		}
 
+		if group.Status == enum.GroupStatusClosed {
+			return exception.ErrGroupClosed
+		}
 		var member entity.GroupMember
 		if err := tx.Where("group_id = ? AND user_id = ? AND status = ?", groupID, newOwnerID, enum.GroupMemberStatusActive).First(&member).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -119,7 +135,7 @@ func (r *groupRepository) TransferOwnership(ctx context.Context, groupID, newOwn
 		if errors.As(err, &appErr) {
 			return err
 		}
-		return exception.Wrap(exception.ErrInternal, err)
+		return settlementPersistenceError(err)
 	}
 	return nil
 }
@@ -171,34 +187,48 @@ func (r *groupRepository) FindAll(ctx context.Context, status *enum.GroupStatus,
 
 func (r *groupRepository) Update(ctx context.Context, group *entity.Group) error {
 	if err := r.getDB(ctx).Model(&entity.Group{}).Where("id = ? AND deleted_at IS NULL", group.ID).Updates(map[string]interface{}{"title": group.Title, "description": group.Description}).Error; err != nil {
-		return exception.Wrap(exception.ErrInternal, err)
+		return settlementPersistenceError(err)
 	}
 	return nil
 }
 
 func (r *groupRepository) UpdateCover(ctx context.Context, group *entity.Group) error {
 	if err := r.getDB(ctx).Model(&entity.Group{}).Where("id = ? AND deleted_at IS NULL", group.ID).Updates(map[string]interface{}{"cover_attachment_id": group.CoverAttachmentID}).Error; err != nil {
-		return exception.Wrap(exception.ErrInternal, err)
+		return settlementPersistenceError(err)
 	}
 	return nil
 }
 
 func (r *groupRepository) SetStatus(ctx context.Context, groupID int64, status enum.GroupStatus) error {
-	updates := map[string]interface{}{"status": status}
-	if status == enum.GroupStatusInactive {
-		updates["archived_at"] = gorm.Expr("CURRENT_TIMESTAMP")
-	} else {
-		updates["archived_at"] = nil
+	if !status.IsValid() {
+		return exception.ErrGroupInvalidStatus
 	}
-	if err := r.getDB(ctx).Model(&entity.Group{}).Where("id = ? AND deleted_at IS NULL", groupID).Updates(updates).Error; err != nil {
-		return exception.Wrap(exception.ErrInternal, err)
-	}
-	return nil
+	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var group entity.Group
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&group, groupID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return exception.ErrGroupNotFound
+			}
+			return err
+		}
+		if group.Status == status {
+			return nil
+		}
+		updates := map[string]any{"status": status}
+		if status == enum.GroupStatusSettling {
+			updates["archived_at"] = gorm.Expr("CURRENT_TIMESTAMP")
+		}
+		if status == enum.GroupStatusClosed {
+			updates["closed_at"] = gorm.Expr("CURRENT_TIMESTAMP")
+		}
+		return tx.Model(&group).Updates(updates).Error
+	})
+	return settlementPersistenceError(err)
 }
 
 func (r *groupRepository) Delete(ctx context.Context, groupID int64) error {
 	if err := r.getDB(ctx).Delete(&entity.Group{}, groupID).Error; err != nil {
-		return exception.Wrap(exception.ErrInternal, err)
+		return settlementPersistenceError(err)
 	}
 	return nil
 }
@@ -224,7 +254,7 @@ func (r *groupRepository) CloneWithMembers(ctx context.Context, sourceGroupID in
 		owner := entity.GroupMember{GroupID: newGroup.ID, UserID: newGroup.CreatedByUserID, Status: enum.GroupMemberStatusActive}
 		return tx.Create(&owner).Error
 	}); err != nil {
-		return exception.Wrap(exception.ErrInternal, err)
+		return settlementPersistenceError(err)
 	}
 	return nil
 }

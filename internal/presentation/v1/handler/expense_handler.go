@@ -121,7 +121,7 @@ func (h *ExpenseHandler) ListParticipants(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req dto.ListExpensesRequest
+	var req dto.ExpensePaginationRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		fail(c, exception.Wrap(exception.ErrBadRequest, err))
 		return

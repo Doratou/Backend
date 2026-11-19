@@ -89,10 +89,19 @@ func (r *expenseRepository) FindByID(ctx context.Context, groupID, expenseID int
 		}), groupID, expenseID)
 }
 
-func (r *expenseRepository) FindByGroupID(ctx context.Context, groupID int64, limit, offset int) ([]*entity.Expense, int64, error) {
+func (r *expenseRepository) FindByGroupID(ctx context.Context, groupID, memberID int64, scope enum.ExpenseListScope, limit, offset int) ([]*entity.Expense, int64, error) {
 	expenses := make([]*entity.Expense, 0)
 	query := r.getDB(ctx).Model(&entity.Expense{}).
 		Joins("JOIN groups ON groups.id = expenses.group_id AND groups.deleted_at IS NULL").Where("expenses.group_id = ?", groupID)
+	switch scope {
+	case enum.ExpenseListScopeCreatedByMe:
+		query = query.Where("expenses.created_by_member_id = ?", memberID)
+	case enum.ExpenseListScopeOwedByMe:
+		shares := r.getDB(ctx).Model(&entity.ExpenseShare{}).Select("1").
+			Where("expense_shares.expense_id = expenses.id AND expense_shares.group_id = expenses.group_id").
+			Where("expense_shares.member_id = ? AND expense_shares.share_amount_toman > 0", memberID)
+		query = query.Where("expenses.created_by_member_id <> ?", memberID).Where("EXISTS (?)", shares)
+	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, expensePersistenceError(err)

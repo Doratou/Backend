@@ -51,7 +51,7 @@ type AttachmentService interface {
 	// --- Batch / Bulk operations ---
 
 	// UploadBatch uploads multiple multipart files concurrently, with partial-success tolerance.
-	UploadBatch(ctx context.Context, userID int64, files []*multipart.FileHeader, defaultType enum.AttachmentType, groupID, expenseID *int64, isPublic *bool) (*dto.BatchUploadResponse, error)
+	UploadBatch(ctx context.Context, userID int64, files []*multipart.FileHeader, defaultType enum.AttachmentType, groupID, expenseID, settlementID *int64, isPublic *bool) (*dto.BatchUploadResponse, error)
 
 	// CreatePresignedUploadBatch generates direct upload PUT URLs for multiple items.
 	CreatePresignedUploadBatch(ctx context.Context, userID int64, req dto.BatchPresignedUploadRequest) (*dto.BatchPresignedUploadResponse, error)

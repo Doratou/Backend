@@ -41,7 +41,7 @@ docs {
 
   Selection-share percentages divide vote_count by total_votes and sum to 100 before rounding. Participant percentages divide by total_voters and can sum above 100 for multi-choice. Use zero for a zero denominator and label the chosen meaning in the UI.
 
-  Inactive groups remain readable with is_frozen=true. Closed polls remain readable with status=INACTIVE and closed_at populated. Empty pages return items=[], including pages past the end even when pagination.total is positive. IDs remain manually configured in Bruno.
+  Polls in `SETTLING` or `CLOSED` groups remain readable with `is_frozen=true`. Closed polls remain readable with status=INACTIVE and closed_at populated. Empty pages return items=[], including pages past the end even when pagination.total is positive. IDs remain manually configured in Bruno.
 
   All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
 

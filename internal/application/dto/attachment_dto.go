@@ -9,10 +9,11 @@ import (
 
 // UploadAttachmentRequest contains parameters sent along with a multipart file.
 type UploadAttachmentRequest struct {
-	Type      enum.AttachmentType `form:"type" binding:"required"`
-	GroupID   *int64              `form:"group_id"`
-	ExpenseID *int64              `form:"expense_id"`
-	IsPublic  *bool               `form:"is_public"`
+	Type         enum.AttachmentType `form:"type" binding:"required"`
+	GroupID      *int64              `form:"group_id"`
+	ExpenseID    *int64              `form:"expense_id"`
+	SettlementID *int64              `form:"settlement_id"`
+	IsPublic     *bool               `form:"is_public"`
 }
 
 // BatchUploadItemFailure records an individual failed file in a batch upload.
@@ -37,6 +38,7 @@ type PresignedUploadRequest struct {
 	MimeType      string              `json:"mime_type" binding:"required"`
 	GroupID       *int64              `json:"group_id"`
 	ExpenseID     *int64              `json:"expense_id"`
+	SettlementID  *int64              `json:"settlement_id,omitempty"`
 	IsPublic      *bool               `json:"is_public"`
 }
 
@@ -55,6 +57,7 @@ type BatchPresignedUploadItemRequest struct {
 	MimeType      string              `json:"mime_type" binding:"required"`
 	GroupID       *int64              `json:"group_id"`
 	ExpenseID     *int64              `json:"expense_id"`
+	SettlementID  *int64              `json:"settlement_id,omitempty"`
 	IsPublic      *bool               `json:"is_public"`
 }
 
@@ -83,6 +86,7 @@ type ConfirmPresignedUploadRequest struct {
 	Type             enum.AttachmentType `json:"type" binding:"required"`
 	GroupID          *int64              `json:"group_id"`
 	ExpenseID        *int64              `json:"expense_id"`
+	SettlementID     *int64              `json:"settlement_id,omitempty"`
 	IsPublic         *bool               `json:"is_public"`
 }
 
@@ -93,6 +97,7 @@ type BatchConfirmUploadItemRequest struct {
 	Type             enum.AttachmentType `json:"type" binding:"required"`
 	GroupID          *int64              `json:"group_id"`
 	ExpenseID        *int64              `json:"expense_id"`
+	SettlementID     *int64              `json:"settlement_id,omitempty"`
 	IsPublic         *bool               `json:"is_public"`
 }
 
@@ -187,6 +192,7 @@ type AttachmentResponse struct {
 	GroupID            *int64                    `json:"group_id,omitempty"`
 	Group              *AttachmentGroupSummary   `json:"group,omitempty"`
 	ExpenseID          *int64                    `json:"expense_id,omitempty"`
+	SettlementID       *int64                    `json:"settlement_id,omitempty"`
 	Expense            *AttachmentExpenseSummary `json:"expense,omitempty"`
 	Type               enum.AttachmentType       `json:"type"`
 	OriginalFilename   *string                   `json:"original_filename,omitempty"`
@@ -259,6 +265,7 @@ func ToAttachmentResponse(entity *entity.Attachment, accessURL string) *Attachme
 		GroupID:            entity.GroupID,
 		Group:              groupSummary,
 		ExpenseID:          entity.ExpenseID,
+		SettlementID:       entity.SettlementID,
 		Expense:            expenseSummary,
 		Type:               entity.Type,
 		OriginalFilename:   entity.OriginalFilename,

@@ -147,7 +147,7 @@ docs {
   | 403 | `POLL_FORBIDDEN` | `only active group members can access this poll` | The user has no active membership in this group or has left it. |
   | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or has been soft-deleted. |
   | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
-  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is inactive; creation is frozen. |
+  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is `SETTLING` or `CLOSED`; creation is frozen. |
   | 400 | `POLL_INVALID_OPTIONS` | `provide at least two non-empty options with titles of at most 255 characters` | An option is blank after trimming or contains unsupported text. |
   | 400 | `POLL_DUPLICATE_OPTIONS` | `poll options must be unique` | Option titles repeat after trimming and case folding. |
   | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
