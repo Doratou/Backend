@@ -22,13 +22,13 @@ type Environment struct {
 	RustFS     RustFSConfig      `mapstructure:",squash"`
 	PoW        PoWConfig         `mapstructure:",squash"`
 	Google     GoogleOAuthConfig `mapstructure:",squash"`
+	AvalAI     AvalAIConfig      `mapstructure:",squash"`
 }
 
 type GoogleOAuthConfig struct {
 	ClientID         string `mapstructure:"GOOGLE_CLIENT_ID"`
 	ClientSecret     string `mapstructure:"GOOGLE_CLIENT_SECRET" json:"-"`
 	RedirectEndPoint string `mapstructure:"GOOGLE_REDIRECT_ENDPOINT"`
-	AvalAI     AvalAIConfig     `mapstructure:",squash"`
 }
 
 type AvalAIConfig struct {
