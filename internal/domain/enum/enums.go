@@ -1,5 +1,6 @@
 package enum
 
+// UserRole enum values: "USER", "ADMIN".
 type UserRole string
 
 const (
@@ -7,6 +8,16 @@ const (
 	UserRoleAdmin UserRole = "ADMIN"
 )
 
+func (u UserRole) IsValid() bool {
+	switch u {
+	case UserRoleUser, UserRoleAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
+// UserStatus enum values: "ACTIVE", "INACTIVE".
 type UserStatus string
 
 const (
@@ -14,6 +25,16 @@ const (
 	UserStatusInactive UserStatus = "INACTIVE"
 )
 
+func (u UserStatus) IsValid() bool {
+	switch u {
+	case UserStatusActive, UserStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// GroupStatus enum values: "ACTIVE", "INACTIVE".
 type GroupStatus string
 
 const (
@@ -21,6 +42,16 @@ const (
 	GroupStatusInactive GroupStatus = "INACTIVE"
 )
 
+func (g GroupStatus) IsValid() bool {
+	switch g {
+	case GroupStatusActive, GroupStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// GroupMemberStatus enum values: "ACTIVE", "INACTIVE".
 type GroupMemberStatus string
 
 const (
@@ -28,6 +59,16 @@ const (
 	GroupMemberStatusInactive GroupMemberStatus = "INACTIVE"
 )
 
+func (g GroupMemberStatus) IsValid() bool {
+	switch g {
+	case GroupMemberStatusActive, GroupMemberStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// GroupMemberRole enum values: "OWNER", "MEMBER".
 type GroupMemberRole string
 
 const (
@@ -35,6 +76,16 @@ const (
 	GroupMemberRoleMember GroupMemberRole = "MEMBER"
 )
 
+func (g GroupMemberRole) IsValid() bool {
+	switch g {
+	case GroupMemberRoleOwner, GroupMemberRoleMember:
+		return true
+	default:
+		return false
+	}
+}
+
+// DirectInviteStatus enum values: "PENDING", "ACCEPTED", "REJECTED".
 type DirectInviteStatus string
 
 const (
@@ -43,6 +94,16 @@ const (
 	DirectInviteStatusRejected DirectInviteStatus = "REJECTED"
 )
 
+func (d DirectInviteStatus) IsValid() bool {
+	switch d {
+	case DirectInviteStatusPending, DirectInviteStatusAccepted, DirectInviteStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// AttachmentType enum values: "PROFILE_IMAGE", "GROUP_COVER", "GALLERY_IMAGE", "GALLERY_VIDEO", "EXPENSE_RECEIPT", "SETTLEMENT_RECEIPT".
 type AttachmentType string
 
 const (
@@ -54,6 +115,16 @@ const (
 	AttachmentTypeSettlementReceipt AttachmentType = "SETTLEMENT_RECEIPT"
 )
 
+func (a AttachmentType) IsValid() bool {
+	switch a {
+	case AttachmentTypeProfileImage, AttachmentTypeGroupCover, AttachmentTypeGalleryImage, AttachmentTypeGalleryVideo, AttachmentTypeExpenseReceipt, AttachmentTypeSettlementReceipt:
+		return true
+	default:
+		return false
+	}
+}
+
+// OTPType enum values: "email", "phone".
 type OTPType string
 
 const (
@@ -61,6 +132,16 @@ const (
 	OTPTypePhone OTPType = "phone"
 )
 
+func (o OTPType) IsValid() bool {
+	switch o {
+	case OTPTypeEmail, OTPTypePhone:
+		return true
+	default:
+		return false
+	}
+}
+
+// ReportReason enum values: "SPAM", "HARASSMENT", "INAPPROPRIATE_CONTENT", "FRAUD", "PRIVACY_VIOLATION", "OTHER".
 type ReportReason string
 
 const (
@@ -74,18 +155,14 @@ const (
 
 func (r ReportReason) IsValid() bool {
 	switch r {
-	case ReportReasonSpam,
-		ReportReasonHarassment,
-		ReportReasonInappropriateContent,
-		ReportReasonFraud,
-		ReportReasonPrivacyViolation,
-		ReportReasonOther:
+	case ReportReasonSpam, ReportReasonHarassment, ReportReasonInappropriateContent, ReportReasonFraud, ReportReasonPrivacyViolation, ReportReasonOther:
 		return true
 	default:
 		return false
 	}
 }
 
+// ReportStatus enum values: "PENDING", "UNDER_REVIEW", "RESOLVED", "REJECTED", "DISMISSED".
 type ReportStatus string
 
 const (
@@ -96,19 +173,16 @@ const (
 	ReportStatusDismissed   ReportStatus = "DISMISSED"
 )
 
-func (s ReportStatus) IsValid() bool {
-	switch s {
-	case ReportStatusPending,
-		ReportStatusUnderReview,
-		ReportStatusResolved,
-		ReportStatusRejected,
-		ReportStatusDismissed:
+func (r ReportStatus) IsValid() bool {
+	switch r {
+	case ReportStatusPending, ReportStatusUnderReview, ReportStatusResolved, ReportStatusRejected, ReportStatusDismissed:
 		return true
 	default:
 		return false
 	}
 }
 
+// FriendshipStatus enum values: "PENDING", "ACCEPTED", "REJECTED".
 type FriendshipStatus string
 
 const (
@@ -117,6 +191,16 @@ const (
 	FriendshipStatusRejected FriendshipStatus = "REJECTED"
 )
 
+func (f FriendshipStatus) IsValid() bool {
+	switch f {
+	case FriendshipStatusPending, FriendshipStatusAccepted, FriendshipStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// PollStatus enum values: "ACTIVE", "INACTIVE".
 type PollStatus string
 
 const (
@@ -124,6 +208,16 @@ const (
 	PollStatusInactive PollStatus = "INACTIVE"
 )
 
+func (p PollStatus) IsValid() bool {
+	switch p {
+	case PollStatusActive, PollStatusInactive:
+		return true
+	default:
+		return false
+	}
+}
+
+// PollVisibility enum values: "PUBLIC", "PRIVATE".
 type PollVisibility string
 
 const (
@@ -131,6 +225,16 @@ const (
 	PollVisibilityPrivate PollVisibility = "PRIVATE"
 )
 
+func (p PollVisibility) IsValid() bool {
+	switch p {
+	case PollVisibilityPublic, PollVisibilityPrivate:
+		return true
+	default:
+		return false
+	}
+}
+
+// ExpenseType enum values: "NORMAL", "PREMIUM".
 type ExpenseType string
 
 const (
@@ -138,9 +242,28 @@ const (
 	ExpenseTypePremium ExpenseType = "PREMIUM"
 )
 
+func (e ExpenseType) IsValid() bool {
+	switch e {
+	case ExpenseTypeNormal, ExpenseTypePremium:
+		return true
+	default:
+		return false
+	}
+}
+
+// LuckyDrawStatus enum values: "DRAFT", "COMPLETED".
 type LuckyDrawStatus string
 
 const (
 	LuckyDrawStatusDraft     LuckyDrawStatus = "DRAFT"
 	LuckyDrawStatusCompleted LuckyDrawStatus = "COMPLETED"
 )
+
+func (l LuckyDrawStatus) IsValid() bool {
+	switch l {
+	case LuckyDrawStatusDraft, LuckyDrawStatusCompleted:
+		return true
+	default:
+		return false
+	}
+}
