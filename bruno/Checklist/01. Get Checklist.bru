@@ -1,0 +1,263 @@
+meta {
+  name: 01. Get Checklist
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{checklistGroupId}}/checklist
+  body: none
+  auth: bearer
+}
+
+params:query {
+  filter: all
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Checklist
+
+  - **Method** `GET`
+  - **Endpoint** `/api/v1/groups/:groupID/checklist`
+  - **Auth** Bearer access token
+
+  ## Description
+
+  Reads the group's checklist and whole-checklist reports. ACTIVE, SETTLING and CLOSED groups can be read by active members.
+
+  ## Request
+
+  ### Headers
+
+  | Header | Required | Value |
+  | --- | --- | --- |
+  | `Authorization` | Yes | `Bearer <access-token>`. Bruno reads `token`. |
+
+  ### Path parameters
+
+  | Parameter | Type | Required | Meaning |
+  | --- | --- | --- | --- |
+  | `groupID` | Integer | Yes | Group ID. Set `checklistGroupId` in Bruno Local. |
+
+  Path IDs are positive BIGINTs from 1 through 9223372036854775807.
+
+  ### Query parameters
+
+  | Parameter | Type | Default | Meaning |
+  | --- | --- | --- | --- |
+  | `filter` | String | `all` | Case-sensitive. Accepts `all`, `claimed`, `unclaimed`, `mine`, `personal`. |
+  | `page` | Integer | `1` | One-based page, at least 1. |
+  | `limit` | Integer | `20` | Page size from 1 to 100. |
+
+  No request body. Change `filter` in Bruno's Params tab. `mine` selects GROUP items claimed by the caller only.
+
+  ## Response
+
+  **200 OK** for `filter=all`, as Sara. The sample includes a personal reminder, an available group item and two claims by different members.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "group_id": 1,
+      "viewer_member_id": 3,
+      "is_frozen": false,
+      "filter": "all",
+      "summary": {
+        "total_items": 4,
+        "group_item_count": 3,
+        "personal_item_count": 1,
+        "claimed_item_count": 2,
+        "unclaimed_item_count": 1,
+        "my_claimed_item_count": 1,
+        "progress_percent": 67
+      },
+      "member_claims": [
+        {
+          "member_id": 1,
+          "user_id": 11,
+          "name": "Mina",
+          "avatar_url": null,
+          "claimed_item_count": 0
+        },
+        {
+          "member_id": 3,
+          "user_id": 12,
+          "name": "Sara",
+          "avatar_url": null,
+          "claimed_item_count": 1
+        },
+        {
+          "member_id": 4,
+          "user_id": 13,
+          "name": "Reza",
+          "avatar_url": null,
+          "claimed_item_count": 1
+        }
+      ],
+      "items": [
+        {
+          "id": 13,
+          "title": "Warm clothes",
+          "type": "PERSONAL",
+          "created_by": {
+            "member_id": 3,
+            "user_id": 12,
+            "name": "Sara",
+            "avatar_url": null
+          },
+          "assigned_to": null,
+          "can_claim": false,
+          "can_release": false,
+          "can_delete": true,
+          "created_at": "2026-11-19T10:00:00Z",
+          "updated_at": "2026-11-19T10:00:00Z"
+        },
+        {
+          "id": 12,
+          "title": "Water",
+          "type": "GROUP",
+          "created_by": {
+            "member_id": 1,
+            "user_id": 11,
+            "name": "Mina",
+            "avatar_url": null
+          },
+          "assigned_to": null,
+          "can_claim": true,
+          "can_release": false,
+          "can_delete": true,
+          "created_at": "2026-11-19T10:00:00Z",
+          "updated_at": "2026-11-19T10:00:00Z"
+        },
+        {
+          "id": 11,
+          "title": "Blanket",
+          "type": "GROUP",
+          "created_by": {
+            "member_id": 3,
+            "user_id": 12,
+            "name": "Sara",
+            "avatar_url": null
+          },
+          "assigned_to": {
+            "member_id": 4,
+            "user_id": 13,
+            "name": "Reza",
+            "avatar_url": null
+          },
+          "can_claim": false,
+          "can_release": false,
+          "can_delete": false,
+          "created_at": "2026-11-19T10:00:00Z",
+          "updated_at": "2026-11-19T10:04:00Z"
+        },
+        {
+          "id": 10,
+          "title": "Blanket",
+          "type": "GROUP",
+          "created_by": {
+            "member_id": 4,
+            "user_id": 13,
+            "name": "Reza",
+            "avatar_url": null
+          },
+          "assigned_to": {
+            "member_id": 3,
+            "user_id": 12,
+            "name": "Sara",
+            "avatar_url": null
+          },
+          "can_claim": false,
+          "can_release": true,
+          "can_delete": false,
+          "created_at": "2026-11-19T10:00:00Z",
+          "updated_at": "2026-11-19T10:05:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 4
+      }
+    }
+  }
+  ```
+
+  ### Checklist fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `group_id` | Group ID from the path. |
+  | `viewer_member_id` | Caller's membership ID in this group. Compare with `assigned_to.member_id` to display "you". |
+  | `is_frozen` | True in SETTLING and CLOSED, when all item action flags are false. |
+  | `filter` | Applied item filter. |
+  | `summary` | Overall checklist totals. The filter and page change only the item list and pagination. |
+  | `member_claims` | Active group memberships in ascending member ID order, including memberships with zero claims. Each contains the member fields and `claimed_item_count`. |
+  | `items` | Current page in descending item ID order, excluding soft-deleted items. |
+  | `pagination` | `page`, `limit` and `total`, the number of items matching the filter before pagination. |
+
+  ### Summary fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `total_items` | Group items plus personal reminders. |
+  | `group_item_count` | All GROUP items, the progress denominator. |
+  | `personal_item_count` | All PERSONAL reminders. |
+  | `claimed_item_count` | GROUP items currently assigned, the progress numerator. |
+  | `unclaimed_item_count` | GROUP items without an assignee. |
+  | `my_claimed_item_count` | GROUP items assigned to the caller. |
+  | `progress_percent` | Claimed GROUP items divided by all GROUP items, multiplied by 100 and rounded to the nearest integer. Zero when there are no GROUP items. |
+
+  With the sample data, `filter=mine` returns only item 10 and `pagination.total` is 1. `summary.total_items` stays 4. An empty list or out-of-range page returns 200 with `items: []`. A whole checklist with no items has zero counts and an active-members report showing zero claims.
+
+  ### Item fields
+
+  Create, Claim and Release return the same item shape in `data`.
+
+  | Field | Meaning |
+  | --- | --- |
+  | `id` | Checklist item ID used for Claim, Release and Delete. |
+  | `title` | Saved title after trimming. A title can be repeated. |
+  | `type` | `GROUP` or `PERSONAL`. |
+  | `created_by` | Member who added the item. Render when the creator toggle is on. |
+  | `assigned_to` | Current assignee, or `null` for an available item or personal reminder. |
+  | `can_claim` | True for an available GROUP item in an ACTIVE group. |
+  | `can_release` | True for the caller's own claim in an ACTIVE group. |
+  | `can_delete` | True in an ACTIVE group for an available item, personal reminder, or a claimed item when the caller owns the group. |
+  | `created_at` | Time the item was added. |
+  | `updated_at` | Creation time or time of the latest claim, release or automatic release. Reads and retries that keep the current state preserve it. |
+
+  Member objects include `member_id`, `user_id`, `name` and `avatar_url`. An avatar URL is signed and temporary. Missing or inaccessible avatars and storage signing failures yield `null`. Timestamps are RFC 3339 strings and can include a timezone offset.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID, unsupported filter, invalid page/limit, or an overflowing page offset. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | The Authorization header is missing or does not have the Bearer token format. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, is a refresh token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token was revoked. |
+  | 403 | `CHECKLIST_FORBIDDEN` | `only active group members can access the checklist` | The caller has no active membership in this group. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The caller's membership is active and their account is inactive. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | An active membership exists but its user is missing or soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group is missing or soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | The database, transaction or token blacklist lookup failed. |
+
+  **Example 403**
+
+  ```json
+  {
+    "success": false,
+    "code": "CHECKLIST_FORBIDDEN",
+    "error": "only active group members can access the checklist"
+  }
+  ```
+}
