@@ -1,0 +1,71 @@
+meta {
+  name: Checklist
+  seq: 15
+}
+
+auth {
+  mode: none
+}
+
+docs {
+  # Group Checklist
+
+  Each group has one checklist. It is available even when empty. Apply `20261119130000_create_checklist_items.sql` with `go run ./cmd/migrate up` before starting this API version.
+
+  ## Endpoints
+
+  All paths below start with `/api/v1/groups/:groupID/checklist`.
+
+  | Method and suffix | Action | Success data |
+  | --- | --- | --- |
+  | `GET` on the base path | Read items and reports | 200, items, summary, member claims and pagination |
+  | `POST /items` | Add an item | 201, created item |
+  | `PUT /items/:itemID/claim` | Take a group item for yourself | 200, item with its assignee |
+  | `DELETE /items/:itemID/claim` | Release your claim | 200, item with a null assignee |
+  | `DELETE /items/:itemID` | Delete an item | 200, message |
+
+  ## Item types and filters
+
+  Values are case-sensitive.
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `type` | `GROUP`, `PERSONAL` | Claimable group item or shared reminder for everyone to bring their own supplies. |
+  | `filter` | `all`, `claimed`, `unclaimed`, `mine`, `personal` | All items, claimed group items, available group items, group items claimed by the caller, or personal reminders. |
+
+  Every item has its own ID. Adding Blanket three times creates three independently claimable rows. An item starts available. Its creator stays the same through claims, releases and member departures.
+
+  ## Access and lifecycle
+
+  All routes require an ACTIVE account, a valid Bearer access token and ACTIVE membership with no departure timestamp. The current group owner controls deletion of claimed items. The server checks permissions on every request.
+
+  | Action | Available group item | Claimed group item | Personal reminder |
+  | --- | --- | --- | --- |
+  | Claim | Any active member, for themselves | Assignee may retry | Unavailable |
+  | Release | Already available, safe to retry | Assignee only | Unavailable |
+  | Delete | Any active member | Group owner only | Any active member |
+
+  Any active member may add either item type. On concurrent claims by different members, the first succeeds and the other receives `409 CHECKLIST_ITEM_ALREADY_CLAIMED`. Member departure or removal clears that member's surviving claims in the same transaction, including departures the group workflow allows during SETTLING. A later rejoin starts without the former claims. Deletion is soft and removes the item from results and counts.
+
+  SETTLING and CLOSED groups remain readable with `is_frozen: true` and all action flags false. Checklist write routes return `409 CHECKLIST_GROUP_INACTIVE`.
+
+  ## Frontend flow
+
+  1. Initialize the screen with GET and `filter=all`. Use `summary` for the tab badges and progress, and `member_claims` for per-member totals. Both cover the whole checklist on every page and filter.
+  2. Split the All tab by `type` and `assigned_to`. Show PERSONAL in the shared reminders section. Use the corresponding GET filter to paginate a section independently.
+  3. Compare `assigned_to.member_id` with `viewer_member_id` to display "you". The Show creator toggle controls display of `created_by`. Keep using `assigned_to` for the claim holder.
+  4. Use `can_claim`, `can_release` and `can_delete` to enable actions. A checkbox claims an available group item or releases the caller's own claim. Omit it on personal reminders.
+  5. Refresh GET for the active filter after a write. If another member claimed the item first, reread the list to show who holds it. If a deletion emptied the last page, request an earlier page.
+
+  Personal reminders contribute to the All and Personal totals. Group progress uses claimed GROUP items divided by all GROUP items. A member's `avatar_url` is optional and temporary. Use an avatar fallback when it is null or expires.
+
+  ## Manual Bruno workflow
+
+  Select Local, set `baseUrl` to the running API and log in through Auth. Set `checklistGroupId`, `checklistItemType` and `checklistItemId` manually. After Create, copy `data.id` to `checklistItemId`. You can also copy an ID from Get. Example IDs are illustrative. Auth Login and Refresh continue to supply the access token.
+
+  1. Create three GROUP items with the same title and one PERSONAL reminder. Verify the IDs and try all five filters in Get Checklist.
+  2. Claim a GROUP item as member A. Check that it shows under Mine for A. Use a second active member to compare permissions and exercise competing claims.
+  3. As B, try to release or delete an item A holds. Try deleting a separate claimed row as the owner. As A, release your claim and check that it returns to Unclaimed.
+  4. Delete a personal reminder with any member and verify that a personal reminder rejects both claim actions. Check that group-only progress stays consistent.
+  5. In a test group, have an assignee leave or get removed. Verify the released item and the member counts. Test that SETTLING and CLOSED allow reads and freeze checklist writes.
+}

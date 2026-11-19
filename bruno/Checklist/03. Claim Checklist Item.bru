@@ -1,0 +1,113 @@
+meta {
+  name: 03. Claim Checklist Item
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/v1/groups/{{checklistGroupId}}/checklist/items/{{checklistItemId}}/claim
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Claim Checklist Item
+
+  - **Method** `PUT`
+  - **Endpoint** `/api/v1/groups/:groupID/checklist/items/:itemID/claim`
+  - **Auth** Bearer access token
+
+  ## Description
+
+  Assigns an available `GROUP` item to the caller when they check its box. For competing claims by different members, one succeeds and the other receives `CHECKLIST_ITEM_ALREADY_CLAIMED`. The assignee can retry and get 200 with the current item and its existing timestamps.
+
+  Writes require an ACTIVE group, ACTIVE membership and an ACTIVE account. In SETTLING and CLOSED, `CHECKLIST_GROUP_INACTIVE` can occur before item-specific errors.
+
+  ## Request
+
+  ### Headers
+
+  | Header | Required | Value |
+  | --- | --- | --- |
+  | `Authorization` | Yes | `Bearer <access-token>`. Bruno reads `token`. |
+
+  ### Path parameters
+
+  | Parameter | Type | Required | Meaning |
+  | --- | --- | --- | --- |
+  | `groupID` | Integer | Yes | Group ID. Set `checklistGroupId` in Bruno Local. |
+  | `itemID` | Integer | Yes | Item ID in this group. Set `checklistItemId` from Create's `data.id` or Get's `data.items[].id`. |
+
+  Path IDs are positive BIGINTs from 1 through 9223372036854775807.
+
+  No query parameters or request body.
+
+  ## Response
+
+  **200 OK**. Sara claims item 10, which Reza created.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 10,
+      "title": "Blanket",
+      "type": "GROUP",
+      "created_by": {
+        "member_id": 4,
+        "user_id": 13,
+        "name": "Reza",
+        "avatar_url": null
+      },
+      "assigned_to": {
+        "member_id": 3,
+        "user_id": 12,
+        "name": "Sara",
+        "avatar_url": null
+      },
+      "can_claim": false,
+      "can_release": true,
+      "can_delete": false,
+      "created_at": "2026-11-19T10:00:00Z",
+      "updated_at": "2026-11-19T10:05:00Z"
+    }
+  }
+  ```
+
+  `assigned_to` identifies the caller. `can_release` is true and `can_claim` is false. `can_delete` is true if the caller is the group owner.
+
+  See the Item fields section of Get Checklist for all shared fields. Refresh Get Checklist after a write to read updated counts.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID or item ID. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | The Authorization header is missing or does not have the Bearer token format. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, is a refresh token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token was revoked. |
+  | 403 | `CHECKLIST_FORBIDDEN` | `only active group members can access the checklist` | The caller has no active membership in this group. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The caller's membership is active and their account is inactive. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | An active membership exists but its user is missing or soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group is missing or soft-deleted. |
+  | 404 | `CHECKLIST_ITEM_NOT_FOUND` | `checklist item not found in this group` | The item is missing, soft-deleted, or belongs to another group. |
+  | 409 | `CHECKLIST_GROUP_INACTIVE` | `the checklist cannot be changed while the group is inactive` | The group is SETTLING or CLOSED. |
+  | 409 | `CHECKLIST_ITEM_ALREADY_CLAIMED` | `another member has already claimed this item` | Another member already claimed the item, including a concurrent claim that committed first. |
+  | 409 | `CHECKLIST_ITEM_NOT_CLAIMABLE` | `personal reminders cannot be claimed or released` | The item is a PERSONAL reminder. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | The database, transaction or token blacklist lookup failed. |
+
+  **Example 409**
+
+  ```json
+  {
+    "success": false,
+    "code": "CHECKLIST_ITEM_ALREADY_CLAIMED",
+    "error": "another member has already claimed this item"
+  }
+  ```
+}
