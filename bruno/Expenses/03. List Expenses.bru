@@ -5,13 +5,19 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/v1/groups/{{expenseGroupId}}/expenses?page=1&limit=20
+  url: {{baseUrl}}/api/v1/groups/{{expenseGroupId}}/expenses
   body: none
   auth: bearer
 }
 
 auth:bearer {
   token: {{token}}
+}
+
+params:query {
+  page: 1
+  limit: 20
+  scope: all
 }
 
 docs {
@@ -27,7 +33,7 @@ docs {
 
   All routes require a valid access token, ACTIVE account and ACTIVE membership with left_at=null. A user who left or was removed cannot read, create, edit or delete expenses, even their own. ACTIVE and INACTIVE are the membership status values currently returned by this project; left and removed members remain stored as INACTIVE, normally with left_at set.
 
-  INACTIVE groups allow reads only. is_frozen=true and can_edit/can_delete=false in that state. On an active group, only the expense creator or current group owner can edit/delete. Site ADMIN alone does not override membership or editing permissions.
+  SETTLING and CLOSED groups allow expense reads only. is_frozen=true and can_edit/can_delete=false in that state. On an active group, only the expense creator or current group owner can edit/delete. Site ADMIN alone does not override membership or editing permissions.
 
   Amounts are integer TOMAN. expense_type is a separate legacy enum (NORMAL, PREMIUM); new records are NORMAL. split_type is the allocation enum (EQUAL, EXACT, PERCENTAGE, WEIGHTED). No wallet charge or premium purchase is performed here.
 
@@ -35,7 +41,15 @@ docs {
 
   Path groupID is a positive BIGINT group ID. expenseID, when present, is a positive expense ID in that same group. Use the manual expenseGroupId and expenseId environment variables.
 
-  List endpoints accept page (default 1) and limit (default 20, max 100), both positive integers.
+  Query parameters are optional. `page` defaults to 1. `limit` defaults to 20 and accepts 1–100.
+
+  | Expense tab | scope | What it returns |
+  | --- | --- | --- |
+  | Group expenses | `all` (default) | All non-deleted expenses in the group. |
+  | Expenses I recorded | `created_by_me` | Expenses created by the caller's membership in this group. |
+  | Expenses I owe a share of | `owed_by_me` | Expenses paid by another member where the caller has a positive, non-deleted share. |
+
+  Scope values are lowercase and case-sensitive. For example, send `?scope=owed_by_me&page=1&limit=20`. The backend filters before paginating, and `pagination.total` counts matching expenses. `owed_by_me` reports the original expense shares. Settlements do not change this list or its share amounts.
 
   ## Response
 
@@ -99,7 +113,7 @@ docs {
 
   | HTTP | code | error | When |
   | --- | --- | --- | --- |
-  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, pagination, JSON field, positive total amount, required field, title, or timestamp. |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID, pagination, or scope. |
   | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is absent or does not contain a Bearer token. |
   | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Access token is invalid or malformed. |
   | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |

@@ -282,6 +282,18 @@ func (e ExpenseSplitType) IsValid() bool {
 	}
 }
 
+type ExpenseListScope string
+
+const (
+	ExpenseListScopeAll         ExpenseListScope = "all"
+	ExpenseListScopeCreatedByMe ExpenseListScope = "created_by_me"
+	ExpenseListScopeOwedByMe    ExpenseListScope = "owed_by_me"
+)
+
+func (e ExpenseListScope) IsValid() bool {
+	return e == ExpenseListScopeAll || e == ExpenseListScopeCreatedByMe || e == ExpenseListScopeOwedByMe
+}
+
 // LuckyDrawStatus enum values: "DRAFT", "COMPLETED".
 type LuckyDrawStatus string
 

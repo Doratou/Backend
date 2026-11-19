@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Doratou/Backend/internal/domain/entity"
+	"github.com/Doratou/Backend/internal/domain/enum"
 )
 
 type ExpenseRepository interface {
@@ -11,7 +12,7 @@ type ExpenseRepository interface {
 	UpdateWithShares(ctx context.Context, expense *entity.Expense) error
 	DeleteByID(ctx context.Context, groupID, expenseID int64) error
 	FindByID(ctx context.Context, groupID, expenseID int64) (*entity.Expense, error)
-	FindByGroupID(ctx context.Context, groupID int64, limit, offset int) ([]*entity.Expense, int64, error)
+	FindByGroupID(ctx context.Context, groupID, memberID int64, scope enum.ExpenseListScope, limit, offset int) ([]*entity.Expense, int64, error)
 	FindGroupByID(ctx context.Context, groupID int64) (*entity.Group, error)
 	FindActiveMemberByUserID(ctx context.Context, groupID, userID int64) (*entity.GroupMember, error)
 	FindMembersByIDs(ctx context.Context, groupID int64, memberIDs []int64) ([]*entity.GroupMember, error)

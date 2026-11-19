@@ -189,7 +189,7 @@ func (s *settlementService) Get(ctx context.Context, userID, groupID, id int64) 
 }
 
 func (s *settlementService) List(ctx context.Context, userID, groupID int64, req dto.ListSettlementsRequest) (*dto.SettlementListResponse, error) {
-	page, limit, offset, err := expensePagination(dto.ListExpensesRequest{Page: req.Page, Limit: req.Limit})
+	page, limit, offset, err := expensePagination(req.Page, req.Limit)
 	if err != nil {
 		return nil, err
 	}
