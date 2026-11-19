@@ -22,6 +22,7 @@ type Dependencies struct {
 	FriendshipHandler  *handler.FriendshipHandler
 	GroupHandler       *handler.GroupHandler
 	PollHandler        *handler.PollHandler
+	ChecklistHandler   *handler.ChecklistHandler
 	ExpenseHandler     *handler.ExpenseHandler
 	SettlementHandler  *handler.SettlementHandler
 	LuckyDrawHandler   *handler.LuckyDrawHandler
@@ -88,6 +89,9 @@ func New(deps Dependencies) *gin.Engine {
 	}
 	if deps.ExpenseHandler != nil {
 		RegisterExpenseRoutes(v1, deps.ExpenseHandler, authMiddleware)
+	}
+	if deps.ChecklistHandler != nil {
+		RegisterChecklistRoutes(v1, deps.ChecklistHandler, authMiddleware)
 	}
 
 	if deps.SettlementHandler != nil {
