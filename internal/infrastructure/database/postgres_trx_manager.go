@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 
 	"gorm.io/gorm"
 )
@@ -11,11 +12,16 @@ type TrxManager interface {
 }
 
 type gormTrxManager struct {
-	db Database
+	db      Database
+	options *sql.TxOptions
 }
 
 func NewTrxManager(db Database) TrxManager {
 	return &gormTrxManager{db: db}
+}
+
+func NewReadSnapshotTrxManager(db Database) TrxManager {
+	return &gormTrxManager{db: db, options: &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}}
 }
 
 func (m *gormTrxManager) WithTransaction(ctx context.Context, fn func(trxCtx context.Context) error) error {
@@ -23,6 +29,5 @@ func (m *gormTrxManager) WithTransaction(ctx context.Context, fn func(trxCtx con
 		txDatabase := m.db.WithTx(tx)
 		trxCtx := InjectTrx(ctx, txDatabase)
 		return fn(trxCtx)
-	})
-
+	}, m.options)
 }
