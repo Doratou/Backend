@@ -1,0 +1,79 @@
+meta {
+  name: 02. Interactive Simulator
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/auth/login
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // If a previous response was locked (423/422) and solved by post-response,
+  // automatically attach the solved headers to this outgoing request.
+  const nonce = bru.getVar('powNonce');
+  if (nonce) {
+    req.setHeader('X-PoW-Salt', bru.getVar('powSalt'));
+    req.setHeader('X-PoW-Timestamp', bru.getVar('powTimestamp'));
+    req.setHeader('X-PoW-HMAC', bru.getVar('powHmac'));
+    req.setHeader('X-PoW-Difficulty', bru.getVar('powDifficulty'));
+    req.setHeader('X-PoW-Nonce', nonce);
+    console.log('[PoW Simulator] Injected solved headers into request (Nonce: ' + nonce + ')');
+  }
+}
+
+script:post-response {
+  const CryptoJS = require('crypto-js');
+  
+  function sha256Hex(input) {
+    return CryptoJS.SHA256(input).toString(CryptoJS.enc.Hex);
+  }
+  
+  function solveChallenge({ salt, timestamp, target }) {
+    const targetBig = BigInt('0x' + target);
+    let nonce = 0;
+    while (true) {
+      const hashHex = sha256Hex(`${salt}:${timestamp}:${nonce}`);
+      if (BigInt('0x' + hashHex) < targetBig) {
+        return String(nonce);
+      }
+      nonce++;
+    }
+  }
+  
+  const status = res.getStatus();
+  const body = res.getBody();
+  
+  if (status === 423 || status === 422) {
+    const challenge = body?.challenge;
+    if (challenge) {
+      const start = Date.now();
+      const nonce = solveChallenge(challenge);
+      const elapsed = Date.now() - start;
+      console.log(`[PoW Simulator] Status ${status}. Solved in ${elapsed}ms (Nonce: ${nonce}).`);
+  
+      bru.setVar('powSalt', challenge.salt);
+      bru.setVar('powTimestamp', String(challenge.timestamp));
+      bru.setVar('powHmac', challenge.hmac);
+      bru.setVar('powDifficulty', String(challenge.difficulty));
+      bru.setVar('powNonce', nonce);
+  
+      console.log('[PoW Simulator] Solution stored. Click "Send" again to retry.');
+    }
+  } else if (status === 200 || status === 201) {
+    bru.setVar('powNonce', '');
+    console.log('[PoW Simulator] 200 OK — Request passed successfully.');
+  }
+}
+
+docs {
+  # Interactive Simulator in Bruno
+  
+  Use this request to simulate and test the PoW flow directly inside Bruno.
+  
+  ## Usage:
+  1. Trigger multiple requests rapidly to exceed the L2 limit and receive a `423 Locked`.
+  2. The Bruno `post-response` script computes the puzzle and saves the headers.
+  3. Send the request again: `pre-request` automatically injects the headers, and the backend unlocks the client (`200 OK`).
+}
