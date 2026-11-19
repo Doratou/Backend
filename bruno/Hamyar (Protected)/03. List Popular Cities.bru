@@ -27,9 +27,9 @@ settings {
 docs {
   ## Method, Endpoint, and Authentication
 
-  `GET /api/v1/groups/{groupID}/hamyar/cities` — requires a Bearer access token; requester must own the group.
+  `GET /api/v1/groups/{groupID}/hamyar/cities` — requires a Bearer access token; requester must own the group. `groupID` is the positive integer ID of the group whose owner is making the request.
 
-  Returns the backend's curated list of 28 popular Iranian cities. The list is hard-coded and includes coordinates that the frontend can pass to the weather forecast endpoint.
+  Returns the backend's curated list of 28 popular Iranian cities. The list is hard-coded, so it does not change based on the group or request parameters. Each city's WGS84 coordinates can be passed as `lat` and `lng` to the weather forecast endpoint.
 
   ## Successful response
 
@@ -49,10 +49,11 @@ docs {
   }
   ```
 
-  Each city contains a Persian display `name`, stable English `slug`, Persian `province`, and WGS84 `latitude` and `longitude`.
+  Each city contains a Persian display `name`, stable English `slug`, Persian `province`, and WGS84 `latitude` and `longitude`. The response is a JSON object with a single `cities` array.
 
   ## Errors
 
   - `401` — access token is missing or invalid.
   - `403` — requester is not the owner of the specified group.
+  - `404` — the specified group does not exist.
 }
