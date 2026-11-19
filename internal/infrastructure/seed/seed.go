@@ -216,7 +216,7 @@ func seedUser(
 
 	user := &entity.User{
 		Name:               name,
-		PasswordHash:       hashedPassword,
+		PasswordHash:       &hashedPassword,
 		Email:              emailPtr,
 		Phone:              phonePtr,
 		IsEmailVerified:    emailPtr != nil,

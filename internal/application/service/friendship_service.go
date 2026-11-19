@@ -24,6 +24,7 @@ type friendshipService struct {
 	friendshipRepo domain_db.FriendshipRepository
 	userRepo       domain_db.UserRepository
 	dbTrx          database.TrxManager
+	attachmentURLs adapter.AttachmentURLResolver
 	cfg            FriendshipServiceConfig
 }
 
@@ -31,6 +32,7 @@ func NewFriendshipService(
 	friendshipRepo domain_db.FriendshipRepository,
 	userRepo domain_db.UserRepository,
 	dbTrx database.TrxManager,
+	attachmentURLs adapter.AttachmentURLResolver,
 	cfg FriendshipServiceConfig,
 	consts *bootstrap.Constant,
 ) adapter.FriendshipService {
@@ -43,6 +45,7 @@ func NewFriendshipService(
 		friendshipRepo: friendshipRepo,
 		userRepo:       userRepo,
 		dbTrx:          dbTrx,
+		attachmentURLs: attachmentURLs,
 		cfg:            cfg,
 	}
 }
@@ -127,9 +130,13 @@ func (s *friendshipService) ListRequests(ctx context.Context, userID int64, req 
 		return nil, err
 	}
 
+	avatarURLs, err := s.resolveAvatarURLs(ctx, userID, friendships)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]dto.FriendRequestListItem, 0, len(friendships))
 	for _, friendship := range friendships {
-		items = append(items, dto.ToFriendRequestListItem(friendship))
+		items = append(items, dto.ToFriendRequestListItem(friendship, avatarURLs))
 	}
 	return &dto.FriendRequestListResponse{
 		Items: items,
@@ -166,9 +173,23 @@ func (s *friendshipService) ListFriends(ctx context.Context, userID int64, req d
 	if err != nil {
 		return nil, err
 	}
+	avatarURLs, err := s.resolveAvatarURLs(ctx, userID, friendships)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]dto.FriendResponse, 0, len(friendships))
+	friendIDs := make([]int64, 0, len(friendships))
 	for _, friendship := range friendships {
-		items = append(items, dto.ToFriendResponse(friendship, userID))
+		item := dto.ToFriendResponse(friendship, userID, avatarURLs)
+		items = append(items, item)
+		friendIDs = append(friendIDs, item.User.ID)
+	}
+	groupCounts, err := s.friendshipRepo.CountMutualGroups(ctx, userID, friendIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		items[i].MutualGroupCount = groupCounts[items[i].User.ID]
 	}
 	return &dto.FriendListResponse{
 		Items: items,
@@ -178,6 +199,33 @@ func (s *friendshipService) ListFriends(ctx context.Context, userID int64, req d
 			Total: total,
 		},
 	}, nil
+}
+
+func (s *friendshipService) resolveAvatarURLs(ctx context.Context, userID int64, friendships []*entity.Friendship) (map[int64]string, error) {
+	ids := make([]int64, 0, len(friendships))
+	seen := make(map[int64]struct{})
+	for _, friendship := range friendships {
+		for _, user := range []*entity.User{friendship.RequesterUser, friendship.ReceiverUser} {
+			if user == nil || user.Status != enum.UserStatusActive || user.AvatarAttachmentID == nil {
+				continue
+			}
+			id := *user.AvatarAttachmentID
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	urls, err := s.attachmentURLs.ResolveAccessURLs(ctx, userID, ids)
+	var appErr *exception.AppError
+	if errors.As(err, &appErr) && appErr.Code == exception.ErrStorageUnavailable.Code {
+		return nil, nil
+	}
+	return urls, err
 }
 
 func (s *friendshipService) RemoveFriend(ctx context.Context, userID, friendshipID int64) error {

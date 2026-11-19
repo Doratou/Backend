@@ -1,6 +1,9 @@
 package dto
 
-import "time"
+import (
+	"github.com/Doratou/Backend/internal/domain/enum"
+	"time"
+)
 
 type CreateGroupRequest struct {
 	Title             string  `json:"title" binding:"required,min=1,max=150"`
@@ -23,7 +26,12 @@ type CloneGroupRequest struct {
 	Description *string `json:"description" binding:"omitempty,max=5000"`
 }
 
+type ChangeGroupStatusRequest struct {
+	Status enum.GroupStatus `json:"status" binding:"required,oneof=ACTIVE SETTLING CLOSED"`
+}
+
 type GroupResponse struct {
+	ClosedAt          *time.Time            `json:"closed_at,omitempty"`
 	ID                int64                 `json:"id"`
 	Title             string                `json:"title"`
 	Description       *string               `json:"description,omitempty"`

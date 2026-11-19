@@ -5,12 +5,14 @@ import (
 
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
+	domain_db "github.com/Doratou/Backend/internal/domain/repository/DB"
 )
 
 type CreatePollRequest struct {
-	Question   string              `json:"question" binding:"required,min=1,max=500"`
-	Visibility enum.PollVisibility `json:"visibility" binding:"required,oneof=PUBLIC PRIVATE"`
-	Options    []string            `json:"options" binding:"required,min=2,dive,required,min=1,max=255"`
+	Question             string              `json:"question" binding:"required,min=1,max=500"`
+	Visibility           enum.PollVisibility `json:"visibility" binding:"required,oneof=PUBLIC PRIVATE"`
+	AllowMultipleChoices bool                `json:"allow_multiple_choices"`
+	Options              []string            `json:"options" binding:"required,min=2,dive,required,min=1,max=255"`
 }
 
 type ListPollsRequest struct {
@@ -20,7 +22,7 @@ type ListPollsRequest struct {
 }
 
 type VotePollRequest struct {
-	OptionID int64 `json:"option_id" binding:"required,gt=0"`
+	OptionIDs []int64 `json:"option_ids" binding:"required,min=1,dive,gt=0"`
 }
 
 type ListPollVotersRequest struct {
@@ -39,19 +41,21 @@ type PollOptionResponse struct {
 }
 
 type PollResponse struct {
-	ID                int64                `json:"id"`
-	GroupID           int64                `json:"group_id"`
-	CreatedByMemberID int64                `json:"created_by_member_id"`
-	Question          string               `json:"question"`
-	Visibility        enum.PollVisibility  `json:"visibility"`
-	Status            enum.PollStatus      `json:"status"`
-	IsFrozen          bool                 `json:"is_frozen"`
-	ClosedAt          *time.Time           `json:"closed_at"`
-	CreatedAt         time.Time            `json:"created_at"`
-	UpdatedAt         time.Time            `json:"updated_at"`
-	Options           []PollOptionResponse `json:"options"`
-	TotalVotes        int64                `json:"total_votes"`
-	MyOptionID        *int64               `json:"my_option_id"`
+	ID                   int64                `json:"id"`
+	GroupID              int64                `json:"group_id"`
+	CreatedByMemberID    int64                `json:"created_by_member_id"`
+	Question             string               `json:"question"`
+	Visibility           enum.PollVisibility  `json:"visibility"`
+	AllowMultipleChoices bool                 `json:"allow_multiple_choices"`
+	Status               enum.PollStatus      `json:"status"`
+	IsFrozen             bool                 `json:"is_frozen"`
+	ClosedAt             *time.Time           `json:"closed_at"`
+	CreatedAt            time.Time            `json:"created_at"`
+	UpdatedAt            time.Time            `json:"updated_at"`
+	Options              []PollOptionResponse `json:"options"`
+	TotalVotes           int64                `json:"total_votes"`
+	TotalVoters          int64                `json:"total_voters"`
+	MyOptionIDs          []int64              `json:"my_option_ids"`
 }
 
 type PollPaginationResponse struct {
@@ -66,7 +70,12 @@ type PollListResponse struct {
 }
 
 type PollVoteResponse struct {
-	PollID    int64     `json:"poll_id"`
+	PollID    int64                       `json:"poll_id"`
+	OptionIDs []int64                     `json:"option_ids"`
+	Votes     []PollVoteSelectionResponse `json:"votes"`
+}
+
+type PollVoteSelectionResponse struct {
 	OptionID  int64     `json:"option_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -97,37 +106,38 @@ type PollStatusResponse struct {
 	ClosedAt *time.Time      `json:"closed_at"`
 }
 
-func ToPollListItem(poll *entity.Poll, counts map[int64]int64, myOptionID *int64, isFrozen bool) PollListItem {
-	response := ToPollResponse(poll, counts, nil, isFrozen)
-	response.MyOptionID = myOptionID
-	return PollListItem{PollResponse: response}
+func ToPollListItem(poll *entity.Poll, summary domain_db.PollVoteSummary, isFrozen bool) PollListItem {
+	return PollListItem{PollResponse: ToPollResponse(poll, summary, isFrozen)}
 }
 
-func ToPollResponse(poll *entity.Poll, counts map[int64]int64, vote *entity.PollVote, isFrozen bool) PollResponse {
+func ToPollResponse(poll *entity.Poll, summary domain_db.PollVoteSummary, isFrozen bool) PollResponse {
 	response := PollResponse{
 		ID: poll.ID, GroupID: poll.GroupID, CreatedByMemberID: poll.CreatedByMemberID,
 		Question: poll.Question, Visibility: poll.Visibility, Status: poll.Status,
+		AllowMultipleChoices: poll.AllowMultipleChoices, TotalVoters: summary.TotalVoters,
 		IsFrozen: isFrozen, ClosedAt: poll.ClosedAt, CreatedAt: poll.CreatedAt, UpdatedAt: poll.UpdatedAt,
-		Options: make([]PollOptionResponse, 0, len(poll.Options)),
+		Options:     make([]PollOptionResponse, 0, len(poll.Options)),
+		MyOptionIDs: append([]int64{}, summary.MyOptionIDs...),
 	}
 	for _, option := range poll.Options {
 		if option.DeletedAt.Valid {
 			continue
 		}
 		response.Options = append(response.Options, PollOptionResponse{
-			ID: option.ID, Title: option.Title, VoteCount: counts[option.ID],
+			ID: option.ID, Title: option.Title, VoteCount: summary.OptionCounts[option.ID],
 		})
-		response.TotalVotes += counts[option.ID]
-	}
-	if vote != nil && !vote.DeletedAt.Valid {
-		optionID := vote.OptionID
-		response.MyOptionID = &optionID
+		response.TotalVotes += summary.OptionCounts[option.ID]
 	}
 	return response
 }
 
-func ToPollVoteResponse(vote *entity.PollVote) PollVoteResponse {
-	return PollVoteResponse{PollID: vote.PollID, OptionID: vote.OptionID, CreatedAt: vote.CreatedAt, UpdatedAt: vote.UpdatedAt}
+func ToPollVoteResponse(pollID int64, votes []*entity.PollVote) PollVoteResponse {
+	response := PollVoteResponse{PollID: pollID, OptionIDs: make([]int64, 0, len(votes)), Votes: make([]PollVoteSelectionResponse, 0, len(votes))}
+	for _, vote := range votes {
+		response.OptionIDs = append(response.OptionIDs, vote.OptionID)
+		response.Votes = append(response.Votes, PollVoteSelectionResponse{OptionID: vote.OptionID, CreatedAt: vote.CreatedAt, UpdatedAt: vote.UpdatedAt})
+	}
+	return response
 }
 
 func ToPollVoterResponse(vote *entity.PollVote) PollVoterResponse {

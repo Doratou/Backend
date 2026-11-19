@@ -20,7 +20,7 @@ auth:bearer {
 
 body:json {
   {
-    "option_id": {{pollOptionId}}
+    "option_ids": {{pollOptionIds}}
   }
 }
 
@@ -33,13 +33,21 @@ docs {
 
   ## Description
 
-  Registers one choice for the authenticated active group member. The option must belong to this poll and must not be soft-deleted. The member is taken from authentication; sending member_id or user_id cannot vote on someone else's behalf.
+  Replaces the authenticated active member's ENTIRE selection set. Send every option you want to keep; this is not a toggle and not an append. The membership comes from the access token, never a supplied member_id or user_id.
 
-  The first vote and later changes return 200 OK. Repeating the same choice keeps one database record. Changing a choice updates that record, preserving its original created_at. After withdrawal, voting again restores the same row. To change your choice in Bruno, set pollOptionId manually in the Local environment to another option ID from Get Poll and save the environment. The folder pre-request script clears legacy runtime poll identifiers so your saved environment values are used.
+  For single-choice (allow_multiple_choices=false), option_ids must contain exactly one ID. For multi-choice (true), one or more distinct IDs are accepted. Every ID must be a positive BIGINT belonging to a non-deleted option in this poll. Empty or null arrays are invalid; use DELETE /vote to withdraw all.
 
-  The poll must be ACTIVE and its group must be ACTIVE. Concurrent voting is serialized with closing, deletion and group freezing. This endpoint never exposes voter identities.
+  [801,802] followed by [802,803] removes 801, keeps 802 and adds 803. Sending [803] then leaves only 803. Repeating the same set, even in a different order, does not create votes or update retained choice timestamps. Response option_ids and votes are sorted by option ID ascending.
 
-  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+  The replacement is atomic and serialized with other replacements, withdrawal, closing, deletion and group freezing. An invalid option leaves all previous selections untouched. Concurrent replacements produce one complete set, never a partial union; the last applied set wins. Frontends should serialize saves or prevent overlapping submissions.
+
+  Each (poll,member,option) has one reusable row. Removed choices are soft-deleted; unchanged choices preserve created_at and updated_at. A newly chosen option gets its own timestamps. Reselecting a removed option restores its row, retains its first created_at and updates updated_at. Response votes[] holds timestamps per selection; top-level ballot timestamps are not returned.
+
+  Set pollOptionIds manually in Local to a JSON array, such as [801] or [801,802]. The saved request resolves it without quotes. Legacy pollOptionId is ignored. The poll and group must both be ACTIVE.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
 
   ## Request
 
@@ -63,15 +71,18 @@ docs {
 
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `option_id` | `integer` | `Yes` | `Positive BIGINT ID of a non-deleted option in this poll` |
+  | option_ids | array of integers | Yes | Complete desired set; at least one distinct positive BIGINT ID. Exactly one for a single-choice poll. All options must belong to this poll. |
+
+  The old option_id-only body is rejected as BAD_REQUEST. Missing/null/empty arrays, strings, floats and zero/negative IDs are invalid. Duplicates return POLL_DUPLICATE_VOTE_OPTIONS. Multiple distinct IDs in single-choice return POLL_SINGLE_CHOICE_REQUIRED. HTTP bodies are limited to 256 KiB; oversized requests return BAD_REQUEST.
 
   ```json
   {
-    "option_id": 801
+    "option_ids": [
+      801,
+      802
+    ]
   }
   ```
-
-  The saved request resolves `{{pollOptionId}}` without quotes, so it must contain a JSON integer.
 
   ## Response
 
@@ -82,9 +93,22 @@ docs {
     "success": true,
     "data": {
       "poll_id": 701,
-      "option_id": 801,
-      "created_at": "2026-11-05T10:05:00Z",
-      "updated_at": "2026-11-05T10:05:00Z"
+      "option_ids": [
+        801,
+        802
+      ],
+      "votes": [
+        {
+          "option_id": 801,
+          "created_at": "2026-11-05T10:05:00Z",
+          "updated_at": "2026-11-05T10:05:00Z"
+        },
+        {
+          "option_id": 802,
+          "created_at": "2026-11-05T10:06:00Z",
+          "updated_at": "2026-11-05T10:06:00Z"
+        }
+      ]
     }
   }
   ```
@@ -96,6 +120,8 @@ docs {
   | HTTP | code | error | When |
   | --- | --- | --- | --- |
   | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, JSON payload, required field, value type, filter or pagination. |
+  | 400 | `POLL_DUPLICATE_VOTE_OPTIONS` | `option_ids must not contain duplicate IDs` | The same option ID is supplied more than once. |
+  | 400 | `POLL_SINGLE_CHOICE_REQUIRED` | `this poll allows exactly one selected option` | Multiple distinct IDs are supplied for a single-choice poll. |
   | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not contain a Bearer token. |
   | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, malformed, not an access token, or has an invalid user ID. |
   | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
@@ -107,7 +133,7 @@ docs {
   | 404 | `POLL_NOT_FOUND` | `poll not found` | The poll does not exist, is soft-deleted, or belongs to another group. |
   | 404 | `POLL_OPTION_NOT_FOUND` | `option not found in this poll` | The option does not exist, is deleted, or belongs to another poll. |
   | 409 | `POLL_CLOSED` | `poll is closed and cannot accept vote changes` | The poll is closed; votes cannot be added or changed. |
-  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is inactive; vote changes are frozen. |
+  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is `SETTLING` or `CLOSED`; vote changes are frozen. |
   | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
 
   **Example: 404**

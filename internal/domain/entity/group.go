@@ -16,6 +16,7 @@ type Group struct {
 	CoverAttachment   *Attachment      `gorm:"foreignKey:CoverAttachmentID" json:"cover_attachment,omitempty"`
 	Status            enum.GroupStatus `gorm:"column:status;type:group_status;not null;default:ACTIVE" json:"status"`
 	IsPremium         bool             `gorm:"column:is_premium;not null;default:false" json:"is_premium"`
+	ClosedAt          *time.Time       `gorm:"column:closed_at" json:"closed_at,omitempty"`
 	ArchivedAt        *time.Time       `gorm:"column:archived_at" json:"archived_at,omitempty"`
 	Members           []GroupMember    `gorm:"foreignKey:GroupID" json:"members,omitempty"`
 	Attachments       []Attachment     `gorm:"foreignKey:GroupID" json:"attachments,omitempty"`

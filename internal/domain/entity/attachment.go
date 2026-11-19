@@ -15,6 +15,8 @@ type Attachment struct {
 	Group              *Group              `gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"group,omitempty"`
 	ExpenseID          *int64              `gorm:"column:expense_id" json:"expense_id,omitempty"`
 	Expense            *Expense            `gorm:"foreignKey:ExpenseID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"expense,omitempty"`
+	SettlementID       *int64              `gorm:"column:settlement_id" json:"settlement_id,omitempty"`
+	Settlement         *Settlement         `gorm:"foreignKey:SettlementID" json:"-"`
 	Type               enum.AttachmentType `gorm:"column:type;type:attachment_type;not null" json:"type"`
 	OriginalFilename   *string             `gorm:"column:original_filename;size:255" json:"original_filename,omitempty"`
 	ObjectKey          *string             `gorm:"column:object_key;not null" json:"object_key,omitempty"`

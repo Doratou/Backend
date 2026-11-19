@@ -22,6 +22,8 @@ type Dependencies struct {
 	FriendshipHandler  *handler.FriendshipHandler
 	GroupHandler       *handler.GroupHandler
 	PollHandler        *handler.PollHandler
+	ExpenseHandler     *handler.ExpenseHandler
+	SettlementHandler  *handler.SettlementHandler
 	LuckyDrawHandler   *handler.LuckyDrawHandler
 	HamyarHandler      *handler.HamyarHandler
 	InviteHandler      *handler.InviteHandler
@@ -45,6 +47,9 @@ func New(deps Dependencies) *gin.Engine {
 			"status": "ok",
 		})
 	})
+
+	// OAuth2 developer test UI
+	engine.GET("/oauth-test", handler.OAuthTestUI)
 
 	var authMiddleware gin.HandlerFunc
 	var optionalAuthMiddleware gin.HandlerFunc
@@ -81,6 +86,13 @@ func New(deps Dependencies) *gin.Engine {
 	}
 	if deps.LuckyDrawHandler != nil {
 		RegisterLuckyDrawRoutes(v1, deps.LuckyDrawHandler, authMiddleware)
+	}
+	if deps.ExpenseHandler != nil {
+		RegisterExpenseRoutes(v1, deps.ExpenseHandler, authMiddleware)
+	}
+
+	if deps.SettlementHandler != nil {
+		RegisterSettlementRoutes(v1, deps.SettlementHandler, authMiddleware)
 	}
 	if deps.HamyarHandler != nil {
 		RegisterHamyarRoutes(v1, deps.HamyarHandler, authMiddleware)

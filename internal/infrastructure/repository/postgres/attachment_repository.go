@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -84,6 +85,40 @@ func (r *attachmentRepository) FindByIDs(ctx context.Context, ids []int64) ([]*e
 	db := r.getDB(ctx)
 
 	if err := db.Where("id IN (?)", ids).Find(&attachments).Error; err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return attachments, nil
+}
+
+const expenseReceiptVisibility = `EXISTS (SELECT 1 FROM users receipt_caller WHERE receipt_caller.id = @receipt_viewer AND receipt_caller.status = 'ACTIVE' AND receipt_caller.deleted_at IS NULL)
+	AND ((attachments.expense_id IS NULL AND attachments.uploaded_by_user_id = @receipt_viewer)
+	OR EXISTS (SELECT 1 FROM expenses receipt_expense
+		JOIN groups receipt_group ON receipt_group.id = receipt_expense.group_id AND receipt_group.deleted_at IS NULL
+		JOIN group_members receipt_member ON receipt_member.group_id = receipt_expense.group_id
+		WHERE receipt_expense.id = attachments.expense_id AND receipt_expense.deleted_at IS NULL
+		AND (attachments.group_id IS NULL OR attachments.group_id = receipt_expense.group_id)
+		AND receipt_member.user_id = @receipt_viewer AND receipt_member.status = 'ACTIVE' AND receipt_member.left_at IS NULL))`
+
+const settlementReceiptVisibility = `EXISTS (SELECT 1 FROM users receipt_caller WHERE receipt_caller.id = @receipt_viewer AND receipt_caller.status = 'ACTIVE' AND receipt_caller.deleted_at IS NULL)
+	AND ((attachments.settlement_id IS NULL AND attachments.uploaded_by_user_id = @receipt_viewer)
+	OR EXISTS (SELECT 1 FROM settlements receipt_payment
+		JOIN groups receipt_group ON receipt_group.id=receipt_payment.group_id AND receipt_group.deleted_at IS NULL
+		JOIN group_members receipt_member ON receipt_member.group_id=receipt_payment.group_id
+		WHERE receipt_payment.id=attachments.settlement_id AND receipt_payment.deleted_at IS NULL
+		AND attachments.group_id=receipt_payment.group_id
+		AND receipt_member.user_id=@receipt_viewer AND receipt_member.status='ACTIVE' AND receipt_member.left_at IS NULL
+		AND (receipt_payment.status IN ('SUCCESS','REJECT') OR receipt_payment.from_member_id=receipt_member.id OR receipt_payment.to_member_id=receipt_member.id)))`
+
+func (r *attachmentRepository) FindAccessibleByIDs(ctx context.Context, userID int64, ids []int64) ([]*entity.Attachment, error) {
+	attachments := make([]*entity.Attachment, 0)
+	if len(ids) == 0 {
+		return attachments, nil
+	}
+	err := r.getDB(ctx).Where("attachments.id IN ?", ids).Where(`((attachments.type = 'EXPENSE_RECEIPT' AND (`+expenseReceiptVisibility+`))
+		OR (attachments.type = 'SETTLEMENT_RECEIPT' AND (`+settlementReceiptVisibility+`))
+		OR (attachments.type NOT IN ('EXPENSE_RECEIPT','SETTLEMENT_RECEIPT') AND (attachments.is_public = TRUE OR attachments.uploaded_by_user_id = @receipt_viewer
+		OR EXISTS (SELECT 1 FROM group_members access_member WHERE access_member.group_id = attachments.group_id AND access_member.user_id = @receipt_viewer AND access_member.status = 'ACTIVE' AND access_member.left_at IS NULL))))`, sql.Named("receipt_viewer", userID)).Find(&attachments).Error
+	if err != nil {
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 	return attachments, nil
@@ -193,6 +228,11 @@ func (r *attachmentRepository) FindByType(ctx context.Context, attachmentType en
 
 func (r *attachmentRepository) List(ctx context.Context, filter domain_repo.AttachmentFilter, pagination domain_repo.Pagination) ([]*entity.Attachment, int64, error) {
 	db := r.getDB(ctx).Model(&entity.Attachment{})
+	if filter.ReceiptViewerUserID == nil {
+		db = db.Where("attachments.type NOT IN ?", []enum.AttachmentType{enum.AttachmentTypeExpenseReceipt, enum.AttachmentTypeSettlementReceipt})
+	} else {
+		db = db.Where("(attachments.type NOT IN ('EXPENSE_RECEIPT','SETTLEMENT_RECEIPT') OR (attachments.type='EXPENSE_RECEIPT' AND ("+expenseReceiptVisibility+")) OR (attachments.type='SETTLEMENT_RECEIPT' AND ("+settlementReceiptVisibility+")))", sql.Named("receipt_viewer", *filter.ReceiptViewerUserID))
+	}
 
 	if filter.PreloadRelations {
 		db = db.Preload("UploadedByUser.AvatarAttachment").Preload("Group").Preload("Expense")
@@ -322,7 +362,7 @@ func (r *attachmentRepository) FindUnclaimedAttachments(ctx context.Context, old
 	var attachments []*entity.Attachment
 
 	db := r.getDB(ctx).
-		Where("group_id IS NULL AND expense_id IS NULL AND created_at < ?", cutoff).
+		Where("group_id IS NULL AND expense_id IS NULL AND settlement_id IS NULL AND created_at < ?", cutoff).
 		Where("id NOT IN (SELECT avatar_attachment_id FROM users WHERE avatar_attachment_id IS NOT NULL AND deleted_at IS NULL)").
 		Where("id NOT IN (SELECT cover_attachment_id FROM groups WHERE cover_attachment_id IS NOT NULL AND deleted_at IS NULL)")
 

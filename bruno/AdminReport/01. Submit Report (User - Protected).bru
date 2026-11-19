@@ -69,4 +69,10 @@ docs {
     }
   }
   ```
+  ## Errors
+
+  * `400 Bad Request` — Missing target (user or group), invalid reason, or description out of range
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — User account is deactivated
+  * `404 Not Found` — Reported user or group does not exist
 }

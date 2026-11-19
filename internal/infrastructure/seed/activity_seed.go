@@ -22,7 +22,7 @@ func activitySeedGroups(tx *gorm.DB) ([]activitySeedGroup, error) {
 	}
 	groups := []entity.Group{primary}
 	var inactive []entity.Group
-	if err := tx.Where("status = ? AND id <> ?", enum.GroupStatusInactive, primary.ID).
+	if err := tx.Where("status = ? AND id <> ?", enum.GroupStatusSettling, primary.ID).
 		Order("id ASC").Limit(1).Find(&inactive).Error; err != nil {
 		return nil, fmt.Errorf("find inactive group for activity samples: %w", err)
 	}

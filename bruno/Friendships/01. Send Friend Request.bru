@@ -53,6 +53,17 @@ docs {
 
   Apply the project migrations, including `20261105000004_reuse_friendships_and_add_request_time.sql` and `20261111183000_add_user_friend_codes.sql`, before using this API version.
 
+  ### Allowed values
+
+  | Field / concept | Allowed values | Meaning |
+  | --- | --- | --- |
+  | Friendship status | `PENDING`, `ACCEPTED`, `REJECTED` | Waiting for a reply, accepted friendship, rejected request. Values are uppercase and case-sensitive. |
+  | Request direction | `incoming`, `outgoing` | Required on List Friend Requests only; values are lowercase and case-sensitive. |
+
+  There are no CANCELED or REMOVED status values. Cancel and Remove use soft deletion. An allowed resend restores the existing relationship to PENDING.
+
+  The Send response status is PENDING.
+
   ## Request
 
   ### Headers
@@ -93,6 +104,18 @@ docs {
     }
   }
   ```
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `data.id` | Relationship/request ID, not the recipient user ID. Reused on an allowed resend. |
+  | `data.requester_user_id / data.receiver_user_id` | User IDs for the latest request direction. |
+  | `data.status` | PENDING for this response. |
+  | `data.created_at` | Latest request time (requested_at in storage), not the original database row creation time. |
+  | `data.responded_at` | null until this latest request is accepted or rejected. |
+
+  Timestamps are RFC 3339 / ISO 8601 strings and may include Z or a numeric UTC offset. Parse the timestamp before formatting local dates and times.
 
   ## Errors
 

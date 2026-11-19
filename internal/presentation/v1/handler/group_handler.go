@@ -301,3 +301,27 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 	}
 	success(c, http.StatusOK, gin.H{"message": "group ownership transferred successfully"})
 }
+
+func (h *GroupHandler) ChangeStatus(c *gin.Context) {
+	userID, role, ok := getUserIdentity(c)
+	if !ok {
+		failLogged(c, exception.ErrMissingToken)
+		return
+	}
+	groupID, err := parseIDParam(c, "groupID")
+	if err != nil || groupID <= 0 {
+		failLogged(c, exception.ErrGroupInvalidID)
+		return
+	}
+	var req dto.ChangeGroupStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		failLogged(c, exception.ErrGroupInvalidStatus)
+		return
+	}
+	res, err := h.service.ChangeStatus(c.Request.Context(), userID, role, groupID, req)
+	if err != nil {
+		failLogged(c, err)
+		return
+	}
+	success(c, http.StatusOK, res)
+}

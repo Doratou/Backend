@@ -33,6 +33,8 @@ settings {
 }
 
 docs {
+  CLOSED groups cannot create, edit or revoke invite links (409 GROUP_CLOSED). Joining still requires an ACTIVE group. Read-only invitation lists remain available under their existing permissions.
+
   ## Method, Endpoint, and Auth
 
   `POST /api/v1/invites/direct` — Group owner; Bearer access token required.
@@ -81,6 +83,6 @@ docs {
   - `401 MISSING_TOKEN` — Access token is missing or invalid.
   - `403 DIRECT_INVITE_FORBIDDEN` — Requester is not the group owner or has a role that cannot send direct invites.
   - `404 GROUP_NOT_FOUND` — Group does not exist or was deleted.
-  - `409 GROUP_INACTIVE` — Group is inactive.
+  - `409 GROUP_INACTIVE` — Direct invites require an `ACTIVE` group.
   - `500 INTERNAL_SERVER_ERROR` — The group could not be checked or the request could not be processed.
 }

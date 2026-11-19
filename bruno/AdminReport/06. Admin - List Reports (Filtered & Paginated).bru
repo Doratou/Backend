@@ -44,7 +44,7 @@ docs {
   | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
 
   ### Query Parameters
-  | Parameter | Type | Required | Description |
+  | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `page` | `integer` | No | Page number (default: `1`) |
   | `limit` | `integer` | No | Items per page (default: `20`, max `100`) |
@@ -71,4 +71,9 @@ docs {
     }
   }
   ```
+  ## Errors
+
+  * `400 Bad Request` — Invalid filter or pagination parameters
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Insufficient permissions (requires ADMIN role)
 }

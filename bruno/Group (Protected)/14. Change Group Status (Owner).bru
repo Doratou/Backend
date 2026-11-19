@@ -1,0 +1,47 @@
+meta {
+  name: 14. Change Group Status (Owner)
+  type: http
+  seq: 14
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/groups/{{settlementGroupId}}/status
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "status": "{{settlementGroupStatus}}"
+  }
+}
+
+docs {
+  # Change Group Status
+
+  PATCH /api/v1/groups/:groupID/status. Bearer authentication required; group owner or site ADMIN. Uses manual settlementGroupId and settlementGroupStatus environment keys.
+
+  Body status is the uppercase case-sensitive enum ACTIVE, SETTLING, CLOSED. Forward transitions: ACTIVE -> SETTLING -> CLOSED. Sending the current state is harmless. Reopening and skipping SETTLING are forbidden. POST /groups/:groupID/archive is retained as an alias for moving to SETTLING.
+
+  | Group status | Expense, poll, and draw writes | Payment writes |
+  | --- | --- | --- |
+  | `ACTIVE` | Allowed | Allowed |
+  | `SETTLING` | Frozen | Allowed |
+  | `CLOSED` | Frozen | Frozen |
+
+  Active members can read history in all three states. Close the group after all pending payments have been resolved. Existing group rows with the former status `INACTIVE` migrate to `SETTLING`. Member and poll statuses use their own enums.
+
+  200 success envelope with the existing GroupResponse. status contains the new state. archived_at records transition to SETTLING, closed_at records transition to CLOSED (omitted before closure). No settlement is auto-confirmed. Closing a group with remaining net debts is permitted once no PENDING payment remains; this endpoint does not enforce zero debt.
+
+  Example JSON body: {"status":"SETTLING"}
+
+  Errors: 400 GROUP_INVALID_ID, 400 GROUP_INVALID_STATUS (status must be ACTIVE, SETTLING or CLOSED), 401 token errors, 403 GROUP_FORBIDDEN (not owner/admin), 404 GROUP_NOT_FOUND, 409 GROUP_STATUS_TRANSITION (forward transitions only), 409 GROUP_PENDING_SETTLEMENTS (resolve pending payments before closing the group), 500 INTERNAL_SERVER_ERROR. Standard error envelope is {"success":false,"code":"GROUP_PENDING_SETTLEMENTS","error":"resolve pending payments before closing the group"}.
+}

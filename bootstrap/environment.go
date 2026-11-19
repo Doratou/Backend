@@ -17,9 +17,17 @@ type Environment struct {
 	Captcha    CaptchaConfig `mapstructure:",squash"`
 	Email      EmailConfig   `mapstructure:",squash"`
 
-	Invite     InvitationConfig `mapstructure:",squash"`
-	Friendship FriendshipConfig `mapstructure:",squash"`
-	RustFS     RustFSConfig     `mapstructure:",squash"`
+	Invite     InvitationConfig  `mapstructure:",squash"`
+	Friendship FriendshipConfig  `mapstructure:",squash"`
+	RustFS     RustFSConfig      `mapstructure:",squash"`
+	PoW        PoWConfig         `mapstructure:",squash"`
+	Google     GoogleOAuthConfig `mapstructure:",squash"`
+}
+
+type GoogleOAuthConfig struct {
+	ClientID         string `mapstructure:"GOOGLE_CLIENT_ID"`
+	ClientSecret     string `mapstructure:"GOOGLE_CLIENT_SECRET" json:"-"`
+	RedirectEndPoint string `mapstructure:"GOOGLE_REDIRECT_ENDPOINT"`
 	AvalAI     AvalAIConfig     `mapstructure:",squash"`
 }
 
@@ -31,6 +39,15 @@ type AvalAIConfig struct {
 
 type FriendshipConfig struct {
 	RequestCooldown time.Duration `mapstructure:"FRIENDSHIP_REQUEST_COOLDOWN"`
+}
+
+type PoWConfig struct {
+	HMACSecret   string        `mapstructure:"POW_HMAC_SECRET" json:"-"`
+	ChallengeTTL time.Duration `mapstructure:"POW_CHALLENGE_TTL"`
+	BlockTTL     time.Duration `mapstructure:"POW_BLOCK_TTL"`
+	Difficulty   int           `mapstructure:"POW_DIFFICULTY"`
+	L1Limit      int           `mapstructure:"POW_L1_LIMIT"`
+	L2Limit      int           `mapstructure:"POW_L2_LIMIT"`
 }
 
 type RustFSConfig struct {
@@ -104,8 +121,9 @@ type Redis struct {
 }
 
 type HttpServer struct {
-	Domain string `mapstructure:"HTTP_DOMAIN"`
-	Port   string `mapstructure:"HTTP_PORT"`
+	Protcol string `mapstructure:"HTTP_PROTCOL"`
+	Domain  string `mapstructure:"HTTP_DOMAIN"`
+	Port    string `mapstructure:"HTTP_PORT"`
 }
 
 type InvitationConfig struct {

@@ -27,11 +27,19 @@ docs {
 
   ## Description
 
-  Returns the poll, its non-deleted options in ID order, counts for every option, total_votes and my_option_id. Results are visible immediately, including before the viewer votes and after the poll closes. Options with no votes have vote_count=0; my_option_id is null when the current member has no active vote.
+  Returns this non-deleted poll, its non-deleted options in ascending ID order, and aggregate results. Results are visible from the start, before the caller votes, after closing and while the group is frozen.
 
-  PUBLIC and PRIVATE detail responses both contain aggregate results and only the current member's own choice. To see other voters in a PUBLIC poll, use List Poll Voters. No voter identities are included here. Inactive groups remain readable with is_frozen=true. A poll from another group cannot be accessed by changing pollId alone.
+  allow_multiple_choices determines whether one or multiple selections are allowed. my_option_ids is always an ascending array of the caller's active option IDs, including [] before voting or after withdrawal. The old my_option_id field is no longer returned.
 
-  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+  vote_count counts active selections of that option. total_votes is their sum; total_voters counts distinct participating memberships. One member choosing 801 and 802 and another choosing 802 gives counts 1/2/0, total_votes=3 and total_voters=2. The example is viewed by the first member.
+
+  PUBLIC and PRIVATE detail both return aggregate results and only the caller's selections. Use List Poll Voters for identities in a PUBLIC poll. Changing pollId cannot access a poll from another group.
+
+  created_at is poll creation time. updated_at is the poll row's last update, currently closing, not the latest vote time. closed_at is null while ACTIVE and records closing time afterward. is_frozen comes from group status and does not change the poll's own status.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
 
   ## Request
 
@@ -65,6 +73,7 @@ docs {
       "created_by_member_id": 30,
       "question": "Which day works best?",
       "visibility": "PUBLIC",
+      "allow_multiple_choices": true,
       "status": "ACTIVE",
       "is_frozen": false,
       "closed_at": null,
@@ -79,11 +88,20 @@ docs {
         {
           "id": 802,
           "title": "Saturday",
-          "vote_count": 1
+          "vote_count": 2
+        },
+        {
+          "id": 803,
+          "title": "Sunday",
+          "vote_count": 0
         }
       ],
-      "total_votes": 2,
-      "my_option_id": 801
+      "total_votes": 3,
+      "total_voters": 2,
+      "my_option_ids": [
+        801,
+        802
+      ]
     }
   }
   ```

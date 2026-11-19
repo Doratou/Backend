@@ -1,0 +1,46 @@
+meta {
+  name: Settlements
+  seq: 14
+}
+
+docs {
+  # Settlements
+
+
+  All routes require Bearer authentication, an ACTIVE account and ACTIVE membership with left_at=null. Membership IDs belong to this group; user IDs are not interchangeable with them. An owner or site ADMIN has no special payment permissions.
+
+  Group status enum: `ACTIVE`, `SETTLING`, `CLOSED`. Both ACTIVE and SETTLING allow settlement writes; CLOSED allows reads only. Expenses, polls and draws remain frozen whenever the group is not ACTIVE.
+
+  Payment status enum (uppercase, case-sensitive): `PENDING`, `SUCCESS`, `REJECT`, `CANCELED`. PENDING and CANCELED are visible only to their active sender/recipient. SUCCESS and REJECT, including receipts, are visible to every active group member. Filtered list counts follow the same visibility rules.
+
+  Payments cannot be edited. Only the active sender may soft-delete PENDING. Only the active recipient may confirm/reject PENDING. Confirmation records a successful external payment; this endpoint does not perform a bank transfer. Rejection/cancellation never count as successful payments. Owner/admin cannot override either party.
+
+  A sender who leaves loses access; their existing PENDING payment remains answerable by its active recipient. If the recipient leaves/is removed before responding, incoming PENDING payments become `CANCELED` and record `canceled_at` in the same transaction. Rejoining does not revive them. Former-member financial relationships are outside the active-member balance calculation; history remains stored. `is_external` is true when either party currently has inactive membership/left_at. Membership status values remain ACTIVE/INACTIVE.
+
+  IDs are manual environment variables. No response script sets or overwrites settlement IDs. Set settlementGroupId, settlementToMemberId (from Get Group Members), settlementId, and settlementAttachmentIds yourself. Auth login/refresh keeps its existing token behavior.
+
+
+  ## Manual test flow
+
+  1. Apply migrations, start services/app and log in as sender A. Obtain recipient B member_id from Get Group Members.
+  2. Set settlementGroupId, settlementToMemberId and settlementAmountToman. Optional: upload receipt, copy its ID into settlementAttachmentIds=[ID].
+  3. Create Settlement, copy data.id into settlementId yourself. Check A outgoing and B incoming lists in separate Bruno/Postman sessions.
+  4. Check C/owner cannot see this pending record or its receipt. B can confirm or reject; only A can delete while pending.
+  5. Confirm one payment, reject a second, delete a third. Confirm/reject history and receipts become visible to C; deleted records disappear. No final record can be edited/deleted.
+  6. Try a sender leaving after Create: B can still confirm. Try recipient leaving/removal: payment becomes `CANCELED` with `canceled_at` set and stays canceled if B rejoins.
+  7. Move group ACTIVE -> SETTLING: settlement writes still work, expense/poll/draw writes stop. Resolve all pending payments, then move SETTLING -> CLOSED: all settlement writes stop. Reopening is not supported by this workflow.
+
+  ## Receipt privacy
+
+  SETTLEMENT_RECEIPT is always private. Metadata, streaming download, signed URL batches, ZIP downloads and group attachment lists enforce the same visibility. Linking happens only through Create Settlement; do not send settlement_id or expense_id when uploading/confirming a receipt. Once linked, direct deletion is blocked with 409 SETTLEMENT_RECEIPT_LOCKED, including for its uploader/owner. Delete a pending payment first to detach its files.
+
+  Receipt signed download URLs expire after the configured presigned TTL (currently 15 minutes). Previously issued signed URLs cannot be revoked instantly. Presigned PUT uploads are copied to a fresh server-controlled object on confirmation; subsequent PUTs to the original upload URL do not change the confirmed receipt.
+
+  ## Group lifecycle
+
+  PATCH /api/v1/groups/:groupID/status accepts ACTIVE, SETTLING, CLOSED. Only owner/site-admin may manage the group lifecycle (this does not grant payment permissions). Forward transitions are ACTIVE -> SETTLING -> CLOSED. POST /groups/:groupID/archive remains an alias for moving to SETTLING. Existing INACTIVE group rows migrate to SETTLING; membership ACTIVE/INACTIVE and poll ACTIVE/INACTIVE enums are unchanged. Closing with a pending payment returns 409 GROUP_PENDING_SETTLEMENTS. A group with non-deleted payment history cannot be deleted (409 GROUP_HAS_SETTLEMENTS).
+
+  ## Scope
+
+  This feature records external payments and decisions. It does not send money, charge wallets, schedule notifications or expose debt graph/report endpoints. Current balances are calculated only for the creation warning. Final SUCCESS records remain the source for future balance/report calculations.
+}

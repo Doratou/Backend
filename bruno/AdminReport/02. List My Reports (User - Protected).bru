@@ -41,10 +41,10 @@ docs {
   | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
 
   ### Query Parameters
-  | Parameter | Type | Required | Default | Description |
-  | --- | --- | --- | --- | --- |
-  | `page` | `integer` | No | `1` | Page number |
-  | `limit` | `integer` | No | `20` | Items per page (max 100) |
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Page number (default: 1) |
+  | `limit` | `integer` | No | Items per page (default: 20, max: 100) |
 
   ## Response
   **`200 OK`**
@@ -60,4 +60,8 @@ docs {
     }
   }
   ```
+  ## Errors
+
+  * `400 Bad Request` — Invalid pagination parameters
+  * `401 Unauthorized` — Missing or invalid token
 }

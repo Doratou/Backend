@@ -12,6 +12,8 @@ docs {
 
   Get My Profile requires a valid Bearer access token and an ACTIVE account.
 
+  Get Public Profile returns the current id, name, avatar_attachment_id and avatar_url for an ACTIVE account. Set profileUserId manually. Use this to resolve USER options and winners in lucky draws; it does not expose private account fields. Inactive/deleted targets return USER_NOT_FOUND and unavailable avatars return null. Cache repeated IDs within the current page; refresh to reflect profile changes.
+
   Get My Profile returns your own account and permanent friend_code. Share that code with another user. It is a public identifier, not an authentication token or an automatic friendship invitation.
 
   To find a friend, enter their full code manually in friendCode in the selected environment and save. Friendships / Find User By Friend Code returns one public preview. Confirm the identity, then manually copy data.id into receiver_user_id and use Friendships / Send Friend Request. These requests do not automatically change environment IDs or friendship state.

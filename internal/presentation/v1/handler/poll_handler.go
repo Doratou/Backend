@@ -73,6 +73,7 @@ func (h *PollHandler) Vote(c *gin.Context) {
 		return
 	}
 	var req dto.VotePollRequest
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 256<<10)
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, exception.Wrap(exception.ErrBadRequest, err))
 		return

@@ -27,11 +27,15 @@ docs {
 
   ## Description
 
-  Soft-deletes only the authenticated member's active vote. The vote stops contributing to results and my_option_id becomes null. The physical row remains for a later vote to reuse. Repeating withdrawal without an active vote returns POLL_VOTE_NOT_FOUND.
+  Withdraws ALL active selections of the authenticated member in this poll in one transaction. Other members are unaffected. Both modes use the same endpoint and no request body.
 
-  Withdrawal is allowed only while the poll and group are ACTIVE. It cannot affect another member's vote.
+  The rows are soft-deleted, this member's selections stop contributing to counts, and List/Get returns my_option_ids=[]. If no active selections existed, including repeated withdrawal, it returns 404 POLL_VOTE_NOT_FOUND.
 
-  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+  To remove only some selections, PUT /vote with the complete non-empty list to keep. To vote again after withdrawal, PUT a non-empty list. The poll and group must still be ACTIVE. Restored option rows keep their first created_at and get a new updated_at.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
 
   ## Request
 
@@ -83,7 +87,7 @@ docs {
   | 404 | `POLL_NOT_FOUND` | `poll not found` | The poll does not exist, is soft-deleted, or belongs to another group. |
   | 404 | `POLL_VOTE_NOT_FOUND` | `no active vote was found for this member in this poll` | The current member has no active vote to withdraw. |
   | 409 | `POLL_CLOSED` | `poll is closed and cannot accept vote changes` | The poll is closed; withdrawal is blocked. |
-  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is inactive; withdrawal is frozen. |
+  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is `SETTLING` or `CLOSED`; withdrawal is frozen. |
   | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
 
   **Example: 404**

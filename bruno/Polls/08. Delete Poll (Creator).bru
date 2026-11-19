@@ -31,7 +31,11 @@ docs {
 
   Deleted polls disappear from lists, detail, results and voter endpoints. Rows remain physically stored. Repeating Delete returns POLL_NOT_FOUND. Deletion is an alternative to keeping a closed poll for history; do not delete the sample poll until the other manual checks are complete.
 
-  The authenticated account and group membership must both be ACTIVE. Public visibility applies inside this group; it does not grant outsiders access.
+  Closing/deleting applies to both voting modes. All selections are affected together; mode is fixed at creation.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
 
   ## Request
 
@@ -82,7 +86,7 @@ docs {
   | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or has been soft-deleted. |
   | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
   | 404 | `POLL_NOT_FOUND` | `poll not found` | The poll does not exist, is soft-deleted, or belongs to another group. |
-  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is inactive; deletion is frozen. |
+  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is `SETTLING` or `CLOSED`; deletion is frozen. |
   | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
 
   **Example: 403**

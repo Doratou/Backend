@@ -1,0 +1,121 @@
+meta {
+  name: 01. Specification & Protocol
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/auth/login
+  body: none
+  auth: none
+}
+
+docs {
+  # Two-Layer Rate Limiter & Proof-of-Work (PoW) Protocol
+  
+  This document specifies the client-server protocol for endpoints guarded by the two-layer rate limiter.
+  
+  ---
+  
+  ## 1. Overview
+  
+  The endpoint uses a two-layer defense mechanism to prevent abuse:
+  
+  1. **Layer 1 (L1 - Generous limit)**: Handles high-volume traffic bursts. Exceeding this returns standard rate-limiting.
+  2. **Layer 2 (L2 - Strict limit)**: Detects sustained automated spamming. Exceeding this temporarily locks the client and requires a stateless cryptographic Proof-of-Work (PoW) solution to unlock.
+  
+  Tracking key: `HTTP_METHOD + ROUTE + CLIENT_IDENTITY` (Authenticated User ID, or Client IP if anonymous).
+  
+  ---
+  
+  ## 2. HTTP Status Codes & State Transitions
+  
+  | HTTP Status | Reason | Client Action |
+  | :--- | :--- | :--- |
+  | **`200 OK`** | Request allowed | Process response normally. |
+  | **`429 Too Many Requests`** | Layer 1 ceiling exceeded | Read `Retry-After` response header (seconds). Wait and retry. **No puzzle required.** |
+  | **`423 Locked`** | Client is blocked by Layer 2 | Solve the `challenge` object in the response body. Resend the original request with 5 `X-PoW-*` headers. |
+  | **`422 Unprocessable Entity`** | Submitted PoW is invalid or expired | A fresh `challenge` is returned in the response body. Solve the new challenge and retry. |
+  
+  ---
+  
+  ## 3. Challenge Payload Specification
+  
+  When receiving `423 Locked` or `422 Unprocessable Entity`, the response body contains:
+  
+  ```json
+  {
+    "success": false,
+    "code": "POW_CHALLENGE_REQUIRED",
+    "error": "rate limit exceeded, solve the proof of work challenge to continue",
+    "challenge": {
+      "salt": "a3f1b2c4d5e6f7a8b9c0d1e2f3a4b5c6",
+      "timestamp": 1731320852,
+      "hmac": "7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
+      "target": "0000ffff00000000000000000000000000000000000000000000000000000000",
+      "difficulty": 16
+    }
+  }
+  ```
+  
+  ### Field Definitions:
+  - `salt` *(string)*: 16-byte random hexadecimal string.
+  - `timestamp` *(int64)*: Unix timestamp (seconds) when the challenge was created.
+  - `hmac` *(string)*: Server-side HMAC-SHA256 signature authenticating `salt`, `timestamp`, and `difficulty`. Must be echoed back untouched.
+  - `target` *(string)*: 64-character hexadecimal representation of a 256-bit unsigned integer threshold.
+  - `difficulty` *(int)*: Target difficulty in bits.
+  
+  ---
+  
+  ## 4. Proof-of-Work Algorithm (Specification)
+  
+  To solve the puzzle, find the smallest non-negative integer `nonce` (starting at `0`) such that:
+  
+  ```text
+  SHA256(salt + ":" + timestamp + ":" + nonce) < target
+  ```
+  
+  Both the SHA-256 output and the `target` are treated as **256-bit unsigned big-endian integers**.
+  
+  ### Algorithm Pseudocode:
+  ```text
+  function solve(salt, timestamp, targetHex):
+      target = parseHexToBigInt(targetHex)
+      nonce = 0
+      loop:
+          message = salt + ":" + timestamp + ":" + string(nonce)
+          hash = sha256(message)
+          if parseHexToBigInt(hash) < target:
+              return string(nonce)
+          nonce = nonce + 1
+  ```
+  
+  ---
+  
+  ## 5. Request Headers for Verification
+  
+  Resend the original request with the following **5 headers**:
+  
+  | Header | Value | Description |
+  | :--- | :--- | :--- |
+  | `X-PoW-Salt` | `challenge.salt` | Echoed back exactly as received |
+  | `X-PoW-Timestamp` | `challenge.timestamp` | String representation of timestamp |
+  | `X-PoW-HMAC` | `challenge.hmac` | Server signature (do not modify) |
+  | `X-PoW-Difficulty` | `challenge.difficulty` | String representation of difficulty |
+  | `X-PoW-Nonce` | Solved nonce | The integer solution as string (e.g. `"14205"`) |
+  
+  > ⚠️ **Notice**: All 5 headers are mandatory. If any header is missing, the request remains locked (`423`).
+  
+  ---
+  
+  ## 6. Informational Rate Limit Headers
+  
+  On supported endpoints, the following headers indicate quota consumption:
+  
+  - `X-RateLimit-L1-Limit`: Maximum requests per window in Layer 1.
+  - `X-RateLimit-L1-Remaining`: Remaining request quota in Layer 1.
+  - `X-RateLimit-L1-Reset`: Seconds until Layer 1 quota refreshes.
+  - `X-RateLimit-L2-Limit`: Maximum requests per window in Layer 2.
+  - `X-RateLimit-L2-Remaining`: Remaining request quota in Layer 2.
+  - `X-RateLimit-L2-Reset`: Seconds until Layer 2 quota refreshes.
+  - `Retry-After`: (Present on `429`) Seconds to wait before retrying.
+}

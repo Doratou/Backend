@@ -31,7 +31,7 @@ func SeedManualTestData(ctx context.Context, db database.Database, h hasher.Hash
 	}
 	gdb := db.GetGormDB().WithContext(ctx)
 
-	const defaultTestPassword = "123123123"
+	const defaultTestPassword = "123123"
 	pwdHash, err := h.Hash(defaultTestPassword)
 	if err != nil {
 		return fmt.Errorf("hash test password: %w", err)
@@ -62,6 +62,7 @@ func SeedManualTestData(ctx context.Context, db database.Database, h hasher.Hash
 	// 2. Seed Rich Auxiliary Users with password 123123123
 	testUsers := []seedUserData{
 		// Primary persona aliases (for backward compatibility with previous scripts)
+		{Name: "Matin Admin", Email: "m9652973@gmail.com", Phone: "+989970000001", Role: enum.UserRoleAdmin, Password: defaultTestPassword},
 		{Name: "Alice Owner", Email: "owner@test.com", Phone: "+989120000001", Role: enum.UserRoleUser, Password: defaultTestPassword},
 		{Name: "Bob Member", Email: "member@test.com", Phone: "+989120000002", Role: enum.UserRoleUser, Password: defaultTestPassword},
 		{Name: "Charlie Inactive", Email: "inactive@test.com", Phone: "+989120000003", Role: enum.UserRoleUser, Password: defaultTestPassword},
@@ -96,7 +97,7 @@ func SeedManualTestData(ctx context.Context, db database.Database, h hasher.Hash
 			Name:            u.Name,
 			Email:           &email,
 			Phone:           &phone,
-			PasswordHash:    pwdHash,
+			PasswordHash:    &pwdHash,
 			SystemRole:      u.Role,
 			Status:          enum.UserStatusActive,
 			IsEmailVerified: true,
@@ -264,7 +265,7 @@ func SeedManualTestData(ctx context.Context, db database.Database, h hasher.Hash
 
 	// --- Group 8: Archived / Inactive Group (for testing group freeze and read-only guards) ---
 	g8Desc := "گروه آرشیو و فریز شده پس از پایان مسابقات هکاتون (وضعیت: غیرفعال)"
-	g8, err := getOrCreateGroup(gdb, "هکاتون استارتاپی پاییز ۱۴۰۲", &g8Desc, primaryUserID, enum.GroupStatusInactive, &sevenDaysAgo)
+	g8, err := getOrCreateGroup(gdb, "هکاتون استارتاپی پاییز ۱۴۰۲", &g8Desc, primaryUserID, enum.GroupStatusSettling, &sevenDaysAgo)
 	if err != nil {
 		return fmt.Errorf("seed group 8: %w", err)
 	}

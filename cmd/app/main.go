@@ -18,6 +18,7 @@ import (
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	emailInfra "github.com/Doratou/Backend/internal/infrastructure/email"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
+	oauthInfra "github.com/Doratou/Backend/internal/infrastructure/oauth"
 	randomInfra "github.com/Doratou/Backend/internal/infrastructure/random"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	postgresRepo "github.com/Doratou/Backend/internal/infrastructure/repository/postgres"
@@ -114,11 +115,15 @@ func main() {
 	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	pollRepo := postgresRepo.NewPollRepository(postgresDB)
+	expenseRepo := postgresRepo.NewExpenseRepository(postgresDB)
+	settlementRepo := postgresRepo.NewSettlementRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
 	tripSuggestionRepo := postgresRepo.NewTripSuggestionRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
+	oauthRepo := postgresRepo.NewOAuthRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
+	oauthStateRepo := redisRepo.NewOAuthStateRepository(redisCache)
 	captchaRepo := redisRepo.NewCaptchaRepository(redisCache)
 
 	// 6. Crypto & Security Utilities
@@ -135,6 +140,26 @@ func main() {
 		log.Printf("[SEED WARNING] database seeder finished with notice/error: %v", err)
 	}
 	cancelSeed()
+
+	// 6.2 Google OAuth Provider
+	var googleProvider oauthInfra.GoogleProvider
+	if cfg.Environment.Google.ClientID != "" {
+		googleCtx, cancelGoogle := context.WithTimeout(context.Background(), 10*time.Second)
+		gp, err := oauthInfra.NewGoogleProvider(googleCtx, oauthInfra.GoogleConfig{
+			ClientID:     cfg.Environment.Google.ClientID,
+			ClientSecret: cfg.Environment.Google.ClientSecret,
+			RedirectURL:  cfg.Environment.HttpServer.Protcol + "://" + cfg.Environment.HttpServer.Domain + ":" + cfg.Environment.HttpServer.Port + cfg.Environment.Google.RedirectEndPoint,
+		})
+		cancelGoogle()
+		if err != nil {
+			log.Printf("[GOOGLE OAUTH WARNING] failed to initialize Google OAuth provider: %v", err)
+		} else {
+			googleProvider = gp
+			log.Print("Google OAuth provider initialized")
+		}
+	} else {
+		log.Print("[GOOGLE OAUTH NOTICE] GOOGLE_CLIENT_ID is not configured; Google OAuth login is disabled")
+	}
 
 	// 7. Application Services
 	emailSender := mail.NewMailer(mail.EmailConfig{
@@ -168,9 +193,12 @@ func main() {
 
 	authService := service.NewAuthService(
 		userRepo,
+		oauthRepo,
 		attachmentRepo,
 		otpService,
 		tokenRepo,
+		oauthStateRepo,
+		googleProvider,
 		dbTrxManager,
 		redisTrxManager,
 		jwtMaker,
@@ -178,16 +206,6 @@ func main() {
 		service.AuthServiceConfig{
 			AccessTokenTTL:  cfg.Environment.JWT.AccessTokenTTL,
 			RefreshTokenTTL: cfg.Environment.JWT.RefreshTokenTTL,
-		},
-		cfg.Constant,
-	)
-
-	friendshipService := service.NewFriendshipService(
-		friendshipRepo,
-		userRepo,
-		dbTrxManager,
-		service.FriendshipServiceConfig{
-			RequestCooldown: cfg.Environment.Friendship.RequestCooldown,
 		},
 		cfg.Constant,
 	)
@@ -218,6 +236,10 @@ func main() {
 	attachmentService := service.NewAttachmentService(
 		attachmentRepo,
 		groupRepo,
+		expenseRepo,
+		settlementRepo,
+		userRepo,
+		dbTrxManager,
 		rustfsStorage,
 		service.AttachmentServiceConfig{
 			PublicURLPrefix:     rustfsEnv.PublicURLPrefix,
@@ -225,8 +247,27 @@ func main() {
 		},
 		cfg.Constant,
 	)
+	settlementService := service.NewSettlementService(settlementRepo, userRepo, dbTrxManager, attachmentService)
+	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
+	friendshipService := service.NewFriendshipService(
+		friendshipRepo,
+		userRepo,
+		dbTrxManager,
+		attachmentService,
+		service.FriendshipServiceConfig{
+			RequestCooldown: cfg.Environment.Friendship.RequestCooldown,
+		},
+		cfg.Constant,
+	)
 
-	userService := service.NewUserService(userRepo, attachmentService)
+	userService := service.NewUserService(
+		userRepo,
+		attachmentService,
+		otpService,
+		tokenRepo,
+		jwtMaker,
+		redisTrxManager,
+	)
 
 	// 8. Presentation Handlers & Routers
 	userHandler := handler.NewUserHandler(userService)
@@ -241,6 +282,8 @@ func main() {
 	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
 	pollHandler := handler.NewPollHandler(pollService)
+	expenseHandler := handler.NewExpenseHandler(expenseService)
+	settlementHandler := handler.NewSettlementHandler(settlementService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
@@ -253,6 +296,8 @@ func main() {
 		InviteHandler:      inviteHandler,
 		FriendshipHandler:  friendshipHandler,
 		PollHandler:        pollHandler,
+		ExpenseHandler:     expenseHandler,
+		SettlementHandler:  settlementHandler,
 		LuckyDrawHandler:   luckyDrawHandler,
 		HamyarHandler:      hamyarHandler,
 		CaptchaService:     captchaService,

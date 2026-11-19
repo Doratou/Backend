@@ -11,7 +11,7 @@ type User struct {
 	FriendCode          string          `gorm:"column:friend_code;size:15;not null;uniqueIndex:idx_users_friend_code;default:generate_user_friend_code();<-:create" json:"friend_code"`
 	Email               *string         `gorm:"column:email;size:255;uniqueIndex" json:"email,omitempty"`
 	Phone               *string         `gorm:"column:phone;size:16;uniqueIndex" json:"phone,omitempty"`
-	PasswordHash        string          `gorm:"column:password_hash;not null" json:"-"`
+	PasswordHash        *string         `gorm:"column:password_hash" json:"-"`
 	IsEmailVerified     bool            `gorm:"column:is_email_verified;not null;default:false" json:"is_email_verified"`
 	IsPhoneVerified     bool            `gorm:"column:is_phone_verified;not null;default:false" json:"is_phone_verified"`
 	AvatarAttachmentID  *int64          `gorm:"column:avatar_attachment_id" json:"avatar_attachment_id,omitempty"`
