@@ -115,6 +115,7 @@ func main() {
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	pollRepo := postgresRepo.NewPollRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
+	tripSuggestionRepo := postgresRepo.NewTripSuggestionRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	otpRepo := redisRepo.NewOTPRepository(redisCache)
 	tokenRepo := redisRepo.NewAuthnTokenRepository(redisCache)
@@ -208,10 +209,11 @@ func main() {
 		adminReportRepo,
 		userRepo,
 	)
-	weatherService := service.NewWeatherService(weatherInfra.NewOpenMeteoClient())
+	weatherService := service.NewWeatherService(weatherInfra.NewCachedWeatherProvider(weatherInfra.NewOpenMeteoClient(), redisCache))
+	aiModel := cfg.Environment.AvalAI.Model
 	tripSuggestionService := service.NewTripSuggestionService(ai.NewAvalAIClient(ai.AvalAIConfig{
-		APIKey: cfg.Environment.AvalAI.APIKey, BaseURL: cfg.Environment.AvalAI.BaseURL, Model: cfg.Environment.AvalAI.Model,
-	}), weatherService)
+		APIKey: cfg.Environment.AvalAI.APIKey, BaseURL: cfg.Environment.AvalAI.BaseURL, Model: aiModel,
+	}), weatherService, tripSuggestionRepo, aiModel)
 
 	attachmentService := service.NewAttachmentService(
 		attachmentRepo,

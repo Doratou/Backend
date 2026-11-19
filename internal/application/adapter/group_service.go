@@ -21,4 +21,5 @@ type GroupService interface {
 	Archive(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error
 	Delete(ctx context.Context, userID int64, role enum.UserRole, groupID int64) error
 	Clone(ctx context.Context, userID int64, role enum.UserRole, groupID int64, req dto.CloneGroupRequest) (*dto.GroupResponse, error)
+	IsActiveMember(ctx context.Context, groupID, userID int64) (bool, error)
 }

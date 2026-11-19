@@ -9,10 +9,15 @@ func RegisterHamyarRoutes(rg *gin.RouterGroup, h *handler.HamyarHandler, auth gi
 	if auth == nil {
 		panic("hamyar routes require authentication middleware")
 	}
-	hamyar := rg.Group("/groups/:groupID/hamyar", auth, h.RequireGroupOwner())
+	hamyar := rg.Group("/groups/:groupID/hamyar", auth)
 	{
-		hamyar.POST("/trip-suggestions", h.Suggest)
-		hamyar.GET("/weather", h.Forecast)
-		hamyar.GET("/cities", h.PopularCities)
+		hamyar.GET("/trip-suggestions", h.RequireGroupMember(), h.ListSuggestions)
+	}
+
+	ownerHamyar := rg.Group("/groups/:groupID/hamyar", auth, h.RequireGroupOwner())
+	{
+		ownerHamyar.POST("/trip-suggestions", h.Suggest)
+		ownerHamyar.GET("/weather", h.Forecast)
+		ownerHamyar.GET("/cities", h.PopularCities)
 	}
 }

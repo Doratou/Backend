@@ -249,6 +249,10 @@ func (s *groupService) LeaveGroup(ctx context.Context, userID, groupID int64) er
 	return s.groups.SetMemberInactive(ctx, groupID, userID)
 }
 
+func (s *groupService) IsActiveMember(ctx context.Context, groupID, userID int64) (bool, error) {
+	return s.groups.IsActiveMember(ctx, groupID, userID)
+}
+
 func (s *groupService) TransferOwnership(ctx context.Context, userID int64, role enum.UserRole, groupID, newOwnerID int64) error {
 	group, _, err := s.groups.FindByID(ctx, groupID)
 	if err != nil {
