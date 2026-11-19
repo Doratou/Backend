@@ -1,0 +1,98 @@
+meta {
+  name: 11. Batch Get Access URLs
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/batch/urls?expiry=1h
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  expiry: 1h
+  ~expiry: 30m
+  ~expiry: 2h
+  ~expiry: 24h
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ids": [1, 2, 3]
+  }
+}
+
+docs {
+  ## Settlement receipt access
+
+  SETTLEMENT_RECEIPT is always private. Unbound files are uploader-only. Bound PENDING/CANCELED files are visible only to the active sender/recipient; SUCCESS/REJECT files are visible to all active group members. Former/inactive members have no access. This applies to metadata, streams, batch URLs, ZIP and group lists. No owner/admin override. Direct deletion of any bound payment receipt returns 409 SETTLEMENT_RECEIPT_LOCKED; delete its PENDING payment first. No receipt edits are supported.
+
+  Upload/confirm omit settlement_id and expense_id; link uploaded IDs through Create Settlement. SETTLING groups allow settlement receipt uploads; CLOSED does not. Presigned confirmation validates actual MIME and size, then creates a separate server-controlled object. Never re-confirm an already registered receipt key. See the Settlements folder for the complete workflow and errors.
+
+  # Batch Get Access URLs
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/batch/urls`
+  **Auth:** Required (Bearer Token)
+
+  ## Description
+
+  Fetches active access URLs for a list of attachment IDs concurrently. For private files, generates freshly signed presigned GET URLs with the specified expiration. For public files, returns direct public URLs.
+
+  EXPENSE_RECEIPT is never publicly readable through these APIs. An unbound receipt is accessible only to its uploader. A linked receipt requires an ACTIVE account and ACTIVE membership with left_at=null in the expense group, including when the uploader is requesting it; former members lose access. `SETTLING` and `CLOSED` groups still allow receipt reads. Site ADMIN alone grants no bypass. Signed URLs already issued remain usable until expiry.
+
+  ## Request
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `expiry` | `string` | No | URL expiration duration (e.g. `15m`, `1h`, `24h`; defaults to `1h`) |
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `attachment_ids` | `int64[]` | Yes | List of attachment IDs (max 100) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "urls": [
+        {
+          "id": 1,
+          "access_url": "https://storage.example.com/uploads/photo.jpg?X-Amz-Signature=...",
+          "expires_at": "2026-11-02T20:00:00Z"
+        }
+      ]
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Empty attachment IDs list or exceeds limit (100)
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Access denied to one or more private attachments
+}

@@ -18,6 +18,7 @@ import (
 	"github.com/Doratou/Backend/internal/domain/repository/cache"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
+	"github.com/Doratou/Backend/internal/infrastructure/oauth"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 	"github.com/Doratou/Backend/pkg/hasher"
 	"github.com/Doratou/Backend/pkg/random"
@@ -29,21 +30,29 @@ type AuthServiceConfig struct {
 }
 
 type authService struct {
-	userRepo   domain_db.UserRepository
-	otpService adapter.OTPService
-	tokenRepo  cache.AuthnTokenRepository
-	dbTrx      database.TrxManager
-	redisTrx   redisInfra.TrxManager
-	jwtMaker   jwt.TokenMaker
-	hasher     hasher.Hasher
-	randomEng  *random.RandomGeneratorEngine
-	cfg        AuthServiceConfig
+	userRepo       domain_db.UserRepository
+	oauthRepo      domain_db.OAuthRepository
+	attachmentRepo domain_db.AttachmentRepository
+	otpService     adapter.OTPService
+	tokenRepo      cache.AuthnTokenRepository
+	oauthStateRepo cache.OAuthStateRepository
+	googleProvider oauth.GoogleProvider
+	dbTrx          database.TrxManager
+	redisTrx       redisInfra.TrxManager
+	jwtMaker       jwt.TokenMaker
+	hasher         hasher.Hasher
+	randomEng      *random.RandomGeneratorEngine
+	cfg            AuthServiceConfig
 }
 
 func NewAuthService(
 	userRepo domain_db.UserRepository,
+	oauthRepo domain_db.OAuthRepository,
+	attachmentRepo domain_db.AttachmentRepository,
 	otpService adapter.OTPService,
 	tokenRepo cache.AuthnTokenRepository,
+	oauthStateRepo cache.OAuthStateRepository,
+	googleProvider oauth.GoogleProvider,
 	dbTrx database.TrxManager,
 	redisTrx redisInfra.TrxManager,
 	jwtMaker jwt.TokenMaker,
@@ -62,15 +71,19 @@ func NewAuthService(
 		cfg.RefreshTokenTTL = defaultTTL
 	}
 	return &authService{
-		userRepo:   userRepo,
-		otpService: otpService,
-		tokenRepo:  tokenRepo,
-		dbTrx:      dbTrx,
-		redisTrx:   redisTrx,
-		jwtMaker:   jwtMaker,
-		hasher:     hasher,
-		randomEng:  random.NewRandomGeneratorEngine(),
-		cfg:        cfg,
+		userRepo:       userRepo,
+		oauthRepo:      oauthRepo,
+		attachmentRepo: attachmentRepo,
+		otpService:     otpService,
+		tokenRepo:      tokenRepo,
+		oauthStateRepo: oauthStateRepo,
+		googleProvider: googleProvider,
+		dbTrx:          dbTrx,
+		redisTrx:       redisTrx,
+		jwtMaker:       jwtMaker,
+		hasher:         hasher,
+		randomEng:      random.NewRandomGeneratorEngine(),
+		cfg:            cfg,
 	}
 }
 
@@ -175,18 +188,11 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 
-	name := req.Name
-	if name == "" {
-		rand_name, err := s.randomEng.GenerateRandomBase58String(8)
-		if err != nil {
-			rand_name = "<|O__O|>"
-		}
-		name = rand_name
-	}
+	name := s.initRandomName(req.Name)
 
 	user := &entity.User{
 		Name:               name,
-		PasswordHash:       hashedPassword,
+		PasswordHash:       &hashedPassword,
 		Email:              req.Email,
 		Phone:              req.Phone,
 		IsEmailVerified:    emailVerified,
@@ -257,7 +263,11 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 		return nil, exception.ErrUserInactive
 	}
 
-	if err := s.hasher.Compare(req.Password, user.PasswordHash); err != nil {
+	if user.PasswordHash == nil || *user.PasswordHash == "" {
+		return nil, exception.ErrOAuthOnlyAccount
+	}
+
+	if err := s.hasher.Compare(req.Password, *user.PasswordHash); err != nil {
 		return nil, exception.ErrInvalidCredentials
 	}
 
@@ -423,7 +433,11 @@ func (s *authService) ChangePassword(ctx context.Context, userID int64, req dto.
 		return exception.ErrUserInactive
 	}
 
-	if err := s.hasher.Compare(req.OldPassword, user.PasswordHash); err != nil {
+	if user.PasswordHash == nil || *user.PasswordHash == "" {
+		return exception.ErrOAuthOnlyAccount
+	}
+
+	if err := s.hasher.Compare(req.OldPassword, *user.PasswordHash); err != nil {
 		return exception.ErrInvalidCredentials
 	}
 
@@ -492,4 +506,215 @@ func (s *authService) ResetPassword(ctx context.Context, req dto.ResetPasswordRe
 	_ = s.tokenRepo.DeleteUserRefreshSessions(ctx, strconv.FormatInt(user.ID, 10))
 
 	return nil
+}
+
+func (s *authService) UpdateAvatar(ctx context.Context, userID int64, avatarAttachmentID int64) (*dto.UserResponse, error) {
+	att, err := s.attachmentRepo.FindByID(ctx, avatarAttachmentID)
+	if err != nil {
+		return nil, err
+	}
+	if att.Type != enum.AttachmentTypeProfileImage {
+		return nil, exception.ErrInvalidFileType
+	}
+	if att.UploadedByUserID == nil || *att.UploadedByUserID != userID {
+		return nil, exception.ErrAttachmentForbidden
+	}
+
+	if err := s.userRepo.UpdateAvatar(ctx, userID, avatarAttachmentID); err != nil {
+		return nil, err
+	}
+
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	res := dto.ToUserResponse(user)
+	return &res, nil
+}
+
+func (s *authService) GoogleLoginURL(ctx context.Context) (*dto.OAuthLoginURLResponse, error) {
+	if s.googleProvider == nil {
+		return nil, exception.Wrap(exception.ErrInternal, errors.New("google oauth provider is not configured"))
+	}
+
+	state, err := oauth.RandString(16)
+	if err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	nonce, err := oauth.RandString(16)
+	if err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	if err := s.oauthStateRepo.SaveState(ctx, state, nonce, 10*time.Minute); err != nil {
+		return nil, err
+	}
+
+	authURL := s.googleProvider.AuthURL(state, nonce)
+	return &dto.OAuthLoginURLResponse{URL: authURL}, nil
+}
+
+func (s *authService) GoogleCallback(ctx context.Context, req dto.GoogleCallbackRequest) (*dto.AuthResponse, error) {
+	log.Printf("Starting Google OAuth callback processing for state: %s", req.State)
+
+	if s.googleProvider == nil {
+		log.Println("Error: google oauth provider is not configured")
+		return nil, exception.Wrap(exception.ErrInternal, errors.New("google oauth provider is not configured"))
+	}
+
+	req.State = strings.TrimSpace(req.State)
+	req.Code = strings.TrimSpace(req.Code)
+	if req.State == "" || req.Code == "" {
+		log.Println("Error: missing state or code in google callback request")
+		return nil, exception.ErrBadRequest
+	}
+
+	// 1. Consume state from Redis (retrieves nonce and atomically deletes state to prevent replay)
+	nonce, err := s.oauthStateRepo.ConsumeState(ctx, req.State)
+	if err != nil {
+		log.Printf("Error: failed to consume oauth state from redis: %v", err)
+		return nil, err
+	}
+
+	// 2. Exchange authorization code for token with a timeout context
+	exchangeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	oauth2Token, err := s.googleProvider.Exchange(exchangeCtx, req.Code)
+	if err != nil {
+		log.Printf("Error: failed to exchange authorization code for token: %v", err)
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	// 3. Verify id_token signature, claims and nonce
+	claims, err := s.googleProvider.VerifyIDToken(exchangeCtx, oauth2Token, nonce)
+	if err != nil {
+		log.Printf("Error: failed to verify id_token signature or claims: %v", err)
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	// 4. Ensure email is verified by Google
+	if !claims.EmailVerified {
+		log.Printf("Warning: google email is not verified: %s", claims.Email)
+		return nil, exception.ErrOAuthEmailUnverified
+	}
+
+	email := strings.TrimSpace(strings.ToLower(claims.Email))
+	if email == "" {
+		log.Println("Warning: extracted email from claims is empty")
+		return nil, exception.ErrBadRequest
+	}
+
+	// 5. Lookup user by email (Account Linking: merge if user already exists)
+	var user *entity.User
+	existingUser, err := s.userRepo.FindByEmail(ctx, email)
+	if err != nil && !errors.Is(err, exception.ErrUserNotFound) {
+		log.Printf("Error: failed to lookup user by email %s: %v", email, err)
+		return nil, err
+	}
+
+	if existingUser != nil {
+		user = existingUser
+		log.Printf("Info: existing user found for account linking, user_id: %d, email: %s", user.ID, email)
+
+		if user.Status != enum.UserStatusActive {
+			log.Printf("Warning: attempted login for inactive user, user_id: %d", user.ID)
+			return nil, exception.ErrUserInactive
+		}
+
+		// Ensure is_email_verified is true since Google verified it
+		if !user.IsEmailVerified {
+			log.Printf("Info: updating email verification status for user_id: %d", user.ID)
+			user.IsEmailVerified = true
+			_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, true, user.IsPhoneVerified)
+		}
+
+		// Check if OAuth account link already exists for this provider
+		exists, err := s.oauthRepo.ExistsByUserAndProvider(ctx, user.ID, "google")
+		if err != nil {
+			log.Printf("Error: failed to check existing oauth account link for user_id %d: %v", user.ID, err)
+			return nil, err
+		}
+		if !exists {
+			log.Printf("Info: creating new oauth account link for existing user, user_id: %d", user.ID)
+			oauthAccount := &entity.UserOAuthAccount{
+				UserID:     user.ID,
+				Provider:   "google",
+				ProviderID: claims.Sub,
+			}
+			if err := s.oauthRepo.Create(ctx, oauthAccount); err != nil {
+				log.Printf("Error: failed to create oauth account link for user_id %d: %v", user.ID, err)
+				return nil, err
+			}
+		}
+	} else {
+		// New user registration via Google OAuth
+		log.Printf("Info: registering new user via google oauth, email: %s", email)
+		name := s.initRandomName(strings.TrimSpace(claims.Name))
+
+		user = &entity.User{
+			Name:               name,
+			PasswordHash:       nil,
+			Email:              &email,
+			Phone:              nil,
+			IsEmailVerified:    true,
+			IsPhoneVerified:    false,
+			AvatarAttachmentID: nil,
+			SystemRole:         enum.UserRoleUser,
+			Status:             enum.UserStatusActive,
+			Wallet:             0,
+			TelegramChatID:     nil,
+			TelegramUserID:     nil,
+		}
+
+		err = s.dbTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
+			if err := s.userRepo.Create(trxCtx, user); err != nil {
+				return err
+			}
+			oauthAccount := &entity.UserOAuthAccount{
+				UserID:     user.ID,
+				Provider:   "google",
+				ProviderID: claims.Sub,
+			}
+			return s.oauthRepo.Create(trxCtx, oauthAccount)
+		})
+		if err != nil {
+			log.Printf("Error: failed to execute database transaction for new user registration: %v", err)
+			return nil, err
+		}
+		log.Printf("Info: new user successfully registered, user_id: %d", user.ID)
+	}
+
+	// 6. Issue JWT access and refresh token pair
+	accessToken, accessClaims, refreshToken, refreshClaims, err := s.issueTokenPair(ctx, user.ID, user.SystemRole)
+	if err != nil {
+		log.Printf("Error: failed to issue jwt token pair for user_id %d: %v", user.ID, err)
+		return nil, err
+	}
+
+	log.Printf("Info: google oauth login successful for user_id: %d", user.ID)
+
+	userResponse := dto.ToUserResponse(user)
+	return &dto.AuthResponse{
+		User:                  userResponse,
+		AccessToken:           accessToken,
+		AccessTokenExpiresAt:  accessClaims.ExpiresAt.Time,
+		RefreshToken:          refreshToken,
+		RefreshTokenExpiresAt: refreshClaims.ExpiresAt.Time,
+		ExpiresAt:             accessClaims.ExpiresAt.Time,
+	}, nil
+}
+
+func (s *authService) initRandomName(reqName string) string {
+	name := reqName
+	if name == "" {
+		rand_name, err := s.randomEng.GenerateRandomBase58String(8)
+		if err != nil {
+			rand_name = "<|O__O|>"
+		}
+		name = rand_name
+	}
+	return name
 }

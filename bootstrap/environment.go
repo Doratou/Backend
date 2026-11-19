@@ -16,6 +16,49 @@ type Environment struct {
 	Seed       SeedConfig    `mapstructure:",squash"`
 	Captcha    CaptchaConfig `mapstructure:",squash"`
 	Email      EmailConfig   `mapstructure:",squash"`
+
+	Invite     InvitationConfig  `mapstructure:",squash"`
+	Friendship FriendshipConfig  `mapstructure:",squash"`
+	RustFS     RustFSConfig      `mapstructure:",squash"`
+	PoW        PoWConfig         `mapstructure:",squash"`
+	Google     GoogleOAuthConfig `mapstructure:",squash"`
+	AvalAI     AvalAIConfig      `mapstructure:",squash"`
+}
+
+type GoogleOAuthConfig struct {
+	ClientID         string `mapstructure:"GOOGLE_CLIENT_ID"`
+	ClientSecret     string `mapstructure:"GOOGLE_CLIENT_SECRET" json:"-"`
+	RedirectEndPoint string `mapstructure:"GOOGLE_REDIRECT_ENDPOINT"`
+}
+
+type AvalAIConfig struct {
+	APIKey  string `mapstructure:"AVALAI_API_KEY" json:"-"`
+	BaseURL string `mapstructure:"AVALAI_BASE_URL"`
+	Model   string `mapstructure:"AVALAI_MODEL"`
+}
+
+type FriendshipConfig struct {
+	RequestCooldown time.Duration `mapstructure:"FRIENDSHIP_REQUEST_COOLDOWN"`
+}
+
+type PoWConfig struct {
+	HMACSecret   string        `mapstructure:"POW_HMAC_SECRET" json:"-"`
+	ChallengeTTL time.Duration `mapstructure:"POW_CHALLENGE_TTL"`
+	BlockTTL     time.Duration `mapstructure:"POW_BLOCK_TTL"`
+	Difficulty   int           `mapstructure:"POW_DIFFICULTY"`
+	L1Limit      int           `mapstructure:"POW_L1_LIMIT"`
+	L2Limit      int           `mapstructure:"POW_L2_LIMIT"`
+}
+
+type RustFSConfig struct {
+	Endpoint        string `mapstructure:"RUSTFS_ENDPOINT"`
+	AccessKeyID     string `mapstructure:"RUSTFS_ACCESS_KEY_ID"`
+	SecretAccessKey string `mapstructure:"RUSTFS_SECRET_ACCESS_KEY" json:"-"`
+	BucketName      string `mapstructure:"RUSTFS_BUCKET_NAME"`
+	UseSSL          bool   `mapstructure:"RUSTFS_USE_SSL"`
+	Region          string `mapstructure:"RUSTFS_REGION"`
+	PublicURLPrefix string `mapstructure:"RUSTFS_PUBLIC_URL_PREFIX"`
+	MaxConcurrency  int    `mapstructure:"RUSTFS_MAX_CONCURRENCY"`
 }
 
 type EmailConfig struct {
@@ -23,7 +66,9 @@ type EmailConfig struct {
 	DoratouEmailAppPassword string `mapstructure:"DORATOU_EMAIL_APP_PASSWORD" json:"-"`
 	SMTPHost                string `mapstructure:"SMTP_HOST"`
 	SMTPPort                string `mapstructure:"SMTP_HOST_PORT"`
+	DeliveryEnabled         bool   `mapstructure:"EMAIL_DELIVERY_ENABLED"`
 	DeliveryMode            string `mapstructure:"EMAIL_DELIVERY_MODE"`
+	FontBaseURL             string `mapstructure:"EMAIL_FONT_BASE_URL"`
 }
 
 type CaptchaConfig struct {
@@ -41,6 +86,10 @@ type SeedConfig struct {
 	AdminEmail    string `mapstructure:"SEED_ADMIN_EMAIL"`
 	AdminPhone    string `mapstructure:"SEED_ADMIN_PHONE"`
 	AdminPassword string `mapstructure:"SEED_ADMIN_PASSWORD"`
+
+	GroupTitle          string `mapstructure:"SEED_GROUP_TITLE"`
+	GroupDescription    string `mapstructure:"SEED_GROUP_DESCRIPTION"`
+	GroupInvitePassword string `mapstructure:"SEED_GROUP_INVITE_PASSWORD"`
 }
 
 type JWTConfig struct {
@@ -72,8 +121,14 @@ type Redis struct {
 }
 
 type HttpServer struct {
-	Domain string `mapstructure:"HTTP_DOMAIN"`
-	Port   string `mapstructure:"HTTP_PORT"`
+	Protcol string `mapstructure:"HTTP_PROTCOL"`
+	Domain  string `mapstructure:"HTTP_DOMAIN"`
+	Port    string `mapstructure:"HTTP_PORT"`
+}
+
+type InvitationConfig struct {
+	SecretKey                  string        `mapstructure:"INVITE_ENCRYPTION_SECRET"`
+	DirectInviteRejectCooldown time.Duration `mapstructure:"GROUP_DIRECT_INVITE_REJECT_COOLDOWN"`
 }
 
 func NewEnvironment() (*Environment, error) {

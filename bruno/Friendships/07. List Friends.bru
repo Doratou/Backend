@@ -1,0 +1,143 @@
+meta {
+  name: 07. List Friends
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/friendships
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Friends
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/friendships`
+  **Auth:** Required
+
+  ## Description
+
+  Lists the authenticated user's non-deleted ACCEPTED friendships, ordered by latest request time descending, then ID descending (`requested_at DESC, id DESC`). Pending, rejected, and soft-deleted relationships are excluded. The other participant's summary is returned regardless of who originally sent the request.
+
+  `friendship_id` identifies the relationship for Remove Friend; `user.id` identifies the other user. `friends_since` is the acceptance time (`responded_at`), which can be null on legacy rows without a response timestamp.
+
+  The list requires an ACTIVE caller. The other participant's summary contains `id`, `name`, `avatar_attachment_id`, and `avatar_url`; no email, phone, or password is returned. If that user has been soft-deleted, the summary keeps the user ID and may contain an empty name and a null avatar.
+
+  To remove a selected friend, set `friendshipId` manually in the Local environment to the selected item's `friendship_id`, then save the environment before using Remove Friend. Neither this list nor Accept Friend Request automatically changes that variable.
+
+  ### Allowed values
+
+  | Field / concept | Allowed values | Meaning |
+  | --- | --- | --- |
+  | Friendship status | `PENDING`, `ACCEPTED`, `REJECTED` | Waiting for a reply, accepted friendship, rejected request. Values are uppercase and case-sensitive. |
+  | Request direction | `incoming`, `outgoing` | Required on List Friend Requests only; values are lowercase and case-sensitive. |
+
+  There are no CANCELED or REMOVED status values. Cancel and Remove use soft deletion. An allowed resend restores the existing relationship to PENDING.
+
+  This list contains ACCEPTED relationships only; the item itself has no status field.
+
+  Render the returned `avatar_url` directly. Use initials or a default avatar when the URL is null. The URL can be null if the image is missing, inaccessible, temporarily unavailable, or belongs to an inactive account. Avatar URLs may expire.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Authenticated user's Bearer access token (`Bearer <token>`) |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Minimum 1; defaults to 1 |
+  | `limit` | `integer` | No | From 1 to 100; defaults to 20 |
+
+  No request body is required.
+
+  Omitting `page` or `limit`, or providing an empty query value, uses its default. Explicit zero, negative values, non-integers, `limit` above 100, integer overflow, and an overflowing pagination offset return `400 BAD_REQUEST`. A page beyond the last result still returns `200 OK` with an empty `items` array.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "friendship_id": 501,
+          "user": {
+            "id": 2,
+            "name": "Default Admin",
+            "avatar_attachment_id": 501,
+            "avatar_url": "https://storage.example.com/avatars/profile.png?signature=example"
+          },
+          "friends_since": "2026-10-29T10:05:00Z",
+          "mutual_group_count": 3
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  This example matches `page=1&limit=20`. `total` counts all matching friendships before pagination. No results return `items: []`; `total` can remain positive on a page beyond the last result.
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `data.items[].friendship_id` | Relationship ID used by Remove Friend; different from user.id. |
+  | `data.items[].user` | Public summary: id (other user ID), name, avatar_attachment_id (integer or null), avatar_url (string or null). |
+  | `data.items[].friends_since` | Acceptance timestamp (responded_at), or null on legacy data. |
+  | `data.items[].mutual_group_count` | Number of non-deleted groups where both users have an active membership. Includes `ACTIVE`, `SETTLING`, and `CLOSED` groups. Returns 0 when they share none. |
+  | `data.pagination` | page and limit describe this page; total counts all matching friendships. |
+
+  Timestamps are RFC 3339 / ISO 8601 strings and may include Z or a numeric UTC offset. Parse the timestamp before formatting local dates and times.
+
+  ## Errors
+
+  Each error returns the HTTP status below and the JSON envelope shown in the example. The `code` and `error` strings match the backend definitions. Internal database and Redis details are not returned.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid page or limit, integer overflow, or an overflowing pagination offset. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing, empty, or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The access token is malformed or invalid, or a refresh token was supplied. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token has expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated user does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Redis blacklist lookup, database access, or a transaction fails. |
+
+  **Example: 400 Bad Request**
+
+  ```json
+  {
+    "success": false,
+    "code": "BAD_REQUEST",
+    "error": "bad request payload or parameters"
+  }
+  ```
+}

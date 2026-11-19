@@ -1,0 +1,47 @@
+meta {
+  name: Friendships
+  seq: 4
+}
+
+auth {
+  mode: none
+}
+
+script:pre-request {
+  bru.deleteVar("friendCode");
+  bru.deleteVar("receiver_user_id");
+  bru.deleteVar("friendRequestId");
+  bru.deleteVar("friendshipId");
+}
+
+docs {
+  # Friendships
+
+  Configure receiver_user_id, friendRequestId and friendshipId manually in the Variables tab of the selected Local environment, then save the environment before sending a request. These fields start empty so you can enter the actual IDs from your own database and responses.
+
+  To find another user, get their friend code, enter it manually in friendCode in the environment and run Find User By Friend Code in this folder. Confirm the returned name and avatar, then copy data.id into receiver_user_id before sending a request. Users / Get My Profile returns your own friend_code for sharing.
+
+  receiver_user_id identifies the other user when sending a request. friendRequestId is data.id from Send Friend Request or an item's id from Incoming or Outgoing Friend Requests. friendshipId is data.id from Accept Friend Request or an item's friendship_id from List Friends.
+
+  Responses do not automatically populate or overwrite these identifiers. The folder pre-request script clears legacy runtime values so the manually configured environment values are used. Authentication continues to use token populated by Login or Refresh Token.
+
+  ### Allowed values
+
+  | Field / concept | Allowed values | Meaning |
+  | --- | --- | --- |
+  | Friendship status | `PENDING`, `ACCEPTED`, `REJECTED` | Waiting for a reply, accepted friendship, rejected request. Values are uppercase and case-sensitive. |
+  | Request direction | `incoming`, `outgoing` | Required on List Friend Requests only; values are lowercase and case-sensitive. |
+
+  There are no CANCELED or REMOVED status values. Cancel and Remove use soft deletion. An allowed resend restores the existing relationship to PENDING.
+
+  ### Frontend flow
+
+  1. Read your own friend_code through GET /api/v1/users/me or the authenticated user returned by Auth. Share the code; it is not an access token.
+  2. Look up the other user's full friend code, show the returned public name/avatar, and send receiver_user_id=data.id only after the user confirms.
+  3. Use the recipient's session for Accept/Reject and the sender's session for Cancel. Either participant may Remove an accepted friendship.
+  4. Refresh lists after an action. A relationship ID is reused after an allowed resend; the same ID can later have a new direction and request time.
+
+  Friend and pending-request summaries include `avatar_attachment_id` and `avatar_url`. Render the URL directly and use a fallback for null values. Each List Friends item also includes `mutual_group_count` across `ACTIVE`, `SETTLING`, and `CLOSED` groups where both users are active members. Deleted groups and former memberships are excluded.
+
+  Examples use illustrative IDs, names and dates. They do not guarantee that these records exist in your database. Runtime/environment identifiers are set manually; only the existing Auth token behavior remains automatic.
+}

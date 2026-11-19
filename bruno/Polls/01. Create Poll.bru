@@ -1,0 +1,164 @@
+meta {
+  name: 01. Create Poll
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/groups/{{pollGroupId}}/polls
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "question": "Which day works best?",
+    "visibility": "PUBLIC",
+    "allow_multiple_choices": true,
+    "options": [
+      "Friday",
+      "Saturday",
+      "Sunday"
+    ]
+  }
+}
+
+docs {
+  # Create Poll
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/groups/:groupID/polls`
+  **Auth:** Required
+
+  ## Description
+
+  Creates an ACTIVE poll and all options in one transaction. The creator is the authenticated caller's group membership. At least two distinct options are required. Question and option titles are trimmed; duplicate titles are rejected after trimming and case folding.
+
+  allow_multiple_choices=false permits exactly one selected option per member. true permits one or more distinct selected options, up to the number of options in this poll. Missing or null uses false. This setting, question, visibility and options cannot be edited after creation. Existing polls remain single-choice after migration.
+
+  Set pollGroupId manually in Local. After creation, copy data.id into pollId and put actual options[].id values in pollOptionIds as a JSON array, e.g. [801] or [801,802]. Save the environment. No poll response auto-fills these variables. This saved example creates a multi-choice PUBLIC poll; use false to test single-choice and PRIVATE to test privacy.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+  | `Content-Type` | `string` | Yes | `application/json` |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; Bruno variable `pollGroupId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | question | string | Yes | 1..500 Unicode characters both before and after trimming. |
+  | visibility | string | Yes | Exactly PUBLIC or PRIVATE. |
+  | allow_multiple_choices | boolean | No | true for multi-choice, false for single-choice; missing/null defaults to false. Immutable. |
+  | options | array of strings | Yes | At least two titles, each 1..255 Unicode characters before/after trimming; non-blank and unique after trim/case folding. |
+
+  ```json
+  {
+    "question": "Which day works best?",
+    "visibility": "PUBLIC",
+    "allow_multiple_choices": true,
+    "options": [
+      "Friday",
+      "Saturday",
+      "Sunday"
+    ]
+  }
+  ```
+
+  ## Response
+
+  **`201 Created`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 701,
+      "group_id": 10,
+      "created_by_member_id": 30,
+      "question": "Which day works best?",
+      "visibility": "PUBLIC",
+      "allow_multiple_choices": true,
+      "status": "ACTIVE",
+      "is_frozen": false,
+      "closed_at": null,
+      "created_at": "2026-11-05T10:00:00Z",
+      "updated_at": "2026-11-05T10:00:00Z",
+      "options": [
+        {
+          "id": 801,
+          "title": "Friday",
+          "vote_count": 0
+        },
+        {
+          "id": 802,
+          "title": "Saturday",
+          "vote_count": 0
+        },
+        {
+          "id": 803,
+          "title": "Sunday",
+          "vote_count": 0
+        }
+      ],
+      "total_votes": 0,
+      "total_voters": 0,
+      "my_option_ids": []
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the same envelope as the existing Auth and Friendships endpoints. Internal causes are not exposed.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, JSON payload, required field, value type, filter or pagination. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, malformed, not an access token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 403 | `POLL_FORBIDDEN` | `only active group members can access this poll` | The user has no active membership in this group or has left it. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 409 | `POLL_GROUP_INACTIVE` | `polls cannot be changed while the group is inactive` | The group is `SETTLING` or `CLOSED`; creation is frozen. |
+  | 400 | `POLL_INVALID_OPTIONS` | `provide at least two non-empty options with titles of at most 255 characters` | An option is blank after trimming or contains unsupported text. |
+  | 400 | `POLL_DUPLICATE_OPTIONS` | `poll options must be unique` | Option titles repeat after trimming and case folding. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
+
+  **Example: 400**
+
+  ```json
+  {
+    "success": false,
+    "code": "POLL_INVALID_OPTIONS",
+    "error": "provide at least two non-empty options with titles of at most 255 characters"
+  }
+  ```
+}

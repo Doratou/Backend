@@ -1,0 +1,1 @@
+Get-ChildItem -Recurse -Filter *.go | ForEach-Object { gofmt -w $_.FullName }

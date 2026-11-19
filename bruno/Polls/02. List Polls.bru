@@ -1,0 +1,159 @@
+meta {
+  name: 02. List Polls
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{pollGroupId}}/polls
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~status: ACTIVE
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Polls
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/polls`
+  **Auth:** Required
+
+  ## Description
+
+  Lists non-deleted polls in this group, ordered by created_at DESC, id DESC. The optional status filter accepts ACTIVE or INACTIVE and applies to the poll itself, independently of group freezing.
+
+  Every item has the same fields as Get Poll: allow_multiple_choices, ordered options with vote_count, total_votes, total_voters and my_option_ids. Selected IDs are sorted ascending; no selection returns []. No votes means both totals are zero. The example uses the same poll and option IDs as Create/Get.
+
+  total_votes is the sum of active selections; total_voters counts distinct participating memberships. One person selecting two options contributes 2 votes but 1 voter. Votes from members who later leave remain counted. Other voters' identities are not returned.
+
+  Selection-share percentages divide vote_count by total_votes and sum to 100 before rounding. Participant percentages divide by total_voters and can sum above 100 for multi-choice. Use zero for a zero denominator and label the chosen meaning in the UI.
+
+  Polls in `SETTLING` or `CLOSED` groups remain readable with `is_frozen=true`. Closed polls remain readable with status=INACTIVE and closed_at populated. Empty pages return items=[], including pages past the end even when pagination.total is positive. IDs remain manually configured in Bruno.
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; Bruno variable `pollGroupId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Defaults to 1; minimum 1 |
+  | `limit` | `integer` | No | Defaults to 20; from 1 to 100 |
+  | `status` | `string` | No | Exactly ACTIVE or INACTIVE; omit for both. Disabled by default in this request. |
+
+  Omitted or empty page/limit values use defaults. Explicit zero, negative or non-integer values, integer overflow and an overflowing pagination offset return BAD_REQUEST.
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 701,
+          "group_id": 10,
+          "created_by_member_id": 30,
+          "question": "Which day works best?",
+          "visibility": "PUBLIC",
+          "allow_multiple_choices": true,
+          "status": "ACTIVE",
+          "is_frozen": false,
+          "closed_at": null,
+          "created_at": "2026-11-05T10:00:00Z",
+          "updated_at": "2026-11-05T10:00:00Z",
+          "options": [
+            {
+              "id": 801,
+              "title": "Friday",
+              "vote_count": 1
+            },
+            {
+              "id": 802,
+              "title": "Saturday",
+              "vote_count": 2
+            },
+            {
+              "id": 803,
+              "title": "Sunday",
+              "vote_count": 0
+            }
+          ],
+          "total_votes": 3,
+          "total_voters": 2,
+          "my_option_ids": [
+            801,
+            802
+          ]
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the same envelope as the existing Auth and Friendships endpoints. Internal causes are not exposed.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, JSON payload, required field, value type, filter or pagination. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, malformed, not an access token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 403 | `POLL_FORBIDDEN` | `only active group members can access this poll` | The user has no active membership in this group or has left it. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
+
+  **Example: 400**
+
+  ```json
+  {
+    "success": false,
+    "code": "BAD_REQUEST",
+    "error": "bad request payload or parameters"
+  }
+  ```
+}

@@ -1,0 +1,63 @@
+meta {
+  name: Polls
+  seq: 6
+}
+
+auth {
+  mode: none
+}
+
+script:pre-request {
+  bru.deleteVar("pollGroupId");
+  bru.deleteVar("pollId");
+  bru.deleteVar("pollOptionId");
+  bru.deleteVar("pollOptionIds");
+}
+
+docs {
+  # Polls
+
+  Run go run ./cmd/migrate up before starting this version, including 20261116120000_add_poll_multiple_choices.sql. Existing polls default to allow_multiple_choices=false and all votes are preserved. The unique key becomes (poll_id,member_id,option_id), including soft-deleted rows. Down refuses rollback if a membership has multiple stored option rows in a poll, even deleted ones; it never silently discards votes.
+
+  ## Enum values and voting mode
+
+  | Field | Allowed values |
+  | --- | --- |
+  | visibility | PUBLIC, PRIVATE |
+  | status | ACTIVE, INACTIVE |
+  | allow_multiple_choices | JSON boolean true or false; missing/null on Create means false. |
+
+  Enums are uppercase and case-sensitive. The creator fixes the mode at creation. Single-choice accepts exactly one option ID; multi-choice accepts one or more distinct option IDs. Question, options, visibility and mode cannot be edited later. All eight route paths and HTTP methods stay the same.
+
+  ## API changes
+
+  PUT /api/v1/groups/{groupID}/polls/{pollID}/vote now takes option_ids, the ENTIRE desired non-empty set. It atomically replaces previous choices, never toggles or appends. [801,802] followed by [802,803] leaves only [802,803]. Repeating a set has no extra effect. Empty arrays are invalid; DELETE /vote withdraws all of this member's choices. To remove some choices, PUT the non-empty list to keep.
+
+  Create/List/Get return allow_multiple_choices, total_votes, total_voters and my_option_ids. my_option_ids is always an ascending array, including [] when no vote exists. my_option_id is removed. PUT returns poll_id, option_ids and votes[], with option_id/created_at/updated_at per selection. Old option_id bodies and top-level vote timestamps are not supported; frontend consumers must update together.
+
+  total_votes is the sum of active option selections; total_voters counts distinct participating memberships. A person choosing two options means 2 votes and 1 voter. vote_count counts people selecting that option. Selection shares divide by total_votes and sum to 100 before rounding. Participant percentages divide by total_voters and can sum above 100. Use zero when the denominator is zero and label the meaning in the UI.
+
+  PUBLIC voter lists have one row per selection. A member can appear several times and across pages; pagination.total counts selections. PRIVATE hides other voter identities, including from the creator. Aggregate results and the caller's own selections remain available.
+
+  ## Dates and concurrent requests
+
+  Each (poll,member,option) has one reusable row. Unchanged selections retain both timestamps. A new option gets a new row; removing it soft-deletes it. Reselecting restores it, keeps the first created_at and updates updated_at. Poll updated_at is not the latest vote time; closed_at records closing time.
+
+  Replacements, withdrawal, closing/deletion serialize using poll row locks and transactions. An invalid ID leaves all old choices untouched. Concurrent saves result in a complete set, never a partial union; last applied set wins. Frontends should serialize saves or disable submission while one is pending.
+
+  ## Access and lifecycle
+
+  All endpoints require an ACTIVE account and ACTIVE group membership. Only the creator may close/delete, without owner/admin override. A creator leaving does not close the poll. Votes by departed members remain counted.
+
+  `SETTLING` and `CLOSED` groups freeze creation, voting, replacement, withdrawal, closing and deletion. Reads remain available with is_frozen=true. Closed polls reject vote changes but retain results; no reopen route exists. Deletion soft-deletes the poll, options and selections.
+
+  ## Manual Bruno setup
+
+  Set pollGroupId, pollId and pollOptionIds manually in Local and save. pollOptionIds is a JSON array, e.g. [801] or [801,802]. Initial [] is a placeholder: fill actual option IDs before voting. Legacy pollOptionId is ignored. No response auto-fills identifiers; the folder clears runtime IDs so saved values are used. Auth Login/Refresh retain automatic token behavior.
+
+  Create returns poll and option IDs. Copy them into the environment yourself. Login as another member replaces token without changing manual poll variables. Example IDs are illustrative, not seeded records.
+
+  Test single-choice by omitting allow_multiple_choices: vote [A], replace with [B], check [A,B] fails without changing B, then withdraw. Test multi-choice with true: [A,B], [B,C], repeat, inspect Get/List and PUBLIC voters using another member, then withdraw all. Check duplicate/foreign/deleted IDs are rejected atomically. Also test PRIVATE, outsider/inactive access, group freezing, creator-only Close/Delete and writes after closing. Withdrawal without an active selection returns POLL_VOTE_NOT_FOUND.
+
+  HTTP errors use the shared success/code/error envelope. Invalid input and authentication are checked first; group freezing can precede poll-specific state or creator errors.
+}

@@ -1,0 +1,115 @@
+meta {
+  name: 04. List Trip Suggestions
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{hamyarGroupId}}/hamyar/trip-suggestions?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Authentication
+
+  `GET /api/v1/groups/{groupID}/hamyar/trip-suggestions` — requires a Bearer access token. The requester must be an active member of the specified group; group owners are also members. `groupID` must be a positive integer.
+
+  Returns the group's saved trip-suggestion history, newest entries first, in the project's standard success envelope and pagination format. Use this endpoint to review checklists previously generated for the group.
+
+  ## Query parameters
+
+  | Parameter | Type | Required | Default | Constraints / Description |
+  | --- | --- | --- | --- | --- |
+  | `page` | `integer` | No | `1` | 1-based page number; must be at least 1. |
+  | `limit` | `integer` | No | `20` | Number of records per page; must be from 1 through 100. |
+
+  The shared pagination parser applies the project's standard rules: omitted or empty values use their defaults; `page` must be at least 1, `limit` must be from 1 through 100, and an overflowing offset is rejected. Invalid values return the standard `400 GROUP_INVALID_PAGINATION` response.
+
+  ## Successful response
+
+  **`200 OK`** — response uses the standard `{ "success": true, "data": ... }` envelope. Pagination metadata is nested under `data.pagination`, matching other paginated endpoints.
+
+  | Field | Type | Description |
+  | --- | --- | --- |
+  | `items` | `object[]` | Saved suggestions for the requested page, ordered newest first. An empty page returns an empty array. |
+  | `items[].id` | `integer` | Suggestion record ID. |
+  | `items[].group_id` | `integer` | Owning group ID. |
+  | `items[].created_by_user_id` | `integer` | User ID of the group owner who generated the suggestion. |
+  | `items[].latitude`, `items[].longitude` | `number` | Destination coordinates used to generate the suggestion. |
+  | `items[].start_date`, `items[].end_date` | `string` | Trip dates in `YYYY-MM-DD` format. |
+  | `items[].people_count` | `integer` | Number of travelers. |
+  | `items[].input` | `object` | Original trip request fields, including city, preferences, activities, and notes. |
+  | `items[].weather_snapshot` | `object` | Weather data included in the generation prompt, when available; omitted when unavailable. |
+  | `items[].summary` | `string` | Persian summary returned by the checklist generator. |
+  | `items[].items` | `object[]` | Suggested preparation items, each with `name`, `priority`, and `reason`. |
+  | `items[].model` | `string` | AI model configured for the generation request. |
+  | `items[].prompt_version` | `string` | Prompt version used to generate the checklist. |
+  | `items[].created_at` | `string` | Creation timestamp in the server's serialized time format. |
+  | `pagination.page` | `integer` | Current 1-based page number. |
+  | `pagination.limit` | `integer` | Page size used for this response. |
+  | `pagination.total` | `integer` | Total number of suggestions across all pages for the group. |
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 42,
+          "group_id": 5,
+          "created_by_user_id": 8,
+          "latitude": 36.9,
+          "longitude": 50.65,
+          "start_date": "2026-11-19",
+          "end_date": "2026-11-22",
+          "people_count": 4,
+          "input": {
+            "city_name": "رامسر",
+            "people_count": 4
+          },
+          "summary": "وسایل پیشنهادی سفر رامسر آماده شده‌اند.",
+          "items": [
+            {
+              "name": "کفش مناسب پیاده‌روی",
+              "priority": "ضروری",
+              "reason": "برای مسیرهای طبیعت‌گردی مناسب است."
+            }
+          ],
+          "model": "configured-model",
+          "prompt_version": "v1",
+          "created_at": "2026-11-19T10:30:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  ## Errors
+
+  - `400 GROUP_INVALID_PAGINATION` — invalid `page` or `limit`, including values outside the shared limits or page/offset overflow. Response uses the standard error object with `success`, `code`, and `error` fields.
+  - `400 GROUP_INVALID_ID` — invalid `groupID`.
+  - `401` — access token is missing or invalid.
+  - `403` — requester is not an active member of the specified group.
+  - `404` — the specified group does not exist.
+  - `500` — unexpected error while reading the group's history; response contains an `error` message.
+}

@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
@@ -32,6 +34,17 @@ func (r *attachmentRepository) Create(ctx context.Context, attachment *entity.At
 	return nil
 }
 
+func (r *attachmentRepository) CreateBatch(ctx context.Context, attachments []*entity.Attachment) error {
+	if len(attachments) == 0 {
+		return nil
+	}
+	db := r.getDB(ctx)
+	if err := db.Create(&attachments).Error; err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+	return nil
+}
+
 func (r *attachmentRepository) FindByID(ctx context.Context, id int64) (*entity.Attachment, error) {
 	var attachment entity.Attachment
 	db := r.getDB(ctx)
@@ -46,11 +59,90 @@ func (r *attachmentRepository) FindByID(ctx context.Context, id int64) (*entity.
 	return &attachment, nil
 }
 
+func (r *attachmentRepository) FindByIDWithRelations(ctx context.Context, id int64) (*entity.Attachment, error) {
+	var attachment entity.Attachment
+	db := r.getDB(ctx)
+
+	err := db.Preload("UploadedByUser.AvatarAttachment").
+		Preload("Group").
+		Preload("Expense").
+		Where("id = ?", id).
+		First(&attachment).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.ErrAttachmentNotFound
+		}
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return &attachment, nil
+}
+
+func (r *attachmentRepository) FindByIDs(ctx context.Context, ids []int64) ([]*entity.Attachment, error) {
+	if len(ids) == 0 {
+		return []*entity.Attachment{}, nil
+	}
+	var attachments []*entity.Attachment
+	db := r.getDB(ctx)
+
+	if err := db.Where("id IN (?)", ids).Find(&attachments).Error; err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return attachments, nil
+}
+
+const expenseReceiptVisibility = `EXISTS (SELECT 1 FROM users receipt_caller WHERE receipt_caller.id = @receipt_viewer AND receipt_caller.status = 'ACTIVE' AND receipt_caller.deleted_at IS NULL)
+	AND ((attachments.expense_id IS NULL AND attachments.uploaded_by_user_id = @receipt_viewer)
+	OR EXISTS (SELECT 1 FROM expenses receipt_expense
+		JOIN groups receipt_group ON receipt_group.id = receipt_expense.group_id AND receipt_group.deleted_at IS NULL
+		JOIN group_members receipt_member ON receipt_member.group_id = receipt_expense.group_id
+		WHERE receipt_expense.id = attachments.expense_id AND receipt_expense.deleted_at IS NULL
+		AND (attachments.group_id IS NULL OR attachments.group_id = receipt_expense.group_id)
+		AND receipt_member.user_id = @receipt_viewer AND receipt_member.status = 'ACTIVE' AND receipt_member.left_at IS NULL))`
+
+const settlementReceiptVisibility = `EXISTS (SELECT 1 FROM users receipt_caller WHERE receipt_caller.id = @receipt_viewer AND receipt_caller.status = 'ACTIVE' AND receipt_caller.deleted_at IS NULL)
+	AND ((attachments.settlement_id IS NULL AND attachments.uploaded_by_user_id = @receipt_viewer)
+	OR EXISTS (SELECT 1 FROM settlements receipt_payment
+		JOIN groups receipt_group ON receipt_group.id=receipt_payment.group_id AND receipt_group.deleted_at IS NULL
+		JOIN group_members receipt_member ON receipt_member.group_id=receipt_payment.group_id
+		WHERE receipt_payment.id=attachments.settlement_id AND receipt_payment.deleted_at IS NULL
+		AND attachments.group_id=receipt_payment.group_id
+		AND receipt_member.user_id=@receipt_viewer AND receipt_member.status='ACTIVE' AND receipt_member.left_at IS NULL
+		AND (receipt_payment.status IN ('SUCCESS','REJECT') OR receipt_payment.from_member_id=receipt_member.id OR receipt_payment.to_member_id=receipt_member.id)))`
+
+func (r *attachmentRepository) FindAccessibleByIDs(ctx context.Context, userID int64, ids []int64) ([]*entity.Attachment, error) {
+	attachments := make([]*entity.Attachment, 0)
+	if len(ids) == 0 {
+		return attachments, nil
+	}
+	err := r.getDB(ctx).Where("attachments.id IN ?", ids).Where(`((attachments.type = 'EXPENSE_RECEIPT' AND (`+expenseReceiptVisibility+`))
+		OR (attachments.type = 'SETTLEMENT_RECEIPT' AND (`+settlementReceiptVisibility+`))
+		OR (attachments.type NOT IN ('EXPENSE_RECEIPT','SETTLEMENT_RECEIPT') AND (attachments.is_public = TRUE OR attachments.uploaded_by_user_id = @receipt_viewer
+		OR EXISTS (SELECT 1 FROM group_members access_member WHERE access_member.group_id = attachments.group_id AND access_member.user_id = @receipt_viewer AND access_member.status = 'ACTIVE' AND access_member.left_at IS NULL))))`, sql.Named("receipt_viewer", userID)).Find(&attachments).Error
+	if err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return attachments, nil
+}
+
 func (r *attachmentRepository) FindByObjectKey(ctx context.Context, objectKey string) (*entity.Attachment, error) {
 	var attachment entity.Attachment
 	db := r.getDB(ctx)
 
 	err := db.Where("object_key = ?", objectKey).First(&attachment).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.ErrAttachmentNotFound
+		}
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return &attachment, nil
+}
+
+func (r *attachmentRepository) FindByHash(ctx context.Context, hash string) (*entity.Attachment, error) {
+	var attachment entity.Attachment
+	db := r.getDB(ctx)
+
+	err := db.Where("file_hash = ?", hash).First(&attachment).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, exception.ErrAttachmentNotFound
@@ -92,6 +184,22 @@ func (r *attachmentRepository) FindByGroup(ctx context.Context, groupID int64, l
 	return attachments, nil
 }
 
+func (r *attachmentRepository) FindByGroupAndType(ctx context.Context, groupID int64, attachmentType enum.AttachmentType, limit, offset int) ([]*entity.Attachment, error) {
+	var attachments []*entity.Attachment
+	db := r.getDB(ctx).Where("group_id = ? AND type = ?", groupID, attachmentType).Order("id DESC")
+	if limit > 0 {
+		db = db.Limit(limit)
+	}
+	if offset > 0 {
+		db = db.Offset(offset)
+	}
+
+	if err := db.Find(&attachments).Error; err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return attachments, nil
+}
+
 func (r *attachmentRepository) FindByExpense(ctx context.Context, expenseID int64) ([]*entity.Attachment, error) {
 	var attachments []*entity.Attachment
 	db := r.getDB(ctx).Where("expense_id = ?", expenseID).Order("id DESC")
@@ -118,9 +226,75 @@ func (r *attachmentRepository) FindByType(ctx context.Context, attachmentType en
 	return attachments, nil
 }
 
+func (r *attachmentRepository) List(ctx context.Context, filter domain_repo.AttachmentFilter, pagination domain_repo.Pagination) ([]*entity.Attachment, int64, error) {
+	db := r.getDB(ctx).Model(&entity.Attachment{})
+	if filter.ReceiptViewerUserID == nil {
+		db = db.Where("attachments.type NOT IN ?", []enum.AttachmentType{enum.AttachmentTypeExpenseReceipt, enum.AttachmentTypeSettlementReceipt})
+	} else {
+		db = db.Where("(attachments.type NOT IN ('EXPENSE_RECEIPT','SETTLEMENT_RECEIPT') OR (attachments.type='EXPENSE_RECEIPT' AND ("+expenseReceiptVisibility+")) OR (attachments.type='SETTLEMENT_RECEIPT' AND ("+settlementReceiptVisibility+")))", sql.Named("receipt_viewer", *filter.ReceiptViewerUserID))
+	}
+
+	if filter.PreloadRelations {
+		db = db.Preload("UploadedByUser.AvatarAttachment").Preload("Group").Preload("Expense")
+	}
+
+	if filter.UploadedByUserID != nil {
+		db = db.Where("uploaded_by_user_id = ?", *filter.UploadedByUserID)
+	}
+	if filter.GroupID != nil {
+		db = db.Where("group_id = ?", *filter.GroupID)
+	}
+	if filter.ExpenseID != nil {
+		db = db.Where("expense_id = ?", *filter.ExpenseID)
+	}
+	if filter.Type != nil {
+		db = db.Where("type = ?", *filter.Type)
+	}
+	if filter.IsPublic != nil {
+		db = db.Where("is_public = ?", *filter.IsPublic)
+	}
+	if filter.Search != "" {
+		searchTerm := "%" + filter.Search + "%"
+		db = db.Where("original_filename ILIKE ?", searchTerm)
+	}
+
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	pageSize := pagination.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	page := pagination.Page
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * pageSize
+
+	var attachments []*entity.Attachment
+	if err := db.Order("id DESC").Limit(pageSize).Offset(offset).Find(&attachments).Error; err != nil {
+		return nil, 0, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	return attachments, total, nil
+}
+
 func (r *attachmentRepository) Update(ctx context.Context, attachment *entity.Attachment) error {
 	db := r.getDB(ctx)
 	if err := db.Save(attachment).Error; err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+	return nil
+}
+
+func (r *attachmentRepository) UpdateBatch(ctx context.Context, ids []int64, updates map[string]any) error {
+	if len(ids) == 0 || len(updates) == 0 {
+		return nil
+	}
+	db := r.getDB(ctx)
+	if err := db.Model(&entity.Attachment{}).Where("id IN (?)", ids).Updates(updates).Error; err != nil {
 		return exception.Wrap(exception.ErrInternal, err)
 	}
 	return nil
@@ -138,6 +312,18 @@ func (r *attachmentRepository) DeleteByID(ctx context.Context, id int64) error {
 	return nil
 }
 
+func (r *attachmentRepository) DeleteByIDs(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db := r.getDB(ctx)
+	res := db.Where("id IN (?)", ids).Delete(&entity.Attachment{})
+	if res.Error != nil {
+		return exception.Wrap(exception.ErrInternal, res.Error)
+	}
+	return nil
+}
+
 func (r *attachmentRepository) HardDeleteByID(ctx context.Context, id int64) error {
 	db := r.getDB(ctx)
 	res := db.Unscoped().Where("id = ?", id).Delete(&entity.Attachment{})
@@ -150,6 +336,18 @@ func (r *attachmentRepository) HardDeleteByID(ctx context.Context, id int64) err
 	return nil
 }
 
+func (r *attachmentRepository) HardDeleteByIDs(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db := r.getDB(ctx)
+	res := db.Unscoped().Where("id IN (?)", ids).Delete(&entity.Attachment{})
+	if res.Error != nil {
+		return exception.Wrap(exception.ErrInternal, res.Error)
+	}
+	return nil
+}
+
 func (r *attachmentRepository) ExistsByID(ctx context.Context, id int64) (bool, error) {
 	var count int64
 	db := r.getDB(ctx)
@@ -157,6 +355,25 @@ func (r *attachmentRepository) ExistsByID(ctx context.Context, id int64) (bool, 
 		return false, exception.Wrap(exception.ErrInternal, err)
 	}
 	return count > 0, nil
+}
+
+func (r *attachmentRepository) FindUnclaimedAttachments(ctx context.Context, olderThan time.Duration, limit int) ([]*entity.Attachment, error) {
+	cutoff := time.Now().UTC().Add(-olderThan)
+	var attachments []*entity.Attachment
+
+	db := r.getDB(ctx).
+		Where("group_id IS NULL AND expense_id IS NULL AND settlement_id IS NULL AND created_at < ?", cutoff).
+		Where("id NOT IN (SELECT avatar_attachment_id FROM users WHERE avatar_attachment_id IS NOT NULL AND deleted_at IS NULL)").
+		Where("id NOT IN (SELECT cover_attachment_id FROM groups WHERE cover_attachment_id IS NOT NULL AND deleted_at IS NULL)")
+
+	if limit > 0 {
+		db = db.Limit(limit)
+	}
+
+	if err := db.Order("id ASC").Find(&attachments).Error; err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return attachments, nil
 }
 
 func (r *attachmentRepository) Count(ctx context.Context) (int64, error) {

@@ -1,0 +1,165 @@
+meta {
+  name: 02. List Lucky Draws
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{drawGroupId}}/draws
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~status: COMPLETED
+}
+
+docs {
+  # List Lucky Draws
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/{groupID}/draws`
+  **Auth:** Bearer access token
+
+  ## Description
+
+  Lists this group's non-deleted draws with pagination. For the current shared wheel use status=DRAFT with limit=1, then fetch its details to obtain candidates. For history use status=COMPLETED. The saved request has the status filter disabled, so it includes both states by default.
+
+  Every endpoint requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group. All active members can see the shared draft/history and run the draw. Only the original creator can edit; a group owner or system admin has no editing override. The group must be ACTIVE for Create, Update and Run. Draws in `SETTLING` or `CLOSED` groups remain readable with `is_frozen=true`.
+
+  A group has at most one non-deleted DRAFT. Completing it makes room for a new draft. There are no delete, cancel, reset or new-winner rerun routes. Run retries return the original result and completed_at while the group is active. Update and Run lock the same row; concurrent Run calls cannot store different winners. Always animate using the final candidates and zero-based result.index returned by Run.
+
+  Rows are ordered by COALESCE(completed_at, created_at) descending, then ID descending. COMPLETED history is therefore ordered by actual execution time, not draft creation time. A DRAFT item has result=null and completed_at=null. No draft returns items=[] for status=DRAFT; no placeholder draw is created.
+
+  ## Enum values
+
+  | Field | Allowed values | Meaning |
+  | --- | --- | --- |
+  | `draw_type` | `EQUAL`, `WEIGHTED` | Equal actual odds, or explicit percentage chances. Required when creating; optional when updating. |
+  | `status` | `DRAFT`, `COMPLETED` | Not executed, or executed with a stored winner. Set by the backend; not writable through the body. |
+  | `candidates[].type` / `result.type` | `TEXT`, `USER` | A text label, or a user ID. List responses expose the type inside result only; result is null for DRAFT. |
+
+  All enum values are case-sensitive uppercase strings. Unsupported input values are rejected as BAD_REQUEST during HTTP binding.
+
+  USER options and winners store and return user IDs without name/avatar snapshots. Fetch current public fields through GET /api/v1/users/{userID}/profile using value. Cache repeated user IDs within the current page. A deleted/inactive target returns USER_NOT_FOUND; an absent/deleted/inaccessible avatar returns avatar_url=null. Show a fallback. TEXT values are displayed directly and do not require a profile lookup.
+
+  Set drawGroupId and drawId manually in the selected environment and save. Create returns data.id for drawId; List returns items[].id. These requests never populate IDs automatically. The folder script clears legacy runtime draw IDs so saved environment values are used. Auth Login/Refresh retain their existing automatic token behavior. All IDs, titles and dates in examples are illustrative; use values from your own responses.
+
+  ## Request
+
+  ### Headers
+
+  | Header | Required | Value |
+  | --- | --- | --- |
+  | `Authorization` | Yes | Bearer <access-token> |
+
+  ### Path parameters
+
+  | Parameter | Meaning |
+  | --- | --- |
+  | `groupID` | Positive group ID; Bruno variable drawGroupId. |
+  | `drawID` | Positive draw ID in this group; Bruno variable drawId. Not present on Create/List. |
+
+  All path IDs are integers from 1 to 9223372036854775807. Authentication and HTTP input validation run before business checks. For writes, a `SETTLING` or `CLOSED` group can return `DRAW_GROUP_INACTIVE` before missing-draw or creator/state errors.
+
+  ### Query parameters
+
+  | Field | Allowed values / limits | Default |
+  | --- | --- | --- |
+  | `status` | DRAFT or COMPLETED, uppercase; omit/empty for both states. | No filter |
+  | `page` | Integer at least 1. | 1 |
+  | `limit` | Integer from 1 to 100. | 20 |
+
+  Omitted/empty values use defaults. Explicit zero, negative/non-integer values, limit above 100, integer overflow and overflowing offsets return BAD_REQUEST. A page beyond the last result returns items=[] while total may remain positive. No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 10,
+          "group_id": 1,
+          "created_by_member_id": 3,
+          "title": "Updated dinner draw",
+          "draw_type": "WEIGHTED",
+          "candidate_count": 3,
+          "status": "COMPLETED",
+          "is_frozen": false,
+          "can_edit": false,
+          "can_run": false,
+          "result": {
+            "index": 1,
+            "type": "TEXT",
+            "value": "Kebab",
+            "weight": 50
+          },
+          "completed_at": "2026-11-14T12:00:00Z",
+          "created_at": "2026-11-14T11:00:00Z",
+          "updated_at": "2026-11-14T12:00:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  This example contains one completed record. items[] has the list fields shown below; candidates and total_weight are intentionally omitted. Pagination.total counts all matching records before pagination.
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `id` / `group_id` | Draw ID and group ID. |
+  | `created_by_member_id` | Creator membership ID in this group, not their user ID. |
+  | `title` | Current saved draw title. |
+  | `draw_type` / `status` | Enum values listed above. |
+  | `candidate_count` | Number of saved options (2 to 100). |
+  | `is_frozen` | Derived from group status; independent of DRAFT/COMPLETED. |
+  | `can_edit` | true only for the active creator while the draw is DRAFT and the group is ACTIVE. |
+  | `can_run` | true for an active member while the draw is DRAFT and the group is ACTIVE. false after completion; retries still return the original result while the group is active. |
+  | `result` | null for DRAFT; otherwise index (zero-based), type, value and weight of the stored winner. |
+  | `completed_at` | null until Run; then the actual execution timestamp, unchanged on retries. |
+  | `created_at` / `updated_at` | Creation time and last draw write (Update or first Run). Reads/retries do not refresh them. Returned timestamps are RFC 3339 UTC strings. |
+  | `candidates` | Ordered array of type/value/weight objects; included in Create, Get, Update and Run, not in List items. |
+  | `total_weight` | Always 100 for a valid draw, including EQUAL. Included with candidates, not in List items. Use each weight directly as its display percentage. |
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID, status, page/limit, integer overflow or overflowing pagination offset. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing/empty/malformed Bearer authorization header. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid token, or a refresh token used as an access token. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `DRAW_FORBIDDEN` | `only active group members can access this lucky draw` | The caller is not an active member of this group or has left it. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The caller account is inactive. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group is missing or soft-deleted. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller account is missing or soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, transaction, randomness or token-blacklist infrastructure fails. Internal details are not returned. |
+
+  The error envelope contains success=false, code and error; internal causes are not exposed. Example:
+
+  ```json
+  {
+    "success": false,
+    "code": "DRAW_FORBIDDEN",
+    "error": "only active group members can access this lucky draw"
+  }
+  ```
+}

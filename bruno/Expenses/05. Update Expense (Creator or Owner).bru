@@ -1,0 +1,174 @@
+meta {
+  name: 05. Update Expense (Creator or Owner)
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/groups/{{expenseGroupId}}/expenses/{{expenseId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Dinner correction",
+    "description": null,
+    "total_amount_toman": {{expenseTotalAmountToman}},
+    "split_type": "{{expenseSplitType}}",
+    "shares": {{expenseShares}}
+  }
+}
+
+docs {
+  # 05. Update Expense (Creator or Owner)
+
+  **Method:** `PUT`
+  **Endpoint:** `/api/v1/groups/:groupID/expenses/:expenseID`
+  **Auth:** Required
+
+  ## Description
+
+  Fully replaces editable expense data and the ENTIRE shares list. Send all members you want to keep, not only changed shares. Both the ACTIVE creator and ACTIVE current group owner may change amount, split method, participants, title, description and date without participant approval or a settlement lock. The original payer/creator, group and expense_type never change, even when the owner edits an expense recorded by another member. Missing/null description clears it. Missing/null occurred_at preserves the previous date. Updates are atomic; invalid data leaves the old expense and shares unchanged. Concurrent saves serialize and the last applied full replacement wins. Removed shares are soft-deleted; re-adding a member restores their existing allocation row. This feature does not keep a separate edit audit history or require edit/delete reasons.
+
+  All routes require a valid access token, ACTIVE account and ACTIVE membership with left_at=null. A user who left or was removed cannot read, create, edit or delete expenses, even their own. ACTIVE and INACTIVE are the membership status values currently returned by this project; left and removed members remain stored as INACTIVE, normally with left_at set.
+
+  SETTLING and CLOSED groups allow expense reads only. is_frozen=true and can_edit/can_delete=false in that state. On an active group, only the expense creator or current group owner can edit/delete. Site ADMIN alone does not override membership or editing permissions.
+
+  Amounts are integer TOMAN. expense_type is a separate legacy enum (NORMAL, PREMIUM); new records are NORMAL. split_type is the allocation enum (EQUAL, EXACT, PERCENTAGE, WEIGHTED). No wallet charge or premium purchase is performed here.
+
+  ## Request
+
+  Path groupID is a positive BIGINT group ID. expenseID, when present, is a positive expense ID in that same group. Use the manual expenseGroupId and expenseId environment variables.
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | title | string | Yes | Trimmed non-empty title, at most 200 Unicode characters. |
+  | description | string or null | No | Optional explanation. Missing/null clears it on PUT. |
+  | total_amount_toman | integer | Yes | Positive BIGINT amount in TOMAN, never rial or a floating-point amount. |
+  | split_type | string enum | Yes | EQUAL, EXACT, PERCENTAGE, WEIGHTED. Uppercase and case-sensitive. |
+  | occurred_at | RFC3339 timestamp or null | No | Defaults to server time on Create. Missing/null preserves the original date on PUT. |
+  | shares | array | Yes | Non-empty list of unique group member IDs, including current or former members. |
+  | attachment_ids | integer array or null | No | Unique IDs of uploaded EXPENSE_RECEIPT files. Create: omitted/null means none. PUT: omitted/null preserves existing files; [] detaches all; an array replaces the complete set. |
+  | shares[].member_id | integer | Yes | Positive group membership ID, not user ID. Get it from List Eligible Participants. |
+  | shares[].value | number | Depends | EQUAL: omit, null or 1. EXACT: non-negative integer toman. PERCENTAGE: 0..100 with at most two decimal places. WEIGHTED: positive integer. |
+
+  EXACT values must sum to total_amount_toman; PERCENTAGE must sum to exactly 100. Number strings and exponent notation for split values are not accepted. All integer values must fit signed BIGINT.
+
+  For EQUAL, PERCENTAGE and WEIGHTED, the server computes integer toman shares with the largest remainder method. Extra tomans go first to the largest fractional remainder; ties use ascending member_id. Input order does not change allocation. Zero-toman shares are valid when rounding a small amount or explicitly choosing zero in EXACT/PERCENTAGE.
+
+  The payer is ALWAYS the original expense creator, derived from the authenticated membership. Do not send paid_by_member_id, created_by_member_id, group_id or expense_type: these are not editable request fields. Existing unrelated JSON fields are ignored by the project's JSON binder; they cannot override these values.
+
+  The payer may be included in shares or excluded completely. Selecting a former member affects only that membership's share; it does not reactivate their membership or grant expense access.
+
+  ```json
+  {
+    "title": "Dinner correction",
+    "total_amount_toman": 900000,
+    "split_type": "WEIGHTED",
+    "shares": [
+      {
+        "member_id": 30,
+        "value": 2
+      },
+      {
+        "member_id": 31,
+        "value": 1
+      },
+      {
+        "member_id": 32,
+        "value": 1
+      }
+    ],
+    "description": null
+  }
+  ```
+
+  Upload receipts first using 07. Upload Expense Receipt, then send their IDs in attachment_ids. New receipts must be your own uploads, unbound to another expense and either unscoped or in this group. An editor may retain existing receipts uploaded by the original creator. Removing an ID unlinks the receipt without deleting its object. IDs are saved together with financial changes in one transaction.
+
+  ## Response
+
+  **200 OK**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1101,
+      "group_id": 10,
+      "created_by_member_id": 30,
+      "paid_by_member_id": 30,
+      "title": "Dinner correction",
+      "description": null,
+      "total_amount_toman": 900000,
+      "expense_type": "NORMAL",
+      "split_type": "WEIGHTED",
+      "occurred_at": "2026-11-16T10:00:00Z",
+      "created_at": "2026-11-16T10:01:00Z",
+      "updated_at": "2026-11-16T11:00:00Z",
+      "is_frozen": false,
+      "can_edit": true,
+      "can_delete": true,
+      "shares": [
+        {
+          "member_id": 30,
+          "value": 2,
+          "share_amount_toman": 450000
+        },
+        {
+          "member_id": 31,
+          "value": 1,
+          "share_amount_toman": 225000
+        },
+        {
+          "member_id": 32,
+          "value": 1,
+          "share_amount_toman": 225000
+        }
+      ],
+      "my_share_amount_toman": 450000,
+      "attachment_ids": [],
+      "attachments": []
+    }
+  }
+  ```
+
+  created_by_member_id and paid_by_member_id identify the same immutable payer membership. shares[].value is 1 (EQUAL), exact toman (EXACT), numeric percent (PERCENTAGE), or integer weight (WEIGHTED). share_amount_toman is always the computed final amount. shares are ordered by member_id ascending. my_share_amount_toman is 0 if the caller is excluded. can_edit/can_delete reflect the current caller and group state. No JWTs, email addresses or phone numbers are returned here.
+
+  attachments contains receipt metadata (id, original_filename, mime_type, file_size_bytes) and access_url. attachment_ids remains the matching ID list. Both arrays are [] when empty. URLs are signed and expire (15 minutes by default); refetch this endpoint or Get Attachment Details for a fresh URL. The server never makes receipts public.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, pagination, JSON field, positive total amount, required field, title, or timestamp. |
+  | 400 | `EXPENSE_INVALID_SPLIT` | `provide valid split values for the selected split type` | Unknown split type, invalid value, missing non-EQUAL value, percentage precision above two decimal places, or non-positive weight. |
+  | 400 | `EXPENSE_SPLIT_TOTAL_MISMATCH` | `exact shares must sum to total_amount_toman and percentages must sum to 100` | EXACT values do not sum to the expense total or PERCENTAGE values do not sum to exactly 100. |
+  | 400 | `EXPENSE_DUPLICATE_MEMBERS` | `shares must not contain duplicate member IDs` | A member_id appears more than once. |
+  | 400 | `EXPENSE_DUPLICATE_ATTACHMENTS` | `attachment_ids must not contain duplicate IDs` | Repeated receipt IDs. |
+  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | An attachment is not an EXPENSE_RECEIPT. |
+  | 403 | `ATTACHMENT_FORBIDDEN` | `you do not have permission to access or modify this attachment` | Receipt belongs to another expense/group, or an unbound receipt was uploaded by another user. |
+  | 404 | `ATTACHMENT_NOT_FOUND` | `attachment not found` | Receipt ID does not exist or was deleted. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is absent or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Access token is invalid or malformed. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Authenticated account is not ACTIVE. |
+  | 403 | `EXPENSE_FORBIDDEN` | `only active group members can access expenses` | Requester is not an ACTIVE member, or left_at is not null. This also applies to a former expense creator. |
+  | 403 | `EXPENSE_EDITOR_REQUIRED` | `only the expense creator or current group owner can edit or delete this expense` | An active requester is neither this expense creator nor current group owner. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Authenticated account no longer exists. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group does not exist or is soft-deleted. |
+  | 404 | `EXPENSE_NOT_FOUND` | `expense not found` | Expense does not exist, is soft-deleted, or belongs to another group. |
+  | 404 | `EXPENSE_PARTICIPANT_NOT_FOUND` | `a selected participant does not belong to this group's current or former members` | An ID is unknown or belongs to another group. |
+  | 409 | `EXPENSE_GROUP_INACTIVE` | `expenses cannot be changed while the group is inactive` | Group is SETTLING or CLOSED; expense creation, updates and deletion are frozen. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or authentication infrastructure failed; causes remain private. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt or avatar URL generation failed. |
+}

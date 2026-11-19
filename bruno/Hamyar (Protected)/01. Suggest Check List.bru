@@ -1,0 +1,131 @@
+meta {
+  name: 01. Suggest Check List
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/groups/{{hamyarGroupId}}/hamyar/trip-suggestions
+  body: json
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "city_name": "رامسر",
+    "lat": 36.90,
+    "lng": 50.65,
+    "start_date": "2026-11-19",
+    "end_date": "2026-11-22",
+    "people_count": 4,
+    "trip_type": "forest_nature",
+    "transport": "private_car",
+    "accommodation": "villa",
+    "meal_plan": "mixed",
+    "time_of_day": "overnight",
+    "companions": ["children"],
+    "activities": ["hiking", "photography", "sightseeing"],
+    "notes": "یک برنامه سبک مناسب خانواده پیشنهاد بده."
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
+
+docs {
+  ## Method, Endpoint, and Authentication
+  
+  `POST /api/v1/groups/{groupID}/hamyar/trip-suggestions` — requires a Bearer access token and the requester must own the group. `groupID` is the positive integer ID of the group for which the checklist is being generated.
+  
+  Generates a Persian packing and preparation checklist using destination details, dates, group size, trip preferences, companions, activities, optional notes, and weather data when available. The result is saved as a trip suggestion in the group and returned to the caller. The request is sent to the configured AvalAI chat-completions model.
+  
+  ## Request
+  
+  ### Headers
+  
+  | Header | Required | Description |
+  | --- | --- | --- |
+  | `Authorization` | Yes | `Bearer <access-token>` |
+  | `Content-Type` | Yes | `application/json` |
+  
+  ### Body fields
+  
+  | Field | Type | Required | Constraints / Description |
+  | --- | --- | --- | --- |
+  | `lat` | `number` | Yes | Destination latitude, from -90 through 90. |
+  | `lng` | `number` | Yes | Destination longitude, from -180 through 180. |
+  | `city_name` | `string` | Yes | Destination city name provided by the client, up to 100 characters. |
+  | `start_date` | `string` | Yes | Start date in `YYYY-MM-DD` format. Must be today or a future date no later than 14 days from today. |
+  | `end_date` | `string` | Yes | End date in `YYYY-MM-DD` format; must be on or after `start_date` and no later than 14 days from today. The trip may last at most 60 days, counting both dates, although the 14-day forecast window imposes the earlier effective limit. |
+  | `people_count` | `integer` | Yes | Number of travelers, from 1 to 100. |
+  | `trip_type` | `string` | No | One of: `city_tour`, `beach`, `camping`, `mountain_hiking`, `picnic`, `skiing`, `desert`, `forest_nature`, `cultural_historical`, `road_trip`, `other`. |
+  | `transport` | `string` | No | One of: `private_car`, `bus`, `train`, `plane`, `motorcycle`, `bicycle`, `on_foot`, `mixed`. |
+  | `accommodation` | `string` | No | One of: `tent`, `hotel`, `villa`, `guesthouse`, `friends_family`, `none_day_trip`. |
+  | `meal_plan` | `string` | No | One of: `self_cooking`, `restaurant`, `bbq`, `mixed`. |
+  | `time_of_day` | `string` | No | One of: `daytime`, `evening_night`, `overnight`. |
+  | `companions` | `string[]` | No | Up to 6 values: `children`, `infant`, `elderly`, `pet`, `person_with_disability`, `none`. |
+  | `activities` | `string[]` | No | Up to 12 values: `swimming`, `hiking`, `photography`, `fishing`, `bbq`, `camp_cooking`, `skiing`, `water_sports`, `cycling`, `sightseeing`, `shopping`, `night_party`. |
+  | `notes` | `string` | No | Additional trip context, up to 500 characters. It is treated as data; instructions inside the notes are ignored by the AI prompt. |
+  
+  Fields marked optional may be omitted. Both `lat` and `lng` are required. Single-select fields accept only one listed value. Array values must each be from the corresponding list.
+  
+  ## Successful response
+  
+  **`200 OK`** — response fields:
+  
+  | Field | Type | Description |
+  | --- | --- | --- |
+  | `summary` | `string` | Short Persian summary of the suggestions. |
+  | `items` | `object[]` | Suggested items, with `name`, `priority`, and `reason`. |
+  | `items[].name` | `string` | Suggested item name. |
+  | `items[].priority` | `string` | One of `ضروری`, `پیشنهادی`, or `اختیاری`. |
+  | `items[].reason` | `string` | Reason for including the item. |
+  
+  ```json
+  {
+    "summary": "برای سفر طبیعت‌گردی رامسر این وسایل را آماده کنید.",
+    "items": [
+      {
+        "name": "کفش مناسب پیاده‌روی",
+        "priority": "ضروری",
+        "reason": "برای مسیرهای طبیعت‌گردی راحتی و ایمنی بیشتری فراهم می‌کند."
+      }
+    ]
+  }
+  ```
+  
+  ## Errors
+  
+  - `400` — request body is malformed or a field fails binding validation, including an unsupported enum value or out-of-range coordinates.
+  - `401` — access token is missing or invalid.
+  - `403` — requester is not the owner of the specified group.
+  - `404` — the specified group does not exist.
+  - `422` — date format/order is invalid, a trip date is before today or more than 14 days ahead, or the trip is longer than 60 days. For a date outside the forecast window, the `error` field explains that `start_date` and `end_date` must be between today and the latest supported forecast date.
+  - `502` — AI provider is unavailable or returns an invalid response.
+  - `500` — unexpected server error.
+
+  Example `422` response when a requested date falls outside the forecast window (the displayed latest date is calculated at request time):
+
+  ```json
+  {
+    "error": "invalid trip input: start_date and end_date must be between today and <latest-date> (the 14-day forecast limit)"
+  }
+  ```
+  
+  ## Notes
+  
+  - Configure `AVALAI_API_KEY`, `AVALAI_BASE_URL`, and `AVALAI_MODEL` in the backend environment.
+  - Both trip dates are validated before requesting weather or generating a checklist: they must be today or later, and neither may be more than 14 days after today. The latest accepted date is inclusive.
+  - Daily weather data is requested from Open-Meteo for the trip dates and added to the AI prompt when available. If weather data is missing or incomplete, the model is instructed not to guess weather conditions.
+}

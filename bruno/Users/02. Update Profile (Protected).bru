@@ -1,0 +1,73 @@
+meta {
+  name: 02. Update Profile (Protected)
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/users/me
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Updated Name"
+  }
+}
+
+docs {
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/users/me`
+  **Auth:** Required
+
+  ## Description
+
+  Updates the authenticated user's profile information.
+
+  ## Request
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `name` | `string` | Yes | Display name (2-100 characters) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "name": "Updated Name",
+      "friend_code": "DR-7K9M2X8Q4P6R",
+      "email": "user@doratou.local",
+      "phone": "+989123456789",
+      "is_email_verified": true,
+      "is_phone_verified": false,
+      "avatar_attachment_id": null,
+      "system_role": "USER",
+      "status": "ACTIVE",
+      "wallet": 0,
+      "telegram_chat_id": null,
+      "telegram_user_id": null,
+      "created_at": "2026-11-11T10:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid input
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Account deactivated
+  * `404 Not Found` — User not found
+}

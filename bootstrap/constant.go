@@ -3,10 +3,12 @@ package bootstrap
 import "time"
 
 type Constant struct {
-	Database DBConst
-	Auth     AuthConst
-	OTP      OTPConst
-	Captcha  CaptchaConst
+	Database   DBConst
+	Auth       AuthConst
+	OTP        OTPConst
+	Captcha    CaptchaConst
+	Attachment AttachmentConst
+	Friendship FriendshipConst
 }
 
 type DBConst struct {
@@ -26,9 +28,22 @@ type OTPConst struct {
 	DefaultDigits      int
 }
 
+type AttachmentConst struct {
+	MaxProfileImageSize int64
+	MaxGroupCoverSize   int64
+	MaxGalleryImageSize int64
+	MaxGalleryVideoSize int64
+	MaxReceiptSize      int64
+	DefaultPresignedTTL time.Duration
+}
+
 type CaptchaConst struct {
 	DefaultTTL     time.Duration
 	DefaultEnabled bool
+}
+
+type FriendshipConst struct {
+	DefaultRequestCooldown time.Duration
 }
 
 func NewConstant() *Constant {
@@ -50,6 +65,17 @@ func NewConstant() *Constant {
 		Captcha: CaptchaConst{
 			DefaultTTL:     2 * time.Minute,
 			DefaultEnabled: true,
+		},
+		Attachment: AttachmentConst{
+			MaxProfileImageSize: 5 * 1024 * 1024,   // 5 MB
+			MaxGroupCoverSize:   10 * 1024 * 1024,  // 10 MB
+			MaxGalleryImageSize: 20 * 1024 * 1024,  // 20 MB
+			MaxGalleryVideoSize: 100 * 1024 * 1024, // 100 MB
+			MaxReceiptSize:      10 * 1024 * 1024,  // 10 MB
+			DefaultPresignedTTL: 15 * time.Minute,
+		},
+		Friendship: FriendshipConst{
+			DefaultRequestCooldown: 24 * time.Hour,
 		},
 	}
 }

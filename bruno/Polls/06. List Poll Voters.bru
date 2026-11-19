@@ -1,0 +1,155 @@
+meta {
+  name: 06. List Poll Voters
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{pollGroupId}}/polls/{{pollId}}/voters
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Poll Voters
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/polls/:pollID/voters`
+  **Auth:** Required
+
+  ## Description
+
+  Lists active SELECTION records of a PUBLIC poll. Every item represents one membership choosing one option, with member_id, option_id, timestamps and a minimal user summary. A member choosing several options appears in several items.
+
+  pagination.total counts selection rows, not people. It corresponds to total_votes in List/Get for the same state; total_voters is the distinct participant count. One member's choices can be split across pages. This example has three selections by two people and matches List/Get counts.
+
+  Order is created_at ASC, id ASC per selection. Retained choices preserve timestamps on repeated PUT. New options get new rows; restored options keep first created_at and update updated_at. Withdrawn rows are excluded. Votes remain counted after the voter leaves. A deleted voter can have empty name/null avatar, but its user ID remains. No email, phone or credentials are returned.
+
+  PRIVATE returns POLL_PRIVATE for everyone, including the creator, group owner and administrators. Closing or freezing does not hide public results. Empty pages return items=[].
+
+  All endpoints require an ACTIVE account and ACTIVE membership in the addressed group. PUBLIC means visible to active members of this group, not to outsiders. PRIVATE exposes aggregate counts and the caller's selections without other voter identities.
+
+  Poll status values are ACTIVE and INACTIVE; visibility values are PUBLIC and PRIVATE. Enum strings are uppercase and case-sensitive. allow_multiple_choices is a JSON boolean, not an enum or a quoted string.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`) |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive BIGINT group ID; Bruno variable `pollGroupId` |
+  | `pollID` | `integer` | Yes | Positive BIGINT poll ID in this group; Bruno variable `pollId` |
+
+  Path IDs must be from 1 to 9223372036854775807.
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Defaults to 1; minimum 1 |
+  | `limit` | `integer` | No | Defaults to 20; from 1 to 100 |
+
+  Omitted or empty page/limit values use defaults. Explicit zero, negative or non-integer values, integer overflow and an overflowing pagination offset return BAD_REQUEST.
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "member_id": 32,
+          "user": {
+            "id": 2,
+            "name": "Group member",
+            "avatar_attachment_id": null
+          },
+          "option_id": 801,
+          "created_at": "2026-11-05T10:05:00Z",
+          "updated_at": "2026-11-05T10:05:00Z"
+        },
+        {
+          "member_id": 32,
+          "user": {
+            "id": 2,
+            "name": "Group member",
+            "avatar_attachment_id": null
+          },
+          "option_id": 802,
+          "created_at": "2026-11-05T10:06:00Z",
+          "updated_at": "2026-11-05T10:06:00Z"
+        },
+        {
+          "member_id": 33,
+          "user": {
+            "id": 3,
+            "name": "Another member",
+            "avatar_attachment_id": null
+          },
+          "option_id": 802,
+          "created_at": "2026-11-05T10:07:00Z",
+          "updated_at": "2026-11-05T10:07:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 3
+      }
+    }
+  }
+  ```
+
+  ## Errors
+
+  Errors use the same envelope as the existing Auth and Friendships endpoints. Internal causes are not exposed.
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, JSON payload, required field, value type, filter or pagination. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not contain a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, malformed, not an access token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted, for example after Logout. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is not ACTIVE. |
+  | 403 | `POLL_FORBIDDEN` | `only active group members can access this poll` | The user has no active membership in this group or has left it. |
+  | 403 | `POLL_PRIVATE` | `voter identities are not available for private polls` | The poll is PRIVATE; voter identities cannot be listed. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The authenticated account does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 404 | `POLL_NOT_FOUND` | `poll not found` | The poll does not exist, is soft-deleted, or belongs to another group. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or Redis operation fails; internal details stay hidden. |
+
+  **Example: 403**
+
+  ```json
+  {
+    "success": false,
+    "code": "POLL_PRIVATE",
+    "error": "voter identities are not available for private polls"
+  }
+  ```
+}

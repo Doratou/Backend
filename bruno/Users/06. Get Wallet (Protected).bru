@@ -1,0 +1,42 @@
+meta {
+  name: 06. Get Wallet (Protected)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/me/wallet
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/users/me/wallet`
+  **Auth:** Required
+
+  ## Description
+
+  Retrieves the current wallet balance of the authenticated user.
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "wallet": 0
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Account deactivated
+}

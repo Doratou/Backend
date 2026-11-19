@@ -1,0 +1,94 @@
+meta {
+  name: 07. Upload Expense Receipt
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/attachments/upload
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file()
+  type: EXPENSE_RECEIPT
+  group_id: {{expenseGroupId}}
+  is_public: false
+}
+
+docs {
+  # 07. Upload Expense Receipt
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/attachments/upload`
+  **Auth:** Required (Bearer token)
+
+  ## Description
+
+  Uploads a receipt before creating/updating an expense. Select a file in Body; do not enter a file path belonging to another computer. Bruno sets the multipart boundary automatically. Repeat for additional photos. No response script changes expense variables.
+
+  ## Request
+
+  | Form field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | file | file | Yes | Image or PDF, up to 10 MiB (10485760 bytes); actual MIME and size are checked. |
+  | type | string enum | Yes | EXPENSE_RECEIPT for this workflow, uppercase. |
+  | group_id | integer | No | Target group ID; if supplied, must be an active group with active caller membership. The prepared request uses expenseGroupId. |
+  | is_public | boolean | No | Always forced false for EXPENSE_RECEIPT, even if true is submitted. |
+
+  Do not send expense_id for receipts; it returns 400 BAD_REQUEST. The upload remains unbound and accessible only to its uploader. Copy data.id into expenseAttachmentIds, for example [1201], then Create Expense with attachment_ids or PATCH the existing expense with {"attachment_ids":[1201]}. Binding requires an active group and active creator/owner permissions. A receipt already attached elsewhere cannot be reused.
+
+  Presigned upload is also supported by the existing Attachments requests: request URL, PUT the file to upload_url, then confirm with the exact object_key from that user response. Receipt object keys are scoped to the uploading user; do not invent or share keys. Presigned uploads also omit expense_id and are private.
+
+  ## Response
+
+  **201 Created**. Example: PNG uploaded by user 3 for group 10; IDs, filename, MIME, hash, dimensions, object_key and timestamps vary. Null optional upload metadata is omitted, so expense_id is absent until linked. uploaded_by_user_id is a USER ID; it is not the member_id used for splitting. URL signatures and hashes below are illustrative.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1201,
+      "uploaded_by_user_id": 3,
+      "group_id": 10,
+      "type": "EXPENSE_RECEIPT",
+      "original_filename": "receipt.png",
+      "object_key": "attachments/expense_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.png",
+      "mime_type": "image/png",
+      "file_size_bytes": 68,
+      "file_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "width": 1,
+      "height": 1,
+      "is_public": false,
+      "access_url": "https://storage.example.com/doratou-storage/attachments/expense_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.png?X-Amz-Signature=example",
+      "uploaded_at": "2026-11-16T10:00:00Z",
+      "created_at": "2026-11-16T10:00:00Z",
+      "updated_at": "2026-11-16T10:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Missing file, invalid form, or expense_id supplied for EXPENSE_RECEIPT. |
+  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | Unsupported receipt format. |
+  | 400 | `GROUP_INVALID_STATUS` | `status must be ACTIVE, SETTLING or CLOSED` | The supplied group is `SETTLING` or `CLOSED`; uploading a new expense receipt requires an `ACTIVE` group. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Expired token. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Revoked token. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Uploader account inactive. |
+  | 403 | `GROUP_FORBIDDEN` | `you do not have permission to access this group` | Uploader is not an active member of the supplied group. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Supplied group does not exist. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Uploader no longer exists. |
+  | 413 | `FILE_TOO_LARGE` | `file size exceeds maximum allowed limit` | Receipt exceeds 10 MiB. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or unexpected internal failure. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Storage upload failed. |
+}

@@ -1,0 +1,73 @@
+meta {
+  name: 03. Change Email (Protected)
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/users/me/email
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "email": "new-email@doratou.local"
+  }
+}
+
+docs {
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/users/me/email`
+  **Auth:** Required
+
+  ## Description
+
+  Updates the authenticated user's email address after successful OTP verification.
+
+  ## Request
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `email` | `string` | Yes | Valid email address verified via OTP |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "name": "Default User",
+      "friend_code": "DR-7K9M2X8Q4P6R",
+      "email": "new-email@doratou.local",
+      "phone": "+989123456789",
+      "is_email_verified": true,
+      "is_phone_verified": false,
+      "avatar_attachment_id": null,
+      "system_role": "USER",
+      "status": "ACTIVE",
+      "wallet": 0,
+      "telegram_chat_id": null,
+      "telegram_user_id": null,
+      "created_at": "2026-11-11T10:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid email format
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Email not verified via OTP or account deactivated
+  * `409 Conflict` — Email already registered by another user
+}
