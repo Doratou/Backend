@@ -96,13 +96,7 @@ func (h *SettlementHandler) Reject(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req dto.RejectSettlementRequest
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
-	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, exception.Wrap(exception.ErrBadRequest, err))
-		return
-	}
-	res, err := h.settlementService.Reject(c.Request.Context(), userID, groupID, id, req)
+	res, err := h.settlementService.Reject(c.Request.Context(), userID, groupID, id)
 	if err != nil {
 		fail(c, err)
 		return

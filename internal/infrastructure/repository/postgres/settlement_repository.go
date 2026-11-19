@@ -105,14 +105,13 @@ func (r *settlementRepository) List(ctx context.Context, groupID, memberID int64
 	return items, total, settlementPersistenceError(err)
 }
 
-func (r *settlementRepository) Respond(ctx context.Context, groupID, id int64, status enum.SettlementStatus, reason *string) error {
+func (r *settlementRepository) Respond(ctx context.Context, groupID, id int64, status enum.SettlementStatus) error {
 	now := time.Now().UTC()
 	fields := map[string]any{"status": status, "updated_at": now}
 	if status == enum.SettlementStatusSuccess {
 		fields["confirmed_at"] = now
 	} else if status == enum.SettlementStatusReject {
 		fields["rejected_at"] = now
-		fields["rejection_reason"] = reason
 	} else {
 		return exception.ErrBadRequest
 	}

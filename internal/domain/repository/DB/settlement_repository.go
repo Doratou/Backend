@@ -20,7 +20,7 @@ type SettlementRepository interface {
 	FindByID(ctx context.Context, groupID, id int64, lock bool) (*entity.Settlement, error)
 	FindGroupID(ctx context.Context, id int64) (int64, error)
 	List(ctx context.Context, groupID, memberID int64, filter SettlementFilter, limit, offset int) ([]*entity.Settlement, int64, error)
-	Respond(ctx context.Context, groupID, id int64, status enum.SettlementStatus, reason *string) error
+	Respond(ctx context.Context, groupID, id int64, status enum.SettlementStatus) error
 	DeletePending(ctx context.Context, groupID, id int64) error
 	FindAttachmentsByIDs(ctx context.Context, ids []int64) ([]*entity.Attachment, error)
 	BindAttachments(ctx context.Context, groupID, id int64, ids []int64) error

@@ -255,21 +255,17 @@ func (s *settlementService) withPending(ctx context.Context, userID, groupID, id
 }
 
 func (s *settlementService) Confirm(ctx context.Context, userID, groupID, id int64) (*dto.SettlementResponse, error) {
-	return s.respond(ctx, userID, groupID, id, enum.SettlementStatusSuccess, nil)
+	return s.respond(ctx, userID, groupID, id, enum.SettlementStatusSuccess)
 }
 
-func (s *settlementService) Reject(ctx context.Context, userID, groupID, id int64, req dto.RejectSettlementRequest) (*dto.SettlementResponse, error) {
-	reason := strings.TrimSpace(req.Reason)
-	if reason == "" || !settlementText(&reason, 1000) {
-		return nil, exception.ErrBadRequest
-	}
-	return s.respond(ctx, userID, groupID, id, enum.SettlementStatusReject, &reason)
+func (s *settlementService) Reject(ctx context.Context, userID, groupID, id int64) (*dto.SettlementResponse, error) {
+	return s.respond(ctx, userID, groupID, id, enum.SettlementStatusReject)
 }
 
-func (s *settlementService) respond(ctx context.Context, userID, groupID, id int64, status enum.SettlementStatus, reason *string) (*dto.SettlementResponse, error) {
+func (s *settlementService) respond(ctx context.Context, userID, groupID, id int64, status enum.SettlementStatus) (*dto.SettlementResponse, error) {
 	var res dto.SettlementResponse
 	err := s.withPending(ctx, userID, groupID, id, true, func(tx context.Context, group *entity.Group, member *entity.GroupMember, payment *entity.Settlement) error {
-		if err := s.repo.Respond(tx, groupID, id, status, reason); err != nil {
+		if err := s.repo.Respond(tx, groupID, id, status); err != nil {
 			return err
 		}
 		stored, err := s.repo.FindByID(tx, groupID, id, false)
