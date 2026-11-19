@@ -113,6 +113,7 @@ func main() {
 	friendshipRepo := postgresRepo.NewFriendshipRepository(postgresDB)
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	pollRepo := postgresRepo.NewPollRepository(postgresDB)
+	checklistRepo := postgresRepo.NewChecklistRepository(postgresDB)
 	expenseRepo := postgresRepo.NewExpenseRepository(postgresDB)
 	settlementRepo := postgresRepo.NewSettlementRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
@@ -241,6 +242,7 @@ func main() {
 	)
 	settlementService := service.NewSettlementService(settlementRepo, userRepo, dbTrxManager, attachmentService)
 	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
+	checklistService := service.NewChecklistService(checklistRepo, dbTrxManager, database.NewReadSnapshotTrxManager(postgresDB), attachmentService)
 	friendshipService := service.NewFriendshipService(
 		friendshipRepo,
 		userRepo,
@@ -273,6 +275,7 @@ func main() {
 	friendshipHandler := handler.NewFriendshipHandler(friendshipService)
 	groupHandler := handler.NewGroupHandler(groupService)
 	pollHandler := handler.NewPollHandler(pollService)
+	checklistHandler := handler.NewChecklistHandler(checklistService)
 	expenseHandler := handler.NewExpenseHandler(expenseService)
 	settlementHandler := handler.NewSettlementHandler(settlementService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
@@ -287,6 +290,7 @@ func main() {
 		InviteHandler:      inviteHandler,
 		FriendshipHandler:  friendshipHandler,
 		PollHandler:        pollHandler,
+		ChecklistHandler:   checklistHandler,
 		ExpenseHandler:     expenseHandler,
 		SettlementHandler:  settlementHandler,
 		LuckyDrawHandler:   luckyDrawHandler,
