@@ -52,7 +52,7 @@ docs {
   | --- | --- | --- | --- |
   | `page` | `integer` | No | 1-based page number; defaults to 1. |
   | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20. |
-  | `status` | `string` | No | `ACTIVE` or `INACTIVE`. |
+  | `status` | `string` | No | `ACTIVE`, `SETTLING` or `CLOSED`. |
 
   ## Response
 
@@ -84,7 +84,7 @@ docs {
   ## Errors
 
   - `400 GROUP_INVALID_PAGINATION` — Invalid `page` or `limit` (including page/offset overflow).
-  - `400 GROUP_INVALID_STATUS` — Status is not `ACTIVE` or `INACTIVE`.
+  - `400 GROUP_INVALID_STATUS` — Status is not `ACTIVE`, `SETTLING` or `CLOSED`.
   - `401 MISSING_TOKEN` — Access token is missing or invalid.
   - `403 GROUP_FORBIDDEN` — Requester is not a site admin.
 }

@@ -33,7 +33,7 @@ docs {
 
   ## Description
 
-  Changes only the fields present in the JSON body. Active original creator or current group owner only; inactive groups are frozen. Former members have no access, including a former creator. Payer, creator, group and expense_type are immutable. All expense/share/receipt changes are atomic. Concurrent saves serialize; the last applied values win. This endpoint has no optimistic version check.
+  Changes only the fields present in the JSON body. Active original creator or current group owner only; SETTLING and CLOSED groups are frozen. Former members have no access, including a former creator. Payer, creator, group and expense_type are immutable. All expense/share/receipt changes are atomic. Concurrent saves serialize; the last applied values win. This endpoint has no optimistic version check.
 
   ## Request
 
@@ -181,7 +181,7 @@ docs {
   | 404 | `GROUP_NOT_FOUND` | `group not found` | Group does not exist or is soft-deleted. |
   | 404 | `EXPENSE_NOT_FOUND` | `expense not found` | Expense does not exist, is soft-deleted, or belongs to another group. |
   | 404 | `EXPENSE_PARTICIPANT_NOT_FOUND` | `a selected participant does not belong to this group's current or former members` | An ID is unknown or belongs to another group. |
-  | 409 | `EXPENSE_GROUP_INACTIVE` | `expenses cannot be changed while the group is inactive` | Group is INACTIVE; expense creation, updates and deletion are frozen. |
+  | 409 | `EXPENSE_GROUP_INACTIVE` | `expenses cannot be changed while the group is inactive` | Group is SETTLING or CLOSED; expense creation, updates and deletion are frozen. |
   | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or authentication infrastructure failed; causes remain private. |
   | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt or avatar URL generation failed. |
 }

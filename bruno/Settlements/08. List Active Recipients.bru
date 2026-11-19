@@ -1,0 +1,39 @@
+meta {
+  name: 08. List Active Recipients
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{settlementGroupId}}/members
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Active Recipients
+
+  GET /api/v1/groups/:groupID/members reuses the existing group-members endpoint. This is a convenience request for settlement testing, not a new backend route. Set settlementGroupId manually.
+
+  Response data is an array of active memberships with member_id, user_id, name, role (OWNER or MEMBER), joined_at. Use member_id for to_member_id; do not use user_id. The list may contain your own membership: exclude yourself in the frontend. Payment creation also requires the recipient account to be ACTIVE, even if an inactive account still has an ACTIVE membership in this existing list.
+
+  Example (IDs and dates illustrative):
+
+  ```json
+  {
+    "success": true,
+    "data": [
+      {"member_id":30,"user_id":3,"name":"Ali","role":"OWNER","joined_at":"2026-11-18T09:00:00Z"},
+      {"member_id":31,"user_id":4,"name":"Reza","role":"MEMBER","joined_at":"2026-11-18T09:00:00Z"}
+    ]
+  }
+  ```
+
+  Copy the other user's member_id into settlementToMemberId yourself. No script changes the environment. The existing group endpoint permits group members or site admins; settlement endpoints additionally require active membership and provide no admin override.
+
+  Errors follow the existing group endpoint: 400 BAD_REQUEST for an unparsable group ID, 401 token errors, 403 GROUP_FORBIDDEN, 404 GROUP_NOT_FOUND, 500 INTERNAL_SERVER_ERROR. See Group / Get Group Members for full details.
+}

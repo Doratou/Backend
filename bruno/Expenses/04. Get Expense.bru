@@ -27,7 +27,7 @@ docs {
 
   All routes require a valid access token, ACTIVE account and ACTIVE membership with left_at=null. A user who left or was removed cannot read, create, edit or delete expenses, even their own. ACTIVE and INACTIVE are the membership status values currently returned by this project; left and removed members remain stored as INACTIVE, normally with left_at set.
 
-  INACTIVE groups allow reads only. is_frozen=true and can_edit/can_delete=false in that state. On an active group, only the expense creator or current group owner can edit/delete. Site ADMIN alone does not override membership or editing permissions.
+  SETTLING and CLOSED groups allow expense reads only. is_frozen=true and can_edit/can_delete=false in that state. On an active group, only the expense creator or current group owner can edit/delete. Site ADMIN alone does not override membership or editing permissions.
 
   Amounts are integer TOMAN. expense_type is a separate legacy enum (NORMAL, PREMIUM); new records are NORMAL. split_type is the allocation enum (EQUAL, EXACT, PERCENTAGE, WEIGHTED). No wallet charge or premium purchase is performed here.
 

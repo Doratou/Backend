@@ -26,6 +26,8 @@ settings {
 }
 
 docs {
+  CLOSED groups cannot create, edit or revoke invite links (409 GROUP_CLOSED). Joining still requires an ACTIVE group. Read-only invitation lists remain available under their existing permissions.
+
   ## Method, Endpoint, and Auth
   
   `GET /api/v1/invites/links/groups/:groupID` — Active group member or site admin; Bearer access token required.
