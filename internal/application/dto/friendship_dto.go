@@ -38,9 +38,10 @@ type FriendRequestStatusResponse struct {
 }
 
 type FriendshipUserResponse struct {
-	ID                 int64  `json:"id"`
-	Name               string `json:"name"`
-	AvatarAttachmentID *int64 `json:"avatar_attachment_id"`
+	ID                 int64   `json:"id"`
+	Name               string  `json:"name"`
+	AvatarAttachmentID *int64  `json:"avatar_attachment_id"`
+	AvatarURL          *string `json:"avatar_url"`
 }
 
 type FriendRequestListItem struct {
@@ -63,9 +64,10 @@ type FriendRequestListResponse struct {
 }
 
 type FriendResponse struct {
-	FriendshipID int64                  `json:"friendship_id"`
-	User         FriendshipUserResponse `json:"user"`
-	FriendsSince *time.Time             `json:"friends_since"`
+	FriendshipID     int64                  `json:"friendship_id"`
+	User             FriendshipUserResponse `json:"user"`
+	FriendsSince     *time.Time             `json:"friends_since"`
+	MutualGroupCount int64                  `json:"mutual_group_count"`
 }
 
 type FriendListResponse struct {
@@ -92,33 +94,38 @@ func ToFriendRequestStatusResponse(friendship *entity.Friendship) FriendRequestS
 	}
 }
 
-func ToFriendRequestListItem(friendship *entity.Friendship) FriendRequestListItem {
+func ToFriendRequestListItem(friendship *entity.Friendship, avatarURLs map[int64]string) FriendRequestListItem {
 	return FriendRequestListItem{
 		ID:        friendship.ID,
-		Requester: toFriendshipUserResponse(friendship.RequesterUserID, friendship.RequesterUser),
-		Receiver:  toFriendshipUserResponse(friendship.ReceiverUserID, friendship.ReceiverUser),
+		Requester: toFriendshipUserResponse(friendship.RequesterUserID, friendship.RequesterUser, avatarURLs),
+		Receiver:  toFriendshipUserResponse(friendship.ReceiverUserID, friendship.ReceiverUser, avatarURLs),
 		Status:    friendship.Status,
 		CreatedAt: friendship.RequestedAt,
 	}
 }
 
-func ToFriendResponse(friendship *entity.Friendship, userID int64) FriendResponse {
+func ToFriendResponse(friendship *entity.Friendship, userID int64, avatarURLs map[int64]string) FriendResponse {
 	friendID, friend := friendship.RequesterUserID, friendship.RequesterUser
 	if friendship.RequesterUserID == userID {
 		friendID, friend = friendship.ReceiverUserID, friendship.ReceiverUser
 	}
 	return FriendResponse{
 		FriendshipID: friendship.ID,
-		User:         toFriendshipUserResponse(friendID, friend),
+		User:         toFriendshipUserResponse(friendID, friend, avatarURLs),
 		FriendsSince: friendship.RespondedAt,
 	}
 }
 
-func toFriendshipUserResponse(userID int64, user *entity.User) FriendshipUserResponse {
+func toFriendshipUserResponse(userID int64, user *entity.User, avatarURLs map[int64]string) FriendshipUserResponse {
 	response := FriendshipUserResponse{ID: userID}
 	if user != nil {
 		response.Name = user.Name
 		response.AvatarAttachmentID = user.AvatarAttachmentID
+		if user.Status == enum.UserStatusActive && user.AvatarAttachmentID != nil {
+			if url := avatarURLs[*user.AvatarAttachmentID]; url != "" {
+				response.AvatarURL = &url
+			}
+		}
 	}
 	return response
 }

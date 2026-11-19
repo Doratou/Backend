@@ -15,6 +15,7 @@ type FriendshipRepository interface {
 	FindIncomingRequests(ctx context.Context, userID int64, limit, offset int) ([]*entity.Friendship, int64, error)
 	FindOutgoingRequests(ctx context.Context, userID int64, limit, offset int) ([]*entity.Friendship, int64, error)
 	FindFriends(ctx context.Context, userID int64, limit, offset int) ([]*entity.Friendship, int64, error)
+	CountMutualGroups(ctx context.Context, userID int64, friendIDs []int64) (map[int64]int64, error)
 	Update(ctx context.Context, friendship *entity.Friendship, expectedStatus enum.FriendshipStatus) error
 	DeleteByID(ctx context.Context, id int64, expectedStatus enum.FriendshipStatus) error
 }

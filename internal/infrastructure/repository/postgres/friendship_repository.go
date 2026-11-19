@@ -108,6 +108,37 @@ func (r *friendshipRepository) FindFriends(ctx context.Context, userID int64, li
 	return r.findAll(db, limit, offset)
 }
 
+func (r *friendshipRepository) CountMutualGroups(ctx context.Context, userID int64, friendIDs []int64) (map[int64]int64, error) {
+	if len(friendIDs) == 0 {
+		return nil, nil
+	}
+
+	var rows []struct {
+		UserID     int64
+		GroupCount int64
+	}
+	err := r.getDB(ctx).Raw(`
+		SELECT friend_members.user_id, COUNT(*) AS group_count
+		FROM group_members AS viewer_members
+		JOIN group_members AS friend_members ON friend_members.group_id = viewer_members.group_id
+		JOIN groups ON groups.id = viewer_members.group_id AND groups.deleted_at IS NULL
+		WHERE viewer_members.user_id = ?
+		  AND viewer_members.status = ? AND viewer_members.left_at IS NULL
+		  AND friend_members.user_id IN ?
+		  AND friend_members.status = ? AND friend_members.left_at IS NULL
+		GROUP BY friend_members.user_id
+	`, userID, enum.GroupMemberStatusActive, friendIDs, enum.GroupMemberStatusActive).Scan(&rows).Error
+	if err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	counts := make(map[int64]int64, len(rows))
+	for _, row := range rows {
+		counts[row.UserID] = row.GroupCount
+	}
+	return counts, nil
+}
+
 func (r *friendshipRepository) Update(ctx context.Context, friendship *entity.Friendship, expectedStatus enum.FriendshipStatus) error {
 	db := r.getDB(ctx)
 	updatedAt := db.NowFunc()
@@ -149,7 +180,7 @@ func (r *friendshipRepository) findAll(db *gorm.DB, limit, offset int) ([]*entit
 		return nil, 0, exception.Wrap(exception.ErrInternal, err)
 	}
 
-	query := db.Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment").Order("requested_at DESC").Order("id DESC")
+	query := db.Preload("RequesterUser").Preload("ReceiverUser").Order("requested_at DESC").Order("id DESC")
 	if limit > 0 {
 		query = query.Limit(limit)
 	}

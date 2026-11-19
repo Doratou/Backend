@@ -207,16 +207,6 @@ func main() {
 		cfg.Constant,
 	)
 
-	friendshipService := service.NewFriendshipService(
-		friendshipRepo,
-		userRepo,
-		dbTrxManager,
-		service.FriendshipServiceConfig{
-			RequestCooldown: cfg.Environment.Friendship.RequestCooldown,
-		},
-		cfg.Constant,
-	)
-
 	captchaService := service.NewCaptchaService(
 		captchaRepo,
 		captchaMan,
@@ -251,6 +241,16 @@ func main() {
 	)
 	settlementService := service.NewSettlementService(settlementRepo, userRepo, dbTrxManager, attachmentService)
 	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
+	friendshipService := service.NewFriendshipService(
+		friendshipRepo,
+		userRepo,
+		dbTrxManager,
+		attachmentService,
+		service.FriendshipServiceConfig{
+			RequestCooldown: cfg.Environment.Friendship.RequestCooldown,
+		},
+		cfg.Constant,
+	)
 
 	userService := service.NewUserService(
 		userRepo,

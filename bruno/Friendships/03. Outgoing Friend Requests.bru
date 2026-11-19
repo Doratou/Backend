@@ -39,7 +39,7 @@ docs {
 
   Each item's `created_at` represents the latest request time (`requested_at` in the database), not the original row creation time. An allowed resend updates this timestamp and preserves the relationship ID.
 
-  Only the authenticated account's ACTIVE status is checked for this list. The other participant's summary contains `id`, `name`, and `avatar_attachment_id`; no email, phone, or password is returned. If that user has been soft-deleted, the summary keeps the user ID and may contain an empty name and a null avatar.
+  The list requires an ACTIVE caller. The other participant's summary contains `id`, `name`, `avatar_attachment_id`, and `avatar_url`; no email, phone, or password is returned. If that user has been soft-deleted, the summary keeps the user ID and may contain an empty name and a null avatar.
 
   ### Allowed values
 
@@ -52,7 +52,7 @@ docs {
 
   This list contains PENDING requests only.
 
-  Avatar summaries contain only an attachment ID. For a current authorized name/avatar URL, call GET /api/v1/users/{userID}/profile with the summary user ID (not friendship_id or the request ID). Use a placeholder when avatar_url is null or the profile returns USER_NOT_FOUND for an inactive/deleted account.
+  Render the returned `avatar_url` directly. Use initials or a default avatar when the URL is null. The URL can be null if the image is missing, inaccessible, temporarily unavailable, or belongs to an inactive account. Avatar URLs may expire.
 
   ## Request
 
@@ -88,12 +88,14 @@ docs {
           "requester": {
             "id": 1,
             "name": "Default User",
-            "avatar_attachment_id": null
+            "avatar_attachment_id": null,
+            "avatar_url": null
           },
           "receiver": {
             "id": 2,
             "name": "Default Admin",
-            "avatar_attachment_id": null
+            "avatar_attachment_id": 501,
+            "avatar_url": "https://storage.example.com/avatars/profile.png?signature=example"
           },
           "status": "PENDING",
           "created_at": "2026-10-29T10:00:00Z"
@@ -115,7 +117,7 @@ docs {
   | Field | Meaning |
   | --- | --- |
   | `data.items[].id` | Relationship/request ID used by Accept, Reject or Cancel. |
-  | `data.items[].requester / receiver` | Public summaries: id (user ID), name, avatar_attachment_id (integer or null). No avatar_url is included. |
+  | `data.items[].requester / receiver` | Public summaries: id (user ID), name, avatar_attachment_id (integer or null), avatar_url (string or null). |
   | `data.items[].status` | PENDING only; accepted, rejected and soft-deleted records are excluded. |
   | `data.items[].created_at` | Latest request time, including an allowed resend. |
   | `data.pagination` | page and limit describe this page; total is the number of all matching records, not the length of items. |

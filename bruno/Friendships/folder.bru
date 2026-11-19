@@ -41,7 +41,7 @@ docs {
   3. Use the recipient's session for Accept/Reject and the sender's session for Cancel. Either participant may Remove an accepted friendship.
   4. Refresh lists after an action. A relationship ID is reused after an allowed resend; the same ID can later have a new direction and request time.
 
-  Friendship summaries in pending/friend lists return avatar_attachment_id, not avatar_url. Resolve a current authorized avatar through GET /api/v1/users/{userID}/profile using the summary user ID, and handle null/unavailable avatars. Find User By Friend Code already returns avatar_url.
+  Friend and pending-request summaries include `avatar_attachment_id` and `avatar_url`. Render the URL directly and use a fallback for null values. Each List Friends item also includes `mutual_group_count` across `ACTIVE`, `SETTLING`, and `CLOSED` groups where both users are active members. Deleted groups and former memberships are excluded.
 
   Examples use illustrative IDs, names and dates. They do not guarantee that these records exist in your database. Runtime/environment identifiers are set manually; only the existing Auth token behavior remains automatic.
 }
