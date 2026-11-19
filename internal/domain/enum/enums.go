@@ -340,3 +340,33 @@ const (
 func (s SettlementDirection) IsValid() bool {
 	return s == SettlementDirectionAll || s == SettlementDirectionIncoming || s == SettlementDirectionOutgoing
 }
+
+type ChecklistItemType string
+
+const (
+	ChecklistItemTypeGroup    ChecklistItemType = "GROUP"
+	ChecklistItemTypePersonal ChecklistItemType = "PERSONAL"
+)
+
+func (t ChecklistItemType) IsValid() bool {
+	return t == ChecklistItemTypeGroup || t == ChecklistItemTypePersonal
+}
+
+type ChecklistFilter string
+
+const (
+	ChecklistFilterAll       ChecklistFilter = "all"
+	ChecklistFilterClaimed   ChecklistFilter = "claimed"
+	ChecklistFilterUnclaimed ChecklistFilter = "unclaimed"
+	ChecklistFilterMine      ChecklistFilter = "mine"
+	ChecklistFilterPersonal  ChecklistFilter = "personal"
+)
+
+func (f ChecklistFilter) IsValid() bool {
+	switch f {
+	case ChecklistFilterAll, ChecklistFilterClaimed, ChecklistFilterUnclaimed, ChecklistFilterMine, ChecklistFilterPersonal:
+		return true
+	default:
+		return false
+	}
+}
