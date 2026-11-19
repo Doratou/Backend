@@ -114,6 +114,7 @@ func main() {
 	groupRepo := postgresRepo.NewGroupRepository(postgresDB)
 	pollRepo := postgresRepo.NewPollRepository(postgresDB)
 	expenseRepo := postgresRepo.NewExpenseRepository(postgresDB)
+	settlementRepo := postgresRepo.NewSettlementRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	oauthRepo := postgresRepo.NewOAuthRepository(postgresDB)
@@ -238,6 +239,7 @@ func main() {
 		attachmentRepo,
 		groupRepo,
 		expenseRepo,
+		settlementRepo,
 		userRepo,
 		dbTrxManager,
 		rustfsStorage,
@@ -247,6 +249,7 @@ func main() {
 		},
 		cfg.Constant,
 	)
+	settlementService := service.NewSettlementService(settlementRepo, userRepo, dbTrxManager, attachmentService)
 	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
 
 	userService := service.NewUserService(
@@ -271,6 +274,7 @@ func main() {
 	groupHandler := handler.NewGroupHandler(groupService)
 	pollHandler := handler.NewPollHandler(pollService)
 	expenseHandler := handler.NewExpenseHandler(expenseService)
+	settlementHandler := handler.NewSettlementHandler(settlementService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
@@ -284,6 +288,7 @@ func main() {
 		FriendshipHandler:  friendshipHandler,
 		PollHandler:        pollHandler,
 		ExpenseHandler:     expenseHandler,
+		SettlementHandler:  settlementHandler,
 		LuckyDrawHandler:   luckyDrawHandler,
 		CaptchaService:     captchaService,
 		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
