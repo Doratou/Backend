@@ -137,3 +137,10 @@ const (
 	ExpenseTypeNormal  ExpenseType = "NORMAL"
 	ExpenseTypePremium ExpenseType = "PREMIUM"
 )
+
+type LuckyDrawStatus string
+
+const (
+	LuckyDrawStatusDraft     LuckyDrawStatus = "DRAFT"
+	LuckyDrawStatusCompleted LuckyDrawStatus = "COMPLETED"
+)
