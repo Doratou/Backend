@@ -34,6 +34,7 @@ func (u UserStatus) IsValid() bool {
 	}
 }
 
+// GroupStatus enum values: "ACTIVE", "SETTLING", "CLOSED".
 type GroupStatus string
 
 const (
@@ -234,6 +235,7 @@ func (p PollVisibility) IsValid() bool {
 	}
 }
 
+// LuckyDrawType enum values: "EQUAL", "WEIGHTED".
 type LuckyDrawType string
 
 const (
@@ -241,6 +243,16 @@ const (
 	LuckyDrawTypeWeighted LuckyDrawType = "WEIGHTED"
 )
 
+func (l LuckyDrawType) IsValid() bool {
+	switch l {
+	case LuckyDrawTypeEqual, LuckyDrawTypeWeighted:
+		return true
+	default:
+		return false
+	}
+}
+
+// LuckyDrawCandidateType enum values: "TEXT", "USER".
 type LuckyDrawCandidateType string
 
 const (
@@ -248,6 +260,16 @@ const (
 	LuckyDrawCandidateTypeUser LuckyDrawCandidateType = "USER"
 )
 
+func (l LuckyDrawCandidateType) IsValid() bool {
+	switch l {
+	case LuckyDrawCandidateTypeText, LuckyDrawCandidateTypeUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// ExpenseType enum values: "NORMAL", "PREMIUM".
 type ExpenseType string
 
 const (
@@ -264,6 +286,7 @@ func (e ExpenseType) IsValid() bool {
 	}
 }
 
+// ExpenseSplitType enum values: "EQUAL", "EXACT", "PERCENTAGE", "WEIGHTED".
 type ExpenseSplitType string
 
 const (
@@ -282,6 +305,7 @@ func (e ExpenseSplitType) IsValid() bool {
 	}
 }
 
+// ExpenseListScope enum values: "all", "created_by_me", "owed_by_me".
 type ExpenseListScope string
 
 const (
@@ -291,7 +315,12 @@ const (
 )
 
 func (e ExpenseListScope) IsValid() bool {
-	return e == ExpenseListScopeAll || e == ExpenseListScopeCreatedByMe || e == ExpenseListScopeOwedByMe
+	switch e {
+	case ExpenseListScopeAll, ExpenseListScopeCreatedByMe, ExpenseListScopeOwedByMe:
+		return true
+	default:
+		return false
+	}
 }
 
 // LuckyDrawStatus enum values: "DRAFT", "COMPLETED".
@@ -311,6 +340,7 @@ func (l LuckyDrawStatus) IsValid() bool {
 	}
 }
 
+// SettlementStatus enum values: "PENDING", "SUCCESS", "REJECT", "CANCELED".
 type SettlementStatus string
 
 const (
@@ -329,6 +359,7 @@ func (s SettlementStatus) IsValid() bool {
 	}
 }
 
+// SettlementDirection enum values: "all", "incoming", "outgoing".
 type SettlementDirection string
 
 const (
@@ -338,9 +369,15 @@ const (
 )
 
 func (s SettlementDirection) IsValid() bool {
-	return s == SettlementDirectionAll || s == SettlementDirectionIncoming || s == SettlementDirectionOutgoing
+	switch s {
+	case SettlementDirectionAll, SettlementDirectionIncoming, SettlementDirectionOutgoing:
+		return true
+	default:
+		return false
+	}
 }
 
+// ChecklistItemType enum values: "GROUP", "PERSONAL".
 type ChecklistItemType string
 
 const (
@@ -348,10 +385,16 @@ const (
 	ChecklistItemTypePersonal ChecklistItemType = "PERSONAL"
 )
 
-func (t ChecklistItemType) IsValid() bool {
-	return t == ChecklistItemTypeGroup || t == ChecklistItemTypePersonal
+func (c ChecklistItemType) IsValid() bool {
+	switch c {
+	case ChecklistItemTypeGroup, ChecklistItemTypePersonal:
+		return true
+	default:
+		return false
+	}
 }
 
+// ChecklistFilter enum values: "all", "claimed", "unclaimed", "mine", "personal".
 type ChecklistFilter string
 
 const (
@@ -362,8 +405,8 @@ const (
 	ChecklistFilterPersonal  ChecklistFilter = "personal"
 )
 
-func (f ChecklistFilter) IsValid() bool {
-	switch f {
+func (c ChecklistFilter) IsValid() bool {
+	switch c {
 	case ChecklistFilterAll, ChecklistFilterClaimed, ChecklistFilterUnclaimed, ChecklistFilterMine, ChecklistFilterPersonal:
 		return true
 	default:

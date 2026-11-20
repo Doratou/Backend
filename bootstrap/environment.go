@@ -16,6 +16,7 @@ type Environment struct {
 	Seed       SeedConfig    `mapstructure:",squash"`
 	Captcha    CaptchaConfig `mapstructure:",squash"`
 	Email      EmailConfig   `mapstructure:",squash"`
+	OAuth      OAuthConfig   `mapstructure:",squash"`
 
 	Invite     InvitationConfig  `mapstructure:",squash"`
 	Friendship FriendshipConfig  `mapstructure:",squash"`
@@ -23,6 +24,11 @@ type Environment struct {
 	PoW        PoWConfig         `mapstructure:",squash"`
 	Google     GoogleOAuthConfig `mapstructure:",squash"`
 	AvalAI     AvalAIConfig      `mapstructure:",squash"`
+}
+type OAuthConfig struct {
+	Protcol string `mapstructure:"OAUTH_PROTCOL"`
+	Domain  string `mapstructure:"OAUTH_DOMAIN"`
+	Port    string `mapstructure:"OAUTH_PORT"`
 }
 
 type GoogleOAuthConfig struct {

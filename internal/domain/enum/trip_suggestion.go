@@ -1,12 +1,7 @@
 package enum
 
+// TripType enum values: "city_tour", "beach", "camping", "mountain_hiking", "picnic", "skiing", "desert", "forest_nature", "cultural_historical", "road_trip", "other".
 type TripType string
-type Transport string
-type Accommodation string
-type MealPlan string
-type TimeOfDay string
-type Companion string
-type Activity string
 
 const (
 	TripTypeCityTour           TripType = "city_tour"
@@ -22,6 +17,18 @@ const (
 	TripTypeOther              TripType = "other"
 )
 
+func (t TripType) IsValid() bool {
+	switch t {
+	case TripTypeCityTour, TripTypeBeach, TripTypeCamping, TripTypeMountainHiking, TripTypePicnic, TripTypeSkiing, TripTypeDesert, TripTypeForestNature, TripTypeCulturalHistorical, TripTypeRoadTrip, TripTypeOther:
+		return true
+	default:
+		return false
+	}
+}
+
+// Transport enum values: "private_car", "bus", "train", "plane", "motorcycle", "bicycle", "on_foot", "mixed".
+type Transport string
+
 const (
 	TransportPrivateCar Transport = "private_car"
 	TransportBus        Transport = "bus"
@@ -33,6 +40,18 @@ const (
 	TransportMixed      Transport = "mixed"
 )
 
+func (t Transport) IsValid() bool {
+	switch t {
+	case TransportPrivateCar, TransportBus, TransportTrain, TransportPlane, TransportMotorcycle, TransportBicycle, TransportOnFoot, TransportMixed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Accommodation enum values: "tent", "hotel", "villa", "guesthouse", "friends_family", "none_day_trip".
+type Accommodation string
+
 const (
 	AccommodationTent          Accommodation = "tent"
 	AccommodationHotel         Accommodation = "hotel"
@@ -42,6 +61,18 @@ const (
 	AccommodationNoneDayTrip   Accommodation = "none_day_trip"
 )
 
+func (a Accommodation) IsValid() bool {
+	switch a {
+	case AccommodationTent, AccommodationHotel, AccommodationVilla, AccommodationGuesthouse, AccommodationFriendsFamily, AccommodationNoneDayTrip:
+		return true
+	default:
+		return false
+	}
+}
+
+// MealPlan enum values: "self_cooking", "restaurant", "bbq", "mixed".
+type MealPlan string
+
 const (
 	MealPlanSelfCooking MealPlan = "self_cooking"
 	MealPlanRestaurant  MealPlan = "restaurant"
@@ -49,11 +80,35 @@ const (
 	MealPlanMixed       MealPlan = "mixed"
 )
 
+func (m MealPlan) IsValid() bool {
+	switch m {
+	case MealPlanSelfCooking, MealPlanRestaurant, MealPlanBBQ, MealPlanMixed:
+		return true
+	default:
+		return false
+	}
+}
+
+// TimeOfDay enum values: "daytime", "evening_night", "overnight".
+type TimeOfDay string
+
 const (
 	TimeOfDayDaytime      TimeOfDay = "daytime"
 	TimeOfDayEveningNight TimeOfDay = "evening_night"
 	TimeOfDayOvernight    TimeOfDay = "overnight"
 )
+
+func (t TimeOfDay) IsValid() bool {
+	switch t {
+	case TimeOfDayDaytime, TimeOfDayEveningNight, TimeOfDayOvernight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Companion enum values: "children", "infant", "elderly", "pet", "person_with_disability", "none".
+type Companion string
 
 const (
 	CompanionChildren             Companion = "children"
@@ -63,6 +118,18 @@ const (
 	CompanionPersonWithDisability Companion = "person_with_disability"
 	CompanionNone                 Companion = "none"
 )
+
+func (c Companion) IsValid() bool {
+	switch c {
+	case CompanionChildren, CompanionInfant, CompanionElderly, CompanionPet, CompanionPersonWithDisability, CompanionNone:
+		return true
+	default:
+		return false
+	}
+}
+
+// Activity enum values: "swimming", "hiking", "photography", "fishing", "bbq", "camp_cooking", "skiing", "water_sports", "cycling", "sightseeing", "shopping", "night_party".
+type Activity string
 
 const (
 	ActivitySwimming    Activity = "swimming"
@@ -78,3 +145,12 @@ const (
 	ActivityShopping    Activity = "shopping"
 	ActivityNightParty  Activity = "night_party"
 )
+
+func (a Activity) IsValid() bool {
+	switch a {
+	case ActivitySwimming, ActivityHiking, ActivityPhotography, ActivityFishing, ActivityBBQ, ActivityCampCooking, ActivitySkiing, ActivityWaterSports, ActivityCycling, ActivitySightseeing, ActivityShopping, ActivityNightParty:
+		return true
+	default:
+		return false
+	}
+}

@@ -4,7 +4,8 @@ package bootstrap
 
 // EnvKeys contains all environment variable keys extracted from .env
 var EnvKeys = []string{
-	"HTTP_ADDRESS",
+	"HTTP_PROTCOL",
+	"HTTP_DOMAIN",
 	"HTTP_PORT",
 	"PDB_HOST",
 	"PDB_PORT",
@@ -65,6 +66,9 @@ var EnvKeys = []string{
 	"POW_DIFFICULTY",
 	"POW_L1_LIMIT",
 	"POW_L2_LIMIT",
+	"OAUTH_PROTCOL",
+	"OAUTH_DOMAIN",
+	"OAUTH_PORT",
 	"GOOGLE_CLIENT_ID",
 	"GOOGLE_CLIENT_SECRET",
 	"GOOGLE_REDIRECT_ENDPOINT",
