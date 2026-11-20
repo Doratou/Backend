@@ -1,0 +1,85 @@
+meta {
+  name: 08. Admin - List Users (Protected)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/users?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~status: ACTIVE
+  ~role: USER
+  ~search: 
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/admin/users`
+  **Auth:** Required (ADMIN)
+
+  ## Description
+
+  Retrieves a paginated and filterable list of all registered users.
+
+  ## Request
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Page number (default: 1) |
+  | `limit` | `integer` | No | Items per page (default: 20, max: 100) |
+  | `status` | `string` | No | Filter by account status (`ACTIVE`, `INACTIVE`) |
+  | `role` | `string` | No | Filter by system role (`USER`, `ADMIN`) |
+  | `search` | `string` | No | Search query for name, email, phone, or friend code |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 1,
+          "name": "Default User",
+          "friend_code": "DR-7K9M2X8Q4P6R",
+          "email": "user@doratou.local",
+          "phone": "+989123456789",
+          "is_email_verified": true,
+          "is_phone_verified": false,
+          "avatar_attachment_id": null,
+          "system_role": "ADMIN",
+          "status": "ACTIVE",
+          "wallet": 0,
+          "telegram_chat_id": null,
+          "telegram_user_id": null,
+          "created_at": "2026-11-11T10:00:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1
+      }
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid pagination or filter parameters
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Insufficient permissions (requires ADMIN role)
+}

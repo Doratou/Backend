@@ -1,0 +1,83 @@
+meta {
+  name: 10. Admin - Update User Role (Protected)
+  type: http
+  seq: 10
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/admin/users/:id/role
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: 2
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "role": "ADMIN"
+  }
+}
+
+docs {
+  **Method:** `PATCH`
+  **Endpoint:** `/api/v1/admin/users/:id/role`
+  **Auth:** Required (ADMIN)
+
+  ## Description
+
+  Updates the system role of a user between `USER` and `ADMIN`. Administrators cannot modify their own role.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `integer` | Yes | Target user ID |
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `role` | `string` | Yes | Target system role (`USER` or `ADMIN`) |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 2,
+      "name": "Regular User",
+      "friend_code": "DR-8M3P4X9Q5R7T",
+      "email": "member@doratou.local",
+      "phone": "+989123456789",
+      "is_email_verified": true,
+      "is_phone_verified": false,
+      "avatar_attachment_id": null,
+      "system_role": "ADMIN",
+      "status": "ACTIVE",
+      "wallet": 0,
+      "telegram_chat_id": null,
+      "telegram_user_id": null,
+      "created_at": "2026-11-11T10:00:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid role value
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Cannot change own role or insufficient permissions
+  * `404 Not Found` — User not found
+}

@@ -1,0 +1,42 @@
+meta {
+  name: 05. Delete Account (Protected)
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/users/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/users/me`
+  **Auth:** Required
+
+  ## Description
+
+  Soft-deletes the authenticated user's account, revokes the access token, and terminates all active sessions.
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "account deleted successfully"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `401 Unauthorized` — Missing or invalid token
+  * `403 Forbidden` — Account already deactivated
+}
