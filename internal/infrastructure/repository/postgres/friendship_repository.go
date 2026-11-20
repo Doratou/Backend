@@ -34,12 +34,14 @@ func (r *friendshipRepository) Create(ctx context.Context, friendship *entity.Fr
 	return nil
 }
 
-func (r *friendshipRepository) FindByID(ctx context.Context, id int64) (*entity.Friendship, error) {
+func (r *friendshipRepository) FindByID(ctx context.Context, id int64, lock bool) (*entity.Friendship, error) {
 	var friendship entity.Friendship
 	db := r.getDB(ctx)
+	if lock {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment")
+	}
 
-	err := db.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("RequesterUser.AvatarAttachment").Preload("ReceiverUser.AvatarAttachment").
-		Where("id = ?", id).First(&friendship).Error
+	err := db.First(&friendship, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, exception.ErrFriendshipNotFound
@@ -117,17 +119,10 @@ func (r *friendshipRepository) CountMutualGroups(ctx context.Context, userID int
 		UserID     int64
 		GroupCount int64
 	}
-	err := r.getDB(ctx).Raw(`
-		SELECT friend_members.user_id, COUNT(*) AS group_count
-		FROM group_members AS viewer_members
-		JOIN group_members AS friend_members ON friend_members.group_id = viewer_members.group_id
-		JOIN groups ON groups.id = viewer_members.group_id AND groups.deleted_at IS NULL
-		WHERE viewer_members.user_id = ?
-		  AND viewer_members.status = ? AND viewer_members.left_at IS NULL
-		  AND friend_members.user_id IN ?
-		  AND friend_members.status = ? AND friend_members.left_at IS NULL
-		GROUP BY friend_members.user_id
-	`, userID, enum.GroupMemberStatusActive, friendIDs, enum.GroupMemberStatusActive).Scan(&rows).Error
+	err := r.mutualGroups(ctx, userID).
+		Where("friend_members.user_id IN ?", friendIDs).
+		Select("friend_members.user_id, COUNT(*) AS group_count").
+		Group("friend_members.user_id").Scan(&rows).Error
 	if err != nil {
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
@@ -137,6 +132,34 @@ func (r *friendshipRepository) CountMutualGroups(ctx context.Context, userID int
 		counts[row.UserID] = row.GroupCount
 	}
 	return counts, nil
+}
+
+func (r *friendshipRepository) FindMutualGroups(ctx context.Context, userID, friendID int64, limit, offset int) ([]domain_repo.MutualGroup, int64, error) {
+	query := r.mutualGroups(ctx, userID).Where("friend_members.user_id = ?", friendID).Session(&gorm.Session{})
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	var groups []domain_repo.MutualGroup
+	err := query.Select(`groups.id, groups.title, groups.cover_attachment_id,
+		(SELECT COUNT(*) FROM group_members AS members
+		 WHERE members.group_id = groups.id AND members.status = ? AND members.left_at IS NULL) AS member_count`,
+		enum.GroupMemberStatusActive).
+		Order("groups.id DESC").Limit(limit).Offset(offset).Scan(&groups).Error
+	if err != nil {
+		return nil, 0, exception.Wrap(exception.ErrInternal, err)
+	}
+	return groups, total, nil
+}
+
+func (r *friendshipRepository) mutualGroups(ctx context.Context, userID int64) *gorm.DB {
+	return r.getDB(ctx).Table("groups").
+		Joins("JOIN group_members AS viewer_members ON viewer_members.group_id = groups.id").
+		Joins("JOIN group_members AS friend_members ON friend_members.group_id = groups.id").
+		Where("groups.deleted_at IS NULL").
+		Where("viewer_members.user_id = ? AND viewer_members.status = ? AND viewer_members.left_at IS NULL", userID, enum.GroupMemberStatusActive).
+		Where("friend_members.status = ? AND friend_members.left_at IS NULL", enum.GroupMemberStatusActive)
 }
 
 func (r *friendshipRepository) Update(ctx context.Context, friendship *entity.Friendship, expectedStatus enum.FriendshipStatus) error {

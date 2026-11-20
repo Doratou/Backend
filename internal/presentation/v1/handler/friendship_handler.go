@@ -144,6 +144,31 @@ func (h *FriendshipHandler) ListFriends(c *gin.Context) {
 	success(c, http.StatusOK, res)
 }
 
+func (h *FriendshipHandler) ListMutualGroups(c *gin.Context) {
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+	friendshipID, err := parseIDParam(c, "id")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	var req dto.ListFriendsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		fail(c, exception.Wrap(exception.ErrBadRequest, err))
+		return
+	}
+	res, err := h.friendshipService.ListMutualGroups(c.Request.Context(), userID, friendshipID, req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, res)
+}
+
 func (h *FriendshipHandler) RemoveFriend(c *gin.Context) {
 	userID, ok := tokencontext.GetUserID(c)
 	if !ok {

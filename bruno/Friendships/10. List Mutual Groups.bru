@@ -1,0 +1,128 @@
+meta {
+  name: 10. List Mutual Groups
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/friendships/{{friendshipId}}/mutual-groups
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Mutual Groups
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/friendships/:id/mutual-groups`
+  **Auth:** Required
+
+  ## Description
+
+  Lists groups that both participants of an accepted friendship belong to. Either participant can make this request with an active account. Set `friendshipId` manually in the selected Local environment using the selected item's `friendship_id` from List Friends.
+
+  This endpoint follows the same membership rules as `mutual_group_count` in List Friends. A group is included when both memberships are `ACTIVE` and neither member has left. Non-deleted groups in all three states, `ACTIVE`, `SETTLING`, and `CLOSED`, are included. Results are ordered by group ID descending.
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | string | Yes | Bearer access token of either friendship participant |
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | integer | Yes | Positive friendship ID from List Friends |
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | integer | No | Starts at 1. Defaults to 1. |
+  | `limit` | integer | No | From 1 to 100. Defaults to 20. |
+
+  No request body is required. Empty query values use their defaults. Invalid numbers or an overflowing pagination offset return `400 BAD_REQUEST`.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 12,
+          "title": "Weekend trip",
+          "cover_url": "https://storage.example.com/group-covers/weekend-trip.png?signature=example",
+          "member_count": 5
+        },
+        {
+          "id": 5,
+          "title": "Dinner plans",
+          "cover_url": null,
+          "member_count": 3
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 2
+      }
+    }
+  }
+  ```
+
+  | Field | Meaning |
+  | --- | --- |
+  | `data.items[].id` | Group ID used to open the group. |
+  | `data.items[].title` | Current group title. |
+  | `data.items[].cover_url` | Temporary URL for the cover image. Use a placeholder if null. This can happen when there is no cover, access is unavailable, or storage cannot generate a URL. |
+  | `data.items[].member_count` | Number of active members who have not left this group. |
+  | `data.pagination.total` | Number of matching groups before pagination. |
+
+  When there are no shared groups, the response contains `items: []` and `total: 0`. A page beyond the available results also contains `items: []` and keeps the matching total.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid friendship ID, page, limit, or pagination offset. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | The Bearer access token is missing. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid or is a refresh token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The token has expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The token has been blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is inactive. |
+  | 403 | `FRIENDSHIP_FORBIDDEN` | `you are not allowed to perform this friendship operation` | The caller does not participate in this friendship. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller's account is missing or soft-deleted. |
+  | 404 | `FRIENDSHIP_NOT_FOUND` | `friendship not found` | The friendship is missing or soft-deleted. |
+  | 409 | `FRIENDSHIP_INVALID_STATUS` | `friendship status does not allow this operation` | The caller participates in a pending or rejected relationship. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | An internal dependency or database operation failed. |
+
+  **Example: 403 Forbidden**
+
+  ```json
+  {
+    "success": false,
+    "code": "FRIENDSHIP_FORBIDDEN",
+    "error": "you are not allowed to perform this friendship operation"
+  }
+  ```
+}

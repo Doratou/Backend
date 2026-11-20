@@ -25,6 +25,7 @@ func RegisterFriendshipRoutes(
 		friendships.PATCH("/requests/:id/reject", friendshipHandler.RejectRequest)
 		friendships.DELETE("/requests/:id", friendshipHandler.CancelRequest)
 		friendships.GET("", friendshipHandler.ListFriends)
+		friendships.GET("/:id/mutual-groups", friendshipHandler.ListMutualGroups)
 		friendships.DELETE("/:id", friendshipHandler.RemoveFriend)
 	}
 }

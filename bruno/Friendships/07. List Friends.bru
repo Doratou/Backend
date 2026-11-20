@@ -40,6 +40,8 @@ docs {
 
   To remove a selected friend, set `friendshipId` manually in the Local environment to the selected item's `friendship_id`, then save the environment before using Remove Friend. Neither this list nor Accept Friend Request automatically changes that variable.
 
+  To open the groups behind a friend's `mutual_group_count`, use the same `friendshipId` with List Mutual Groups.
+
   ### Allowed values
 
   | Field / concept | Allowed values | Meaning |
@@ -108,7 +110,7 @@ docs {
 
   | Field | Meaning |
   | --- | --- |
-  | `data.items[].friendship_id` | Relationship ID used by Remove Friend; different from user.id. |
+  | `data.items[].friendship_id` | Relationship ID used by Remove Friend and List Mutual Groups. |
   | `data.items[].user` | Public summary: id (other user ID), name, avatar_attachment_id (integer or null), avatar_url (string or null). |
   | `data.items[].friends_since` | Acceptance timestamp (responded_at), or null on legacy data. |
   | `data.items[].mutual_group_count` | Number of non-deleted groups where both users have an active membership. Includes `ACTIVE`, `SETTLING`, and `CLOSED` groups. Returns 0 when they share none. |
