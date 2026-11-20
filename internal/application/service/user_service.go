@@ -78,6 +78,22 @@ func (s *userService) UpdateProfile(ctx context.Context, userID int64, req dto.U
 	return &response, nil
 }
 
+func (s *userService) ActivateUserStatus(ctx context.Context, userID int64) (*dto.UserResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	user.Status = enum.UserStatusActive
+	err = s.userRepo.Update(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	response := dto.ToUserResponse(user)
+	return &response, nil
+}
+
 func (s *userService) ChangeEmail(ctx context.Context, userID int64, req dto.ChangeEmailRequest) (*dto.UserResponse, error) {
 	user, err := s.activeUser(ctx, userID)
 	if err != nil {
@@ -95,18 +111,15 @@ func (s *userService) ChangeEmail(ctx context.Context, userID int64, req dto.Cha
 		return &response, nil
 	}
 
-	// 1. Verify OTP was confirmed in Redis
-	if s.otpService != nil {
-		verified, err := s.otpService.IsVerified(ctx, email, enum.OTPTypeEmail)
-		if err != nil {
-			return nil, err
-		}
-		if !verified {
-			return nil, exception.ErrUnverifiedCredentials
-		}
+	verified, err := s.otpService.IsVerified(ctx, email, enum.OTPTypeEmail)
+	if err != nil {
+		return nil, err
+	}
+	if !verified {
+		return nil, exception.ErrUnverifiedCredentials
 	}
 
-	// 2. Ensure email is not already taken by another user
+	// 1. Ensure email is not already taken by another user
 	exists, err := s.userRepo.ExistsByEmail(ctx, email)
 	if err != nil {
 		return nil, err
@@ -115,19 +128,17 @@ func (s *userService) ChangeEmail(ctx context.Context, userID int64, req dto.Cha
 		return nil, exception.ErrUserEmailAlreadyExists
 	}
 
-	// 3. Update email and mark verified
+	// 2. Update email and mark verified
 	user.Email = &email
 	user.IsEmailVerified = true
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
 	}
 
-	// 4. Clear verified flag from Redis
-	if s.otpService != nil && s.redisTrx != nil {
-		_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
-			return s.otpService.ClearVerified(trxCtx, email, enum.OTPTypeEmail)
-		})
-	}
+	// 3. Clear verified flag from Redis
+	_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
+		return s.otpService.ClearVerified(trxCtx, email, enum.OTPTypeEmail)
+	})
 
 	response := dto.ToUserResponse(user)
 	return &response, nil
@@ -150,14 +161,12 @@ func (s *userService) ChangePhone(ctx context.Context, userID int64, req dto.Cha
 	}
 
 	// 1. Verify OTP was confirmed in Redis
-	if s.otpService != nil {
-		verified, err := s.otpService.IsVerified(ctx, phone, enum.OTPTypePhone)
-		if err != nil {
-			return nil, err
-		}
-		if !verified {
-			return nil, exception.ErrUnverifiedCredentials
-		}
+	verified, err := s.otpService.IsVerified(ctx, phone, enum.OTPTypePhone)
+	if err != nil {
+		return nil, err
+	}
+	if !verified {
+		return nil, exception.ErrUnverifiedCredentials
 	}
 
 	// 2. Ensure phone is not already taken by another user
@@ -177,11 +186,9 @@ func (s *userService) ChangePhone(ctx context.Context, userID int64, req dto.Cha
 	}
 
 	// 4. Clear verified flag from Redis
-	if s.otpService != nil && s.redisTrx != nil {
-		_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
-			return s.otpService.ClearVerified(trxCtx, phone, enum.OTPTypePhone)
-		})
-	}
+	_ = s.redisTrx.WithTransaction(ctx, func(trxCtx context.Context) error {
+		return s.otpService.ClearVerified(trxCtx, phone, enum.OTPTypePhone)
+	})
 
 	response := dto.ToUserResponse(user)
 	return &response, nil
@@ -201,17 +208,13 @@ func (s *userService) DeleteAccount(ctx context.Context, userID int64, tokenStri
 	}
 
 	userIDStr := strconv.FormatInt(userID, 10)
-	if s.tokenRepo != nil {
-		_ = s.tokenRepo.DeleteUserRefreshSessions(ctx, userIDStr)
-	}
+	_ = s.tokenRepo.DeleteUserRefreshSessions(ctx, userIDStr)
 
-	if tokenString != "" && s.jwtMaker != nil && s.tokenRepo != nil {
-		claims, err := s.jwtMaker.VerifyToken(tokenString)
-		if err == nil && claims != nil {
-			remaining := time.Until(claims.ExpiresAt.Time)
-			if remaining > 0 {
-				_ = s.tokenRepo.BlacklistAccessToken(ctx, claims.ID, remaining)
-			}
+	claims, err := s.jwtMaker.VerifyToken(tokenString)
+	if err == nil && claims != nil {
+		remaining := time.Until(claims.ExpiresAt.Time)
+		if remaining > 0 {
+			_ = s.tokenRepo.BlacklistAccessToken(ctx, claims.ID, remaining)
 		}
 	}
 
@@ -225,30 +228,6 @@ func (s *userService) GetWallet(ctx context.Context, userID int64) (*dto.WalletR
 	}
 	return &dto.WalletResponse{
 		Wallet: user.Wallet,
-	}, nil
-}
-
-func (s *userService) TopUpWallet(ctx context.Context, userID int64, req dto.TopUpWalletRequest) (*dto.WalletResponse, error) {
-	if req.Amount <= 0 {
-		return nil, exception.ErrBadRequest
-	}
-
-	if _, err := s.activeUser(ctx, userID); err != nil {
-		return nil, err
-	}
-
-	if err := s.userRepo.UpdateWallet(ctx, userID, req.Amount); err != nil {
-		return nil, err
-	}
-
-	updatedUser, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &dto.WalletResponse{
-		Wallet:  updatedUser.Wallet,
-		Message: "wallet charged successfully (dev mode)",
 	}, nil
 }
 

@@ -114,7 +114,8 @@ type Redis struct {
 }
 
 type HttpServer struct {
-	Address string `mapstructure:"HTTP_ADDRESS"`
+	Protcol string `mapstructure:"HTTP_PROTCOL"`
+	Domain  string `mapstructure:"HTTP_DOMAIN"`
 	Port    string `mapstructure:"HTTP_PORT"`
 }
 

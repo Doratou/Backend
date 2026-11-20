@@ -29,29 +29,28 @@ body:json {
 }
 
 docs {
-  **Method:** `PATCH`
-  **Endpoint:** `/api/v1/admin/users/:id/role`
-  **Auth:** Required (ADMIN)
-
+  **Method:** `PATCH` **Endpoint:** `/api/v1/admin/users/:id/role` **Auth:** Required (ADMIN)
+  
   ## Description
-
-  Updates the system role of a user between `USER` and `ADMIN`. Administrators cannot modify their own role.
-
+  
+  Updates the system role of a user between `USER` and `ADMIN`. Administrators cannot modify their own role(except himself).
+  
   ## Request
-
+  
   ### Path Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `id` | `integer` | Yes | Target user ID |
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `role` | `string` | Yes | Target system role (`USER` or `ADMIN`) |
-
+  
   ## Response
-
-  **`200 OK`**
+  
+  `200 OK`
+  
   ```json
   {
     "success": true,
@@ -73,11 +72,11 @@ docs {
     }
   }
   ```
-
+  
   ## Errors
-
-  * `400 Bad Request` — Invalid role value
-  * `401 Unauthorized` — Missing or invalid token
-  * `403 Forbidden` — Cannot change own role or insufficient permissions
-  * `404 Not Found` — User not found
+  
+  - `400 Bad Request` — Invalid role value
+  - `401 Unauthorized` — Missing or invalid token
+  - `403 Forbidden` — Cannot change own role or insufficient permissions
+  - `404 Not Found` — User not found
 }

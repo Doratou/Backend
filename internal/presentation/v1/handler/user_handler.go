@@ -101,6 +101,23 @@ func (h *UserHandler) ChangePhone(c *gin.Context) {
 	success(c, http.StatusOK, response)
 }
 
+// ActivateUserStatus handles POST /api/v1/admin/users/status/activate/:id
+func (h *UserHandler) ActivateUserStatus(c *gin.Context) {
+	targetUserID, err := parseIDParam(c, "id")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	response, err := h.userService.ActivateUserStatus(c.Request.Context(), targetUserID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	success(c, http.StatusOK, response)
+}
+
 // DeleteMe handles DELETE /api/v1/users/me
 func (h *UserHandler) DeleteMe(c *gin.Context) {
 	userID, ok := tokencontext.GetUserID(c)
@@ -134,28 +151,6 @@ func (h *UserHandler) GetWallet(c *gin.Context) {
 	}
 
 	response, err := h.userService.GetWallet(c.Request.Context(), userID)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	success(c, http.StatusOK, response)
-}
-
-// TopUpWallet handles POST /api/v1/users/me/wallet/top-up
-func (h *UserHandler) TopUpWallet(c *gin.Context) {
-	userID, ok := tokencontext.GetUserID(c)
-	if !ok {
-		fail(c, exception.ErrMissingToken)
-		return
-	}
-
-	var req dto.TopUpWalletRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, exception.Wrap(exception.ErrBadRequest, err))
-		return
-	}
-
-	response, err := h.userService.TopUpWallet(c.Request.Context(), userID, req)
 	if err != nil {
 		fail(c, err)
 		return

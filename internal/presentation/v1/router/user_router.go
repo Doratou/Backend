@@ -27,7 +27,6 @@ func RegisterUserRoutes(rg *gin.RouterGroup, userHandler *handler.UserHandler, a
 		users.DELETE("/me", userHandler.DeleteMe)
 
 		users.GET("/me/wallet", userHandler.GetWallet)
-		users.POST("/me/wallet/top-up", userHandler.TopUpWallet)
 
 		users.GET("/by-friend-code/:friendCode", userHandler.FindByFriendCode)
 		users.POST("/me/friend-code/regenerate", userHandler.RegenerateFriendCode)
@@ -42,5 +41,6 @@ func RegisterUserRoutes(rg *gin.RouterGroup, userHandler *handler.UserHandler, a
 		adminUsers.GET("", userHandler.AdminListUsers)
 		adminUsers.GET("/:id", userHandler.AdminGetUserByID)
 		adminUsers.PATCH("/:id/role", userHandler.AdminUpdateUserRole)
+		adminUsers.POST("/status/activate/:id", userHandler.ActivateUserStatus)
 	}
 }

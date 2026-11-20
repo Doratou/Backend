@@ -21,10 +21,6 @@ type ChangePhoneRequest struct {
 	Phone string `json:"phone" binding:"required,min=10,max=20"`
 }
 
-type TopUpWalletRequest struct {
-	Amount int64 `json:"amount" binding:"required,gt=0"`
-}
-
 type WalletResponse struct {
 	Wallet  int64  `json:"wallet"`
 	Message string `json:"message,omitempty"`
