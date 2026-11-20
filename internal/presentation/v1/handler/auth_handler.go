@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
+	"github.com/Doratou/Backend/bootstrap"
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
 	"github.com/Doratou/Backend/internal/domain/exception"
@@ -12,11 +14,16 @@ import (
 )
 
 type AuthHandler struct {
+	oauthCfg    *bootstrap.OAuthConfig
 	authService adapter.AuthService
 }
 
-func NewAuthHandler(authService adapter.AuthService) *AuthHandler {
+func NewAuthHandler(
+	oauthCfg *bootstrap.OAuthConfig,
+	authService adapter.AuthService,
+) *AuthHandler {
 	return &AuthHandler{
+		oauthCfg:    oauthCfg,
 		authService: authService,
 	}
 }
@@ -267,6 +274,17 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		fail(c, err)
 		return
 	}
+	if h.oauthCfg.FrontendEnabled {
+		encRes, err := toURLFormat(res)
+		if err != nil {
+			fail(c, err)
+		}
+		baseUrl := h.oauthCfg.FrontendProtcol + "://" + h.oauthCfg.FrontendDomain + ":" + h.oauthCfg.FrontendPort + h.oauthCfg.FrontendEndpoint
+		targetUrl := baseUrl + "#" + "data=" + encRes
 
-	success(c, http.StatusOK, res)
+		log.Println("[REDIRCET] url=", targetUrl)
+		c.Redirect(http.StatusFound, targetUrl)
+	} else {
+		success(c, http.StatusOK, res)
+	}
 }
