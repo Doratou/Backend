@@ -29,6 +29,12 @@ type OAuthConfig struct {
 	Protcol string `mapstructure:"OAUTH_PROTCOL"`
 	Domain  string `mapstructure:"OAUTH_DOMAIN"`
 	Port    string `mapstructure:"OAUTH_PORT"`
+
+	FrontendEnabled  bool   `mapstructure:"OAUTH_FRONTEND_ENABLED"`
+	FrontendProtcol  string `mapstructure:"OAUTH_FRONTEND_PROTCOL"`
+	FrontendDomain   string `mapstructure:"OAUTH_FRONTEND_DOMAIN"`
+	FrontendPort     string `mapstructure:"OAUTH_FRONTEND_PORT"`
+	FrontendEndpoint string `mapstructure:"OAUTH_FRONTEND_ENDPOINT"`
 }
 
 type GoogleOAuthConfig struct {

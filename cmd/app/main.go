@@ -275,7 +275,7 @@ func main() {
 
 	// 8. Presentation Handlers & Routers
 	userHandler := handler.NewUserHandler(userService)
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(&cfg.Environment.OAuth, authService)
 	captchaHandler := handler.NewCaptchaHandler(captchaService)
 
 	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
