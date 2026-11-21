@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
 	"github.com/Doratou/Backend/internal/domain/exception"
+	"github.com/Doratou/Backend/internal/domain/finance"
 	domainDB "github.com/Doratou/Backend/internal/domain/repository/DB"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -25,9 +27,13 @@ func (r *settlementRepository) getDB(ctx context.Context) *gorm.DB {
 	return database.ExtractTrxOrDB(ctx, r.db).GetGormDB().WithContext(ctx)
 }
 
-func (r *settlementRepository) FindGroupByID(ctx context.Context, id int64) (*entity.Group, error) {
+func (r *settlementRepository) FindGroupByID(ctx context.Context, id int64, exclusive bool) (*entity.Group, error) {
 	var group entity.Group
-	err := r.getDB(ctx).Clauses(clause.Locking{Strength: "SHARE"}).First(&group, id).Error
+	lock := "SHARE"
+	if exclusive {
+		lock = "NO KEY UPDATE"
+	}
+	err := r.getDB(ctx).Clauses(clause.Locking{Strength: lock}).First(&group, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.ErrGroupNotFound
 	}
@@ -105,10 +111,18 @@ func (r *settlementRepository) List(ctx context.Context, groupID, memberID int64
 	return items, total, settlementPersistenceError(err)
 }
 
-func (r *settlementRepository) Respond(ctx context.Context, groupID, id int64, status enum.SettlementStatus) error {
+func (r *settlementRepository) Respond(ctx context.Context, groupID, id int64, status enum.SettlementStatus, legs []finance.Transfer) error {
 	now := time.Now().UTC()
 	fields := map[string]any{"status": status, "updated_at": now}
 	if status == enum.SettlementStatusSuccess {
+		if len(legs) == 0 {
+			return exception.ErrInternal
+		}
+		encoded, err := json.Marshal(legs)
+		if err != nil {
+			return settlementPersistenceError(err)
+		}
+		fields["balance_legs"] = string(encoded)
 		fields["confirmed_at"] = now
 	} else if status == enum.SettlementStatusReject {
 		fields["rejected_at"] = now
@@ -150,24 +164,6 @@ func (r *settlementRepository) BindAttachments(ctx context.Context, groupID, id 
 		return nil
 	}
 	return settlementPersistenceError(r.getDB(ctx).Model(&entity.Attachment{}).Where("id IN ?", ids).Updates(map[string]any{"settlement_id": id, "group_id": groupID, "is_public": false, "updated_at": time.Now().UTC()}).Error)
-}
-
-func (r *settlementRepository) NetDebt(ctx context.Context, groupID, memberID int64) (string, error) {
-	var result string
-	err := r.getDB(ctx).Raw(`SELECT COALESCE(SUM(delta),0)::text FROM (
-		SELECT CASE WHEN sh.member_id = ? THEN sh.share_amount_toman::numeric ELSE -sh.share_amount_toman::numeric END AS delta
-		FROM expense_shares sh JOIN expenses e ON e.id = sh.expense_id AND e.deleted_at IS NULL
-		JOIN group_members payer ON payer.id=e.created_by_member_id AND payer.status='ACTIVE' AND payer.left_at IS NULL
-		JOIN group_members participant ON participant.id=sh.member_id AND participant.status='ACTIVE' AND participant.left_at IS NULL
-		WHERE e.group_id=? AND sh.deleted_at IS NULL AND sh.member_id<>e.created_by_member_id AND (sh.member_id=? OR e.created_by_member_id=?)
-		UNION ALL
-		SELECT CASE WHEN p.from_member_id=? THEN -p.amount_toman::numeric ELSE p.amount_toman::numeric END
-		FROM settlements p
-		JOIN group_members sender ON sender.id=p.from_member_id AND sender.status='ACTIVE' AND sender.left_at IS NULL
-		JOIN group_members recipient ON recipient.id=p.to_member_id AND recipient.status='ACTIVE' AND recipient.left_at IS NULL
-		WHERE p.group_id=? AND p.status='SUCCESS' AND p.deleted_at IS NULL AND (p.from_member_id=? OR p.to_member_id=?)
-	) balances`, memberID, groupID, memberID, memberID, memberID, groupID, memberID, memberID).Scan(&result).Error
-	return result, settlementPersistenceError(err)
 }
 
 func settlementPersistenceError(err error) error {
