@@ -14,25 +14,26 @@ import (
 
 // Dependencies bundles all handlers and presentation dependencies needed to wire routes.
 type Dependencies struct {
-	AttachmentHandler  *handler.AttachmentHandler
-	AuthHandler        *handler.AuthHandler
-	UserHandler        *handler.UserHandler
-	CaptchaHandler     *handler.CaptchaHandler
-	AdminReportHandler *handler.AdminReportHandler
-	FriendshipHandler  *handler.FriendshipHandler
-	GroupHandler       *handler.GroupHandler
-	PollHandler        *handler.PollHandler
-	ChecklistHandler   *handler.ChecklistHandler
-	ExpenseHandler     *handler.ExpenseHandler
-	SettlementHandler  *handler.SettlementHandler
-	LuckyDrawHandler   *handler.LuckyDrawHandler
-	HamyarHandler      *handler.HamyarHandler
-	InviteHandler      *handler.InviteHandler
-	CaptchaService     adapter.CaptchaService
-	CaptchaEnabled     bool
-	TokenMaker         jwt.TokenMaker
-	TokenRepo          cache.AuthnTokenRepository
-	EmailFontFiles     fs.FS
+	AttachmentHandler      *handler.AttachmentHandler
+	AuthHandler            *handler.AuthHandler
+	UserHandler            *handler.UserHandler
+	CaptchaHandler         *handler.CaptchaHandler
+	AdminReportHandler     *handler.AdminReportHandler
+	FriendshipHandler      *handler.FriendshipHandler
+	GroupHandler           *handler.GroupHandler
+	PollHandler            *handler.PollHandler
+	ChecklistHandler       *handler.ChecklistHandler
+	ExpenseHandler         *handler.ExpenseHandler
+	SettlementHandler      *handler.SettlementHandler
+	FinancialReportHandler *handler.FinancialReportHandler
+	LuckyDrawHandler       *handler.LuckyDrawHandler
+	HamyarHandler          *handler.HamyarHandler
+	InviteHandler          *handler.InviteHandler
+	CaptchaService         adapter.CaptchaService
+	CaptchaEnabled         bool
+	TokenMaker             jwt.TokenMaker
+	TokenRepo              cache.AuthnTokenRepository
+	EmailFontFiles         fs.FS
 }
 
 // New builds the fully configured Gin engine with global middlewares and versioned routes.
@@ -97,6 +98,9 @@ func New(deps Dependencies) *gin.Engine {
 
 	if deps.SettlementHandler != nil {
 		RegisterSettlementRoutes(v1, deps.SettlementHandler, authMiddleware)
+	}
+	if deps.FinancialReportHandler != nil {
+		RegisterFinancialReportRoutes(v1, deps.FinancialReportHandler, authMiddleware)
 	}
 	if deps.HamyarHandler != nil {
 		RegisterHamyarRoutes(v1, deps.HamyarHandler, authMiddleware)

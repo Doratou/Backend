@@ -118,6 +118,7 @@ func main() {
 	checklistRepo := postgresRepo.NewChecklistRepository(postgresDB)
 	expenseRepo := postgresRepo.NewExpenseRepository(postgresDB)
 	settlementRepo := postgresRepo.NewSettlementRepository(postgresDB)
+	financialReportRepo := postgresRepo.NewFinancialReportRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
 	tripSuggestionRepo := postgresRepo.NewTripSuggestionRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
@@ -248,9 +249,10 @@ func main() {
 		},
 		cfg.Constant,
 	)
-	settlementService := service.NewSettlementService(settlementRepo, userRepo, dbTrxManager, attachmentService)
+	settlementService := service.NewSettlementService(settlementRepo, financialReportRepo, userRepo, dbTrxManager, attachmentService)
 	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
 	readTrxManager := database.NewReadSnapshotTrxManager(postgresDB)
+	financialReportService := service.NewFinancialReportService(financialReportRepo, userRepo, readTrxManager, attachmentService)
 	checklistService := service.NewChecklistService(checklistRepo, dbTrxManager, readTrxManager, attachmentService)
 	friendshipService := service.NewFriendshipService(
 		friendshipRepo,
@@ -289,28 +291,30 @@ func main() {
 	checklistHandler := handler.NewChecklistHandler(checklistService)
 	expenseHandler := handler.NewExpenseHandler(expenseService)
 	settlementHandler := handler.NewSettlementHandler(settlementService)
+	financialReportHandler := handler.NewFinancialReportHandler(financialReportService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	engine := router.New(router.Dependencies{
-		AuthHandler:        authHandler,
-		UserHandler:        userHandler,
-		CaptchaHandler:     captchaHandler,
-		AttachmentHandler:  attachmentHandler,
-		AdminReportHandler: adminReportHandler,
-		GroupHandler:       groupHandler,
-		InviteHandler:      inviteHandler,
-		FriendshipHandler:  friendshipHandler,
-		PollHandler:        pollHandler,
-		ChecklistHandler:   checklistHandler,
-		ExpenseHandler:     expenseHandler,
-		SettlementHandler:  settlementHandler,
-		LuckyDrawHandler:   luckyDrawHandler,
-		HamyarHandler:      hamyarHandler,
-		CaptchaService:     captchaService,
-		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
-		TokenMaker:         jwtMaker,
-		TokenRepo:          tokenRepo,
-		EmailFontFiles:     emailFontFiles,
+		AuthHandler:            authHandler,
+		UserHandler:            userHandler,
+		CaptchaHandler:         captchaHandler,
+		AttachmentHandler:      attachmentHandler,
+		AdminReportHandler:     adminReportHandler,
+		GroupHandler:           groupHandler,
+		InviteHandler:          inviteHandler,
+		FriendshipHandler:      friendshipHandler,
+		PollHandler:            pollHandler,
+		ChecklistHandler:       checklistHandler,
+		ExpenseHandler:         expenseHandler,
+		SettlementHandler:      settlementHandler,
+		FinancialReportHandler: financialReportHandler,
+		LuckyDrawHandler:       luckyDrawHandler,
+		HamyarHandler:          hamyarHandler,
+		CaptchaService:         captchaService,
+		CaptchaEnabled:         cfg.Environment.Captcha.Enabled,
+		TokenMaker:             jwtMaker,
+		TokenRepo:              tokenRepo,
+		EmailFontFiles:         emailFontFiles,
 	})
 
 	// 9. HTTP Server Lifecycle & Graceful Shutdown
