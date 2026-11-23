@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -18,8 +19,8 @@ func NewTopology(cm ConnectionManager) *Topology {
 	return &Topology{cm: cm}
 }
 
-// DeclareExchange idempotently declares an AMQP exchange.
-func (t *Topology) DeclareExchange(ctx context.Context, name, kind string, durable, autoDelete bool, args amqp.Table) error {
+// DeclareExchange idempotently declares an AMQP exchange using typed ExchangeType.
+func (t *Topology) DeclareExchange(ctx context.Context, name string, kind domain_broker.ExchangeType, durable, autoDelete bool, args amqp.Table) error {
 	ch, err := t.cm.Channel()
 	if err != nil {
 		return fmt.Errorf("topology: open channel for exchange %q: %w", name, err)
@@ -28,7 +29,7 @@ func (t *Topology) DeclareExchange(ctx context.Context, name, kind string, durab
 
 	if err := ch.ExchangeDeclare(
 		name,
-		kind,
+		string(kind),
 		durable,
 		autoDelete,
 		false, // internal
@@ -40,13 +41,21 @@ func (t *Topology) DeclareExchange(ctx context.Context, name, kind string, durab
 	return nil
 }
 
-// DeclareQueue idempotently declares an AMQP queue.
-func (t *Topology) DeclareQueue(ctx context.Context, name string, durable, autoDelete bool, args amqp.Table) (*amqp.Queue, error) {
+// DeclareQueue idempotently declares an AMQP queue with an explicit QueueType and optional custom arguments.
+func (t *Topology) DeclareQueue(ctx context.Context, name string, qType domain_broker.QueueType, durable, autoDelete bool, args amqp.Table) (*amqp.Queue, error) {
 	ch, err := t.cm.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("topology: open channel for queue %q: %w", name, err)
 	}
 	defer ch.Close()
+
+	mergedArgs := make(amqp.Table, len(args)+1)
+	for k, v := range args {
+		mergedArgs[k] = v
+	}
+	if qType != "" {
+		mergedArgs["x-queue-type"] = string(qType)
+	}
 
 	q, err := ch.QueueDeclare(
 		name,
@@ -54,7 +63,7 @@ func (t *Topology) DeclareQueue(ctx context.Context, name string, durable, autoD
 		autoDelete,
 		false, // exclusive
 		false, // no-wait
-		args,
+		mergedArgs,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("topology: declare queue %q: %w", name, err)
@@ -85,12 +94,12 @@ func (t *Topology) BindQueue(ctx context.Context, queue, routingKey, exchange st
 // SetupDeadLetterTopology declares a Dead Letter Exchange and Queue, binding them together.
 func (t *Topology) SetupDeadLetterTopology(ctx context.Context, dlxExchange, dlqQueue, routingKey string) error {
 	if dlxExchange != "" {
-		if err := t.DeclareExchange(ctx, dlxExchange, amqp.ExchangeDirect, true, false, nil); err != nil {
+		if err := t.DeclareExchange(ctx, dlxExchange, domain_broker.ExchangeTypeDirect, true, false, nil); err != nil {
 			return err
 		}
 	}
 
-	if _, err := t.DeclareQueue(ctx, dlqQueue, true, false, nil); err != nil {
+	if _, err := t.DeclareQueue(ctx, dlqQueue, domain_broker.QueueTypeQuorum, true, false, nil); err != nil {
 		return err
 	}
 
@@ -108,7 +117,7 @@ func (t *Topology) SetupDeadLetterTopology(ctx context.Context, dlxExchange, dlq
 // after which RabbitMQ dead-letters them back to `mainExchange` with `mainQueue` routing key.
 func (t *Topology) SetupRetryTopology(ctx context.Context, mainExchange, mainQueue, retryExchange, retryQueue string, delayTTL time.Duration) error {
 	if retryExchange != "" {
-		if err := t.DeclareExchange(ctx, retryExchange, amqp.ExchangeDirect, true, false, nil); err != nil {
+		if err := t.DeclareExchange(ctx, retryExchange, domain_broker.ExchangeTypeDirect, true, false, nil); err != nil {
 			return fmt.Errorf("declare retry exchange %q: %w", retryExchange, err)
 		}
 	}
@@ -120,7 +129,7 @@ func (t *Topology) SetupRetryTopology(ctx context.Context, mainExchange, mainQue
 		"x-dead-letter-routing-key": mainQueue,
 	}
 
-	if _, err := t.DeclareQueue(ctx, retryQueue, true, false, args); err != nil {
+	if _, err := t.DeclareQueue(ctx, retryQueue, domain_broker.QueueTypeClassic, true, false, args); err != nil {
 		return fmt.Errorf("declare retry queue %q: %w", retryQueue, err)
 	}
 
