@@ -15,6 +15,7 @@ import (
 	"github.com/Doratou/Backend/bootstrap"
 	"github.com/Doratou/Backend/internal/application/service"
 	"github.com/Doratou/Backend/internal/infrastructure/ai"
+	brokerInfra "github.com/Doratou/Backend/internal/infrastructure/broker/rabbitmq"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 	emailInfra "github.com/Doratou/Backend/internal/infrastructure/email"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
@@ -103,6 +104,24 @@ func main() {
 		log.Fatalf("failed to connect to RustFS storage: %v", err)
 	}
 	log.Print("RustFS storage connected and bucket verified")
+
+	// 3.1 RabbitMQ Broker Connection & Publisher
+	rmqEnv := cfg.Environment.RabbitMQ
+	rmqCfg := brokerInfra.DefaultConfig(rmqEnv.Host, rmqEnv.Port, rmqEnv.User, rmqEnv.Password, rmqEnv.VHost)
+	rmqCfg.ConnectionTimeout = cfg.Constant.RabbitMQ.DefaultPublishTimeout
+	rmqCfg.InitialReconnectDelay = cfg.Constant.RabbitMQ.DefaultReconnectDelay
+
+	rmqConnCtx, cancelRmq := context.WithTimeout(context.Background(), 10*time.Second)
+	rmqConnMgr, err := brokerInfra.NewConnectionManager(rmqConnCtx, rmqCfg)
+	cancelRmq()
+	if err != nil {
+		log.Printf("[RABBITMQ WARNING] failed to connect to RabbitMQ broker at startup: %v (broker will auto-reconnect)", err)
+	} else {
+		defer rmqConnMgr.Close()
+		log.Print("RabbitMQ broker connected")
+	}
+	rmqPublisher := brokerInfra.NewPublisher(rmqConnMgr)
+	_ = rmqPublisher
 
 	// 4. Infrastructure Transaction Managers
 	dbTrxManager := database.NewTrxManager(postgresDB)

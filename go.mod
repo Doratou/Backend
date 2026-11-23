@@ -12,6 +12,7 @@ require (
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/mojocn/base64Captcha v1.3.8
 	github.com/pressly/goose/v3 v3.29.0
+	github.com/rabbitmq/amqp091-go v1.17.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/spf13/viper v1.21.0
 	github.com/wneessen/go-mail v0.8.1
