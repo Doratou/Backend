@@ -62,8 +62,27 @@ services:
       retries: 10
       start_period: 5s
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: doratou-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RMQ_PASSWORD:-guest}
+      RABBITMQ_DEFAULT_VHOST: ${RMQ_VHOST:-/}
+    ports:
+      - "127.0.0.1:${RMQ_PORT:-5672}:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:
   redisdata:
   rustfsdata:
+  rmqdata:

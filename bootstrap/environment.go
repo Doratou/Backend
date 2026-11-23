@@ -10,6 +10,7 @@ import (
 type Environment struct {
 	DataBase   DataBase      `mapstructure:",squash"`
 	Redis      Redis         `mapstructure:",squash"`
+	RabbitMQ   RabbitMQ      `mapstructure:",squash"`
 	HttpServer HttpServer    `mapstructure:",squash"`
 	JWT        JWTConfig     `mapstructure:",squash"`
 	OTP        OTPConfig     `mapstructure:",squash"`
@@ -130,6 +131,14 @@ type Redis struct {
 	Port      string `mapstructure:"RDB_PORT"`
 	Password  string `mapstructure:"RDB_PASSWORD"`
 	RDBNumber string `mapstructure:"RDB_DB_NUMBER"`
+}
+
+type RabbitMQ struct {
+	Host     string `mapstructure:"RMQ_HOST"`
+	Port     string `mapstructure:"RMQ_PORT"`
+	User     string `mapstructure:"RMQ_USER"`
+	Password string `mapstructure:"RMQ_PASSWORD" json:"-"`
+	VHost    string `mapstructure:"RMQ_VHOST"`
 }
 
 type HttpServer struct {

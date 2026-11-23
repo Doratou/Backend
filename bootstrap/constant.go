@@ -9,6 +9,7 @@ type Constant struct {
 	Captcha    CaptchaConst
 	Attachment AttachmentConst
 	Friendship FriendshipConst
+	RabbitMQ   RabbitMQConst
 }
 
 type DBConst struct {
@@ -46,6 +47,14 @@ type FriendshipConst struct {
 	DefaultRequestCooldown time.Duration
 }
 
+type RabbitMQConst struct {
+	DefaultPrefetchCount  int
+	DefaultReconnectDelay time.Duration
+	DefaultPublishTimeout time.Duration
+	DefaultMaxRetries     int
+	DefaultRetryDelay     time.Duration
+}
+
 func NewConstant() *Constant {
 	return &Constant{
 		Database: DBConst{
@@ -76,6 +85,13 @@ func NewConstant() *Constant {
 		},
 		Friendship: FriendshipConst{
 			DefaultRequestCooldown: 24 * time.Hour,
+		},
+		RabbitMQ: RabbitMQConst{
+			DefaultPrefetchCount:  10,
+			DefaultReconnectDelay: 5 * time.Second,
+			DefaultPublishTimeout: 5 * time.Second,
+			DefaultMaxRetries:     3,
+			DefaultRetryDelay:     10 * time.Second,
 		},
 	}
 }
