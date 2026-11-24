@@ -119,9 +119,18 @@ func main() {
 	} else {
 		defer rmqConnMgr.Close()
 		log.Print("RabbitMQ broker connected")
+
+		// Setup Doratou notification exchange and queues
+		setupCtx, cancelSetup := context.WithTimeout(context.Background(), 10*time.Second)
+		topology := brokerInfra.NewTopology(rmqConnMgr)
+		if err := topology.SetupDoratouTopology(setupCtx); err != nil {
+			log.Printf("[RABBITMQ WARNING] failed to declare doratou topology: %v", err)
+		} else {
+			log.Print("RabbitMQ Doratou notification topology initialized")
+		}
+		cancelSetup()
 	}
 	rmqPublisher := brokerInfra.NewPublisher(rmqConnMgr)
-	_ = rmqPublisher
 
 	// 4. Infrastructure Transaction Managers
 	dbTrxManager := database.NewTrxManager(postgresDB)
@@ -201,6 +210,7 @@ func main() {
 		redisTrxManager,
 		emailSender,
 		emailRenderer,
+		rmqPublisher,
 		service.OTPServiceConfig{
 			TTL:                  cfg.Environment.OTP.TTL,
 			VerifiedTTL:          cfg.Environment.OTP.VerifiedTTL,

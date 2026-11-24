@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"os/signal"
@@ -11,7 +13,9 @@ import (
 
 	"github.com/Doratou/Backend/bootstrap"
 	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
+	"github.com/Doratou/Backend/internal/domain/broker/payload"
 	brokerInfra "github.com/Doratou/Backend/internal/infrastructure/broker/rabbitmq"
+	mail "github.com/Doratou/Backend/pkg/wneessen-go-mail"
 )
 
 func main() {
@@ -37,44 +41,66 @@ func main() {
 	defer rmqConnMgr.Close()
 	log.Print("RabbitMQ connection established for workers")
 
-	// 2. Initialize Broker Infrastructure
+	// 2. Initialize Broker Infrastructure and Setup Topology
 	rmqPublisher := brokerInfra.NewPublisher(rmqConnMgr)
 	rmqConsumer := brokerInfra.NewConsumer(rmqConnMgr, rmqPublisher)
 	topology := brokerInfra.NewTopology(rmqConnMgr)
 
-	_ = topology
+	setupCtx, cancelSetup := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := topology.SetupDoratouTopology(setupCtx); err != nil {
+		log.Printf("[WORKER WARNING] failed to declare doratou topology: %v", err)
+	} else {
+		log.Print("Doratou notification topology verified and ready")
+	}
+	cancelSetup()
 
-	// 3. Graceful Shutdown & Context Management
+	// 3. Initialize Outgoing Email Sender
+	emailSender := mail.NewMailer(mail.EmailConfig{
+		From:     cfg.Environment.Email.DoratouEmail,
+		Password: cfg.Environment.Email.DoratouEmailAppPassword,
+		SMTPHost: cfg.Environment.Email.SMTPHost,
+		SMTPPort: cfg.Environment.Email.SMTPPort,
+	})
+
+	// 4. Graceful Shutdown & Context Management
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	var wg sync.WaitGroup
 
-	// Sample Consumer Registration Skeleton:
-	// In the next phase, register specific business queues and handlers here:
-	//
-	// retryPolicy := domain_broker.RetryPolicy{
-	// 	Enabled:           true,
-	// 	MaxRetries:        cfg.Constant.RabbitMQ.DefaultMaxRetries,
-	// 	InitialDelay:      cfg.Constant.RabbitMQ.DefaultRetryDelay,
-	// 	BackoffMultiplier: 2.0,
-	// 	RetryExchange:     "doratou.retry.exchange",
-	// }
-	//
-	// wg.Add(1)
-	// go func() {
-	// 	defer wg.Done()
-	// 	_ = rmqConsumer.Consume(ctx, "sample.queue", sampleHandler,
-	// 		domain_broker.WithConcurrency(2),
-	// 		domain_broker.WithPrefetchCount(cfg.Constant.RabbitMQ.DefaultPrefetchCount),
-	// 		domain_broker.WithRetryPolicy(retryPolicy),
-	// 	)
-	// }()
+	// 5. Register Email Queue Consumer
+	emailHandler := func(ctx context.Context, d domain_broker.Delivery) error {
+		var p payload.EmailPayload
+		if err := json.Unmarshal(d.Message().Body, &p); err != nil {
+			log.Printf("[EMAIL WORKER ERROR] invalid payload format: %v", err)
+			return domain_broker.ErrReject
+		}
 
-	_ = rmqConsumer
-	_ = domain_broker.DefaultRetryPolicy
+		log.Printf("[EMAIL WORKER] delivering email to %v with subject %q", p.To, p.Subject)
+		if err := emailSender.Send(ctx, p.ToSendOptions()); err != nil {
+			log.Printf("[EMAIL WORKER ERROR] failed to deliver email: %v", err)
+			return err
+		}
 
-	log.Print("Worker process initialized and ready for registered consumers.")
+		log.Printf("[EMAIL WORKER] email successfully sent to %v", p.To)
+		return nil
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := rmqConsumer.Consume(
+			ctx,
+			domain_broker.EmailQueue,
+			emailHandler,
+			domain_broker.WithConcurrency(2),
+			domain_broker.WithPrefetchCount(cfg.Constant.RabbitMQ.DefaultPrefetchCount),
+		); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("[EMAIL WORKER ERROR] consumer stopped: %v", err)
+		}
+	}()
+
+	log.Print("Worker process running and listening on notification queues.")
 
 	<-ctx.Done()
 	log.Print("Shutdown signal received in worker, waiting for in-flight tasks to complete...")
