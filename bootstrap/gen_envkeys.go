@@ -100,4 +100,5 @@ var EnvKeys = []string{
 	"EMAIL_QUEUE_TTL",
 	"SMS_QUEUE_TTL",
 	"WS_QUEUE_TTL",
+	"DLQ_MESSAGE_TTL",
 }
