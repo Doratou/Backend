@@ -25,6 +25,24 @@ type Environment struct {
 	PoW        PoWConfig         `mapstructure:",squash"`
 	Google     GoogleOAuthConfig `mapstructure:",squash"`
 	AvalAI     AvalAIConfig      `mapstructure:",squash"`
+	Workers    WorkerConfig      `mapstructure:",squash"`
+}
+
+type WorkerConfig struct {
+	EmailConcurrency int           `mapstructure:"EMAIL_WORKER_CONCURRENCY"`
+	EmailPrefetch    int           `mapstructure:"EMAIL_WORKER_PREFETCH"`
+	EmailMaxRetries  int           `mapstructure:"EMAIL_WORKER_MAX_RETRIES"`
+	EmailRetryDelay  time.Duration `mapstructure:"EMAIL_WORKER_RETRY_DELAY"`
+
+	SMSConcurrency int           `mapstructure:"SMS_WORKER_CONCURRENCY"`
+	SMSPrefetch    int           `mapstructure:"SMS_WORKER_PREFETCH"`
+	SMSMaxRetries  int           `mapstructure:"SMS_WORKER_MAX_RETRIES"`
+	SMSRetryDelay  time.Duration `mapstructure:"SMS_WORKER_RETRY_DELAY"`
+
+	WSConcurrency int           `mapstructure:"WS_WORKER_CONCURRENCY"`
+	WSPrefetch    int           `mapstructure:"WS_WORKER_PREFETCH"`
+	WSMaxRetries  int           `mapstructure:"WS_WORKER_MAX_RETRIES"`
+	WSRetryDelay  time.Duration `mapstructure:"WS_WORKER_RETRY_DELAY"`
 }
 type OAuthConfig struct {
 	Protcol string `mapstructure:"OAUTH_PROTCOL"`

@@ -36,6 +36,9 @@ func (c *Consumer) Consume(ctx context.Context, queue string, handler domain_bro
 		PrefetchCount: 10,
 		Concurrency:   1,
 		AutoAck:       false,
+		Exclusive:     false,
+		NoLocal:       false,
+		NoWait:        false,
 	}
 	for _, opt := range opts {
 		opt(&options)

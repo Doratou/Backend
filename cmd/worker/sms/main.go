@@ -3,15 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-	"time"
 
 	"github.com/Doratou/Backend/bootstrap"
+	runner "github.com/Doratou/Backend/cmd/worker"
 	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
 	"github.com/Doratou/Backend/internal/domain/broker/payload"
 	brokerInfra "github.com/Doratou/Backend/internal/infrastructure/broker/rabbitmq"
@@ -32,101 +27,32 @@ func (m *mockSMSSender) Send(ctx context.Context, p payload.SMSPayload) error {
 }
 
 func main() {
-	cfg, err := bootstrap.Run()
-	if err != nil {
-		log.Fatalf("sms worker bootstrap error: %v", err)
-	}
+	runner.Run("SMS", func(ctx context.Context, consumer *brokerInfra.Consumer, cfg *bootstrap.Config) error {
+		smsSender := &mockSMSSender{}
 
-	log.Print("Starting Doratou SMS Consumer Worker...")
+		smsHandler := func(ctx context.Context, d domain_broker.Delivery) error {
+			var p payload.SMSPayload
+			if err := json.Unmarshal(d.Message().Body, &p); err != nil {
+				log.Printf("[SMS WORKER ERROR] invalid payload format: %v", err)
+				return domain_broker.ErrReject
+			}
 
-	// 1. Establish RabbitMQ Connection
-	rmqEnv := cfg.Environment.RabbitMQ
-	rmqCfg := brokerInfra.DefaultConfig(rmqEnv.Host, rmqEnv.Port, rmqEnv.User, rmqEnv.Password, rmqEnv.VHost)
-	rmqCfg.ConnectionTimeout = cfg.Constant.RabbitMQ.DefaultPublishTimeout
-	rmqCfg.InitialReconnectDelay = cfg.Constant.RabbitMQ.DefaultReconnectDelay
-
-	connCtx, cancelConn := context.WithTimeout(context.Background(), 10*time.Second)
-	rmqConnMgr, err := brokerInfra.NewConnectionManager(connCtx, rmqCfg)
-	cancelConn()
-	if err != nil {
-		log.Fatalf("failed to connect to RabbitMQ broker: %v", err)
-	}
-	defer rmqConnMgr.Close()
-	log.Print("RabbitMQ connection established for sms worker")
-
-	// 2. Initialize Broker Infrastructure and Setup Topology
-	rmqPublisher := brokerInfra.NewPublisher(rmqConnMgr)
-	rmqConsumer := brokerInfra.NewConsumer(rmqConnMgr, rmqPublisher)
-	topology := brokerInfra.NewTopology(rmqConnMgr)
-
-	setupCtx, cancelSetup := context.WithTimeout(context.Background(), 10*time.Second)
-	if err := topology.SetupDoratouTopology(setupCtx); err != nil {
-		log.Printf("[SMS WORKER WARNING] failed to declare doratou topology: %v", err)
-	} else {
-		log.Print("Doratou notification topology verified and ready")
-	}
-	cancelSetup()
-
-	// 3. Initialize SMS Sender (Mock implementation for now)
-	smsSender := &mockSMSSender{}
-
-	// 4. Graceful Shutdown & Context Management
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	var wg sync.WaitGroup
-
-	// 5. Register SMS Queue Consumer Handler
-	smsHandler := func(ctx context.Context, d domain_broker.Delivery) error {
-		var p payload.SMSPayload
-		if err := json.Unmarshal(d.Message().Body, &p); err != nil {
-			log.Printf("[SMS WORKER ERROR] invalid payload format: %v", err)
-			return domain_broker.ErrReject
+			log.Printf("[SMS WORKER] processing SMS for recipient %s", p.Recipient)
+			return smsSender.Send(ctx, p)
 		}
 
-		log.Printf("[SMS WORKER] processing SMS for recipient %s", p.Recipient)
-		if err := smsSender.Send(ctx, p); err != nil {
-			log.Printf("[SMS WORKER ERROR] failed to deliver SMS: %v", err)
-			return err
-		}
-
-		return nil
-	}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := rmqConsumer.Consume(
+		wCfg := cfg.Environment.Workers
+		return consumer.Consume(
 			ctx,
 			domain_broker.SMSQueue,
 			smsHandler,
-			domain_broker.WithConcurrency(2),
-			domain_broker.WithPrefetchCount(cfg.Constant.RabbitMQ.DefaultPrefetchCount),
-		); err != nil && !errors.Is(err, context.Canceled) {
-			log.Printf("[SMS WORKER ERROR] consumer stopped: %v", err)
-		}
-	}()
-
-	log.Print("SMS worker running and listening on q.sms.classic.")
-
-	<-ctx.Done()
-	log.Print("Shutdown signal received in sms worker, waiting for in-flight tasks to complete...")
-
-	shutdownWaitCtx, cancelShutdown := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancelShutdown()
-
-	waitDone := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(waitDone)
-	}()
-
-	select {
-	case <-waitDone:
-		log.Print("All sms worker consumers shut down cleanly.")
-	case <-shutdownWaitCtx.Done():
-		log.Print("Shutdown timed out waiting for sms consumers.")
-	}
-
-	log.Print("SMS worker process stopped.")
+			domain_broker.WithConcurrency(wCfg.SMSConcurrency),
+			domain_broker.WithPrefetchCount(wCfg.SMSPrefetch),
+			domain_broker.WithRetryPolicy(domain_broker.RetryPolicy{
+				Enabled:      true,
+				MaxRetries:   wCfg.SMSMaxRetries,
+				InitialDelay: wCfg.SMSRetryDelay,
+			}),
+		)
+	})
 }

@@ -153,11 +153,13 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 			Tokens:     map[string]string{"code": code},
 		}
 		if s.brokerPub != nil {
-			if err:= s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.SMSRoutingKey, smsPayload){
-				
+			if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.SMSRoutingKey, smsPayload); err != nil {
+				log.Printf("failed to publish OTP sms to rabbitmq: %v", err)
+				return nil, exception.Wrap(exception.ErrInternal, err)
+			} else {
+				// use syncSmsSender
 			}
 		}
-		log.Printf("[OTP DEV LOG] Type: %s | Identifier: %s | Code: %s (Expires in %v)", otpType, identifier, code, s.cfg.TTL)
 	} else {
 		log.Printf("[OTP DEV LOG] Type: %s | Identifier: %s | Code: %s (Expires in %v)", otpType, identifier, code, s.cfg.TTL)
 	}
