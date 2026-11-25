@@ -190,6 +190,24 @@ func (p *Publisher) PublishToRetry(ctx context.Context, retryExchange, mainQueue
 	return p.Publish(ctx, retryExchange, mainQueue, originalMsg, publishOpts...)
 }
 
+// PublishToDLQ routes an unrecoverable poison message to the DLX with failure metadata headers.
+func (p *Publisher) PublishToDLQ(ctx context.Context, dlx, routingKey string, originalMsg domain_broker.Message, retryCount int, reason error) error {
+	headers := make(domain_broker.Headers)
+	if originalMsg.Headers != nil {
+		for k, v := range originalMsg.Headers {
+			headers[k] = v
+		}
+	}
+	if reason != nil {
+		headers["x-death-reason"] = reason.Error()
+	}
+	headers["x-failed-retries"] = retryCount
+	headers["x-dead-lettered-at"] = time.Now().UTC().Format(time.RFC3339)
+	originalMsg.Headers = headers
+
+	return p.Publish(ctx, dlx, routingKey, originalMsg, domain_broker.WithPersistent(true))
+}
+
 // PublishWithExpiration publishes a message with per-message TTL (expiration).
 func (p *Publisher) PublishWithExpiration(ctx context.Context, exchange, routingKey string, msg domain_broker.Message, expiration time.Duration, opts ...domain_broker.PublishOption) error {
 	ch, err := p.getChannel()
