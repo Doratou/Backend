@@ -65,9 +65,11 @@ func main() {
 			domain_broker.WithConcurrency(wCfg.EmailConcurrency),
 			domain_broker.WithPrefetchCount(wCfg.EmailPrefetch),
 			domain_broker.WithRetryPolicy(domain_broker.RetryPolicy{
-				Enabled:      true,
-				MaxRetries:   wCfg.EmailMaxRetries,
-				InitialDelay: wCfg.EmailRetryDelay,
+				Enabled:            true,
+				MaxRetries:         wCfg.EmailMaxRetries,
+				InitialDelay:       wCfg.EmailRetryDelay,
+				RetryExchange:      domain_broker.NotificationRetryExchange,
+				DeadLetterExchange: domain_broker.NotificationDLX,
 			}),
 		)
 	})

@@ -49,9 +49,11 @@ func main() {
 			domain_broker.WithConcurrency(wCfg.SMSConcurrency),
 			domain_broker.WithPrefetchCount(wCfg.SMSPrefetch),
 			domain_broker.WithRetryPolicy(domain_broker.RetryPolicy{
-				Enabled:      true,
-				MaxRetries:   wCfg.SMSMaxRetries,
-				InitialDelay: wCfg.SMSRetryDelay,
+				Enabled:            true,
+				MaxRetries:         wCfg.SMSMaxRetries,
+				InitialDelay:       wCfg.SMSRetryDelay,
+				RetryExchange:      domain_broker.NotificationRetryExchange,
+				DeadLetterExchange: domain_broker.NotificationDLX,
 			}),
 		)
 	})
