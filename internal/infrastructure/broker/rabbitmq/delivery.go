@@ -81,6 +81,29 @@ func (dw *deliveryWrapper) RetryCount() int {
 	return 0
 }
 
+func (dw *deliveryWrapper) Urgency() domain_broker.Urgency {
+	if dw.d.Headers == nil {
+		return domain_broker.UrgencyNormal
+	}
+
+	if val, ok := dw.d.Headers[domain_broker.HeaderUrgency]; ok {
+		switch v := val.(type) {
+		case uint8:
+			return domain_broker.Urgency(v)
+		case int:
+			return domain_broker.Urgency(v)
+		case int32:
+			return domain_broker.Urgency(v)
+		case int64:
+			return domain_broker.Urgency(v)
+		case float64:
+			return domain_broker.Urgency(v)
+		}
+	}
+
+	return domain_broker.UrgencyNormal
+}
+
 func (dw *deliveryWrapper) Ack(multiple bool) error {
 	return dw.d.Ack(multiple)
 }

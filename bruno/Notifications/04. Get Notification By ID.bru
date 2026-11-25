@@ -1,0 +1,63 @@
+meta {
+  name: 04. Get Notification By ID
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/notifications/101
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Notification By ID
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/notifications/:id`
+  **Auth:** Required
+
+  ## Description
+
+  Retrieves details of a single active notification belonging to the authenticated user.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `integer` | Yes | Unique notification primary key ID |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 101,
+      "recipient_id": 12,
+      "actor_id": 34,
+      "group_id": null,
+      "event": "friend_request.received",
+      "data": {
+        "request_id": 5,
+        "sender_name": "Ali"
+      },
+      "is_read": true,
+      "created_at": "2026-11-24T14:40:00Z"
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid notification ID
+  * `401 Unauthorized` — Missing or invalid access token
+  * `404 Not Found` — Notification not found or not owned by user
+}

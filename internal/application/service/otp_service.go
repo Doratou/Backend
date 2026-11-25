@@ -11,6 +11,8 @@ import (
 	"github.com/Doratou/Backend/bootstrap"
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
+	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
+	"github.com/Doratou/Backend/internal/domain/broker/payload"
 	"github.com/Doratou/Backend/internal/domain/enum"
 	"github.com/Doratou/Backend/internal/domain/exception"
 	"github.com/Doratou/Backend/internal/domain/repository/cache"
@@ -28,19 +30,21 @@ type OTPServiceConfig struct {
 }
 
 type otpService struct {
-	repo          cache.OTPRepository
-	redisTrx      redisInfra.TrxManager
-	randomEng     *random.RandomGeneratorEngine
-	emailSender   mail.Sender
-	emailRenderer adapter.OTPEmailRenderer
-	cfg           OTPServiceConfig
+	repo            cache.OTPRepository
+	redisTrx        redisInfra.TrxManager
+	randomEng       *random.RandomGeneratorEngine
+	syncEmailSender mail.Sender
+	emailRenderer   adapter.OTPEmailRenderer
+	brokerPub       domain_broker.Publisher
+	cfg             OTPServiceConfig
 }
 
 func NewOTPService(
 	repo cache.OTPRepository,
 	redisTrx redisInfra.TrxManager,
-	emailSender mail.Sender,
+	syncEmailSender mail.Sender,
 	emailRenderer adapter.OTPEmailRenderer,
+	brokerPub domain_broker.Publisher,
 	cfg OTPServiceConfig,
 	consts *bootstrap.Constant,
 ) adapter.OTPService {
@@ -60,12 +64,13 @@ func NewOTPService(
 	}
 
 	return &otpService{
-		repo:          repo,
-		redisTrx:      redisTrx,
-		randomEng:     random.NewRandomGeneratorEngine(),
-		emailSender:   emailSender,
-		emailRenderer: emailRenderer,
-		cfg:           cfg,
+		repo:            repo,
+		redisTrx:        redisTrx,
+		randomEng:       random.NewRandomGeneratorEngine(),
+		syncEmailSender: syncEmailSender,
+		emailRenderer:   emailRenderer,
+		brokerPub:       brokerPub,
+		cfg:             cfg,
 	}
 }
 
@@ -89,8 +94,8 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 		if !strings.EqualFold(strings.TrimSpace(s.cfg.EmailDeliveryMode), "SMTP") {
 			return nil, exception.Wrap(exception.ErrInternal, fmt.Errorf("EMAIL_DELIVERY_MODE must be SMTP"))
 		}
-		if s.emailSender == nil {
-			return nil, exception.Wrap(exception.ErrInternal, fmt.Errorf("email sender is not configured"))
+		if s.brokerPub == nil && s.syncEmailSender == nil {
+			return nil, exception.Wrap(exception.ErrInternal, fmt.Errorf("neither broker publisher nor email sender is configured"))
 		}
 		if s.emailRenderer == nil {
 			return nil, exception.Wrap(exception.ErrInternal, fmt.Errorf("OTP email renderer is not configured"))
@@ -110,9 +115,56 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 			return nil, exception.Wrap(exception.ErrInternal, err)
 		}
 		message.To = []string{identifier}
-		if err := s.emailSender.Send(ctx, message); err != nil {
-			log.Printf("failed to send OTP email: %v", err)
-			return nil, exception.Wrap(exception.ErrInternal, err)
+
+		// Asynchronous delivery via RabbitMQ broker if publisher is available
+		if s.brokerPub != nil {
+			attachments := make([]payload.InlineAttachment, len(message.InlineAttachments))
+			for i, att := range message.InlineAttachments {
+				attachments[i] = payload.InlineAttachment{
+					Name:      att.Name,
+					ContentID: att.ContentID,
+					Data:      att.Data,
+				}
+			}
+			emailPayload := payload.EmailPayload{
+				To:                message.To,
+				Subject:           message.Subject,
+				PlainBody:         message.PlainBody,
+				HTMLBody:          message.HTMLBody,
+				InlineAttachments: attachments,
+			}
+			if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.EmailRoutingKey, emailPayload,
+				domain_broker.WithTTL(s.cfg.TTL),
+				domain_broker.WithUrgency(domain_broker.UrgencyRealtime),
+			); err != nil {
+				log.Printf("failed to publish OTP email to rabbitmq: %v", err)
+				return nil, exception.Wrap(exception.ErrInternal, err)
+			}
+		} else if s.syncEmailSender != nil {
+			// Synchronous fallback if broker publisher is not configured
+			if err := s.syncEmailSender.Send(ctx, message); err != nil {
+				log.Printf("failed to send OTP email: %v", err)
+				return nil, exception.Wrap(exception.ErrInternal, err)
+			}
+		}
+	} else if otpType == enum.OTPTypePhone {
+		// Asynchronous delivery for SMS queue
+		smsPayload := payload.SMSPayload{
+			Recipient:  identifier,
+			Message:    fmt.Sprintf("Your Doratou verification code: %s", code),
+			TemplateID: "otp_verify",
+			Tokens:     map[string]string{"code": code},
+		}
+		if s.brokerPub != nil {
+			if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.SMSRoutingKey, smsPayload,
+				domain_broker.WithTTL(s.cfg.TTL),
+				domain_broker.WithUrgency(domain_broker.UrgencyRealtime),
+			); err != nil {
+				log.Printf("failed to publish OTP sms to rabbitmq: %v", err)
+				return nil, exception.Wrap(exception.ErrInternal, err)
+			} else {
+				// use syncSmsSender
+			}
 		}
 	} else {
 		log.Printf("[OTP DEV LOG] Type: %s | Identifier: %s | Code: %s (Expires in %v)", otpType, identifier, code, s.cfg.TTL)

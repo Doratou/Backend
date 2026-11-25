@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/Doratou/Backend/bootstrap"
+	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/service"
+	"github.com/Doratou/Backend/internal/application/service/decorator"
 	"github.com/Doratou/Backend/internal/infrastructure/ai"
 	brokerInfra "github.com/Doratou/Backend/internal/infrastructure/broker/rabbitmq"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
@@ -119,9 +121,19 @@ func main() {
 	} else {
 		defer rmqConnMgr.Close()
 		log.Print("RabbitMQ broker connected")
+
+		// Setup Doratou notification exchange and queues with default safety net TTL
+		setupCtx, cancelSetup := context.WithTimeout(context.Background(), 10*time.Second)
+		topology := brokerInfra.NewTopology(rmqConnMgr)
+		qTTL := cfg.Environment.QueueTTL
+		if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.WSQueueTTL, qTTL.DLQMessageTTL); err != nil {
+			log.Printf("[RABBITMQ WARNING] failed to declare doratou topology: %v", err)
+		} else {
+			log.Print("RabbitMQ Doratou notification topology initialized")
+		}
+		cancelSetup()
 	}
 	rmqPublisher := brokerInfra.NewPublisher(rmqConnMgr)
-	_ = rmqPublisher
 
 	// 4. Infrastructure Transaction Managers
 	dbTrxManager := database.NewTrxManager(postgresDB)
@@ -138,6 +150,8 @@ func main() {
 	expenseRepo := postgresRepo.NewExpenseRepository(postgresDB)
 	settlementRepo := postgresRepo.NewSettlementRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
+	notificationRepo := postgresRepo.NewNotificationRepository(postgresDB)
+	tokenPriceRepo := postgresRepo.NewTokenPriceRepository(postgresDB)
 	tripSuggestionRepo := postgresRepo.NewTripSuggestionRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	oauthRepo := postgresRepo.NewOAuthRepository(postgresDB)
@@ -201,6 +215,7 @@ func main() {
 		redisTrxManager,
 		emailSender,
 		emailRenderer,
+		rmqPublisher,
 		service.OTPServiceConfig{
 			TTL:                  cfg.Environment.OTP.TTL,
 			VerifiedTTL:          cfg.Environment.OTP.VerifiedTTL,
@@ -238,8 +253,8 @@ func main() {
 		},
 		cfg.Constant,
 	)
-	groupService := service.NewGroupService(groupRepo, attachmentRepo)
-	inviteService := service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
+	var groupService adapter.GroupService = service.NewGroupService(groupRepo, attachmentRepo)
+	var inviteService adapter.InviteService = service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
 	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
 	luckyDrawService := service.NewLuckyDrawService(luckyDrawRepo, userRepo, dbTrxManager, randomInfra.NewCryptoGenerator())
 
@@ -247,6 +262,7 @@ func main() {
 		adminReportRepo,
 		userRepo,
 	)
+	tokenPriceService := service.NewTokenPriceService(tokenPriceRepo)
 	weatherService := service.NewWeatherService(weatherInfra.NewCachedWeatherProvider(weatherInfra.NewOpenMeteoClient(), redisCache))
 	aiModel := cfg.Environment.AvalAI.Model
 	tripSuggestionService := service.NewTripSuggestionService(ai.NewAvalAIClient(ai.AvalAIConfig{
@@ -292,6 +308,50 @@ func main() {
 		redisTrxManager,
 	)
 
+	notificationService := service.NewNotificationService(
+		notificationRepo,
+		groupRepo,
+		dbTrxManager,
+		rmqPublisher,
+		service.NotificationServiceConfig{
+			RealtimeTTL: cfg.Environment.Notification.RealtimeTTL,
+			StandardTTL: cfg.Environment.Notification.StandardTTL,
+			NormalTTL:   cfg.Environment.Notification.NormalTTL,
+		},
+	)
+
+	// Decorate domain services with real-time & persistent event notification dispatching.
+	friendshipService = decorator.NewFriendshipNotificationDecorator(friendshipService, notificationService, friendshipRepo, userRepo)
+	settlementService = decorator.NewSettlementNotificationDecorator(settlementService, notificationService, groupRepo)
+	pollService = decorator.NewPollNotificationDecorator(pollService, notificationService, groupRepo, userRepo)
+	luckyDrawService = decorator.NewLuckyDrawNotificationDecorator(luckyDrawService, notificationService, groupRepo, userRepo)
+	checklistService = decorator.NewChecklistNotificationDecorator(checklistService, notificationService, groupRepo, userRepo, checklistRepo)
+	adminReportService = decorator.NewAdminReportNotificationDecorator(adminReportService, notificationService, userRepo)
+	groupService = decorator.NewGroupNotificationDecorator(groupService, notificationService, groupRepo, userRepo)
+	inviteService = decorator.NewInviteNotificationDecorator(inviteService, notificationService, groupRepo, userRepo)
+	tokenPriceService = decorator.NewTokenPriceNotificationDecorator(tokenPriceService, notificationService)
+
+	// 7.1 Optional End-to-End Notification Demo Seeder (runs all 14 real event flows on startup)
+	if cfg.Environment.Notification.SeedDemoEvents {
+		seedNotifCtx, cancelSeedNotif := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := seed.SeedNotificationEvents(seedNotifCtx, seed.NotificationSeedDeps{
+			DB:                  postgresDB,
+			FriendshipService:   friendshipService,
+			SettlementService:   settlementService,
+			PollService:         pollService,
+			LuckyDrawService:    luckyDrawService,
+			ChecklistService:    checklistService,
+			AdminReportService:  adminReportService,
+			GroupService:        groupService,
+			InviteService:       inviteService,
+			TokenPriceService:   tokenPriceService,
+			NotificationService: notificationService,
+		}); err != nil {
+			log.Printf("[SEED NOTIFICATIONS WARNING] failed to emit demo notification events: %v", err)
+		}
+		cancelSeedNotif()
+	}
+
 	// 8. Presentation Handlers & Routers
 	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(&cfg.Environment.OAuth, authService)
@@ -310,26 +370,30 @@ func main() {
 	settlementHandler := handler.NewSettlementHandler(settlementService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
+	notificationHandler := handler.NewNotificationHandler(notificationService)
+	tokenPriceHandler := handler.NewTokenPriceHandler(tokenPriceService)
 	engine := router.New(router.Dependencies{
-		AuthHandler:        authHandler,
-		UserHandler:        userHandler,
-		CaptchaHandler:     captchaHandler,
-		AttachmentHandler:  attachmentHandler,
-		AdminReportHandler: adminReportHandler,
-		GroupHandler:       groupHandler,
-		InviteHandler:      inviteHandler,
-		FriendshipHandler:  friendshipHandler,
-		PollHandler:        pollHandler,
-		ChecklistHandler:   checklistHandler,
-		ExpenseHandler:     expenseHandler,
-		SettlementHandler:  settlementHandler,
-		LuckyDrawHandler:   luckyDrawHandler,
-		HamyarHandler:      hamyarHandler,
-		CaptchaService:     captchaService,
-		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
-		TokenMaker:         jwtMaker,
-		TokenRepo:          tokenRepo,
-		EmailFontFiles:     emailFontFiles,
+		AuthHandler:         authHandler,
+		UserHandler:         userHandler,
+		CaptchaHandler:      captchaHandler,
+		AttachmentHandler:   attachmentHandler,
+		AdminReportHandler:  adminReportHandler,
+		NotificationHandler: notificationHandler,
+		TokenPriceHandler:   tokenPriceHandler,
+		GroupHandler:        groupHandler,
+		InviteHandler:       inviteHandler,
+		FriendshipHandler:   friendshipHandler,
+		PollHandler:         pollHandler,
+		ChecklistHandler:    checklistHandler,
+		ExpenseHandler:      expenseHandler,
+		SettlementHandler:   settlementHandler,
+		LuckyDrawHandler:    luckyDrawHandler,
+		HamyarHandler:       hamyarHandler,
+		CaptchaService:      captchaService,
+		CaptchaEnabled:      cfg.Environment.Captcha.Enabled,
+		TokenMaker:          jwtMaker,
+		TokenRepo:           tokenRepo,
+		EmailFontFiles:      emailFontFiles,
 	})
 
 	// 9. HTTP Server Lifecycle & Graceful Shutdown

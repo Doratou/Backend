@@ -1,0 +1,28 @@
+meta {
+  name: Notifications
+  seq: 16
+}
+
+auth {
+  mode: none
+}
+
+docs {
+  # Notifications
+
+  Provides user notification inbox management, High-Water Mark read tracking, reconnect catch-up sync, and group owner manual announcements.
+
+  ## Endpoints
+
+  | Method | Path | Action |
+  | --- | --- | --- |
+  | `GET` | `/api/v1/notifications` | Get cursor-paginated notifications timeline |
+  | `GET` | `/api/v1/notifications/unread-count` | Get lightweight unread badge counter |
+  | `GET` | `/api/v1/notifications/sync` | Catch up missed notifications since last received ID |
+  | `GET` | `/api/v1/notifications/:id` | Get details of a single notification |
+  | `POST` | `/api/v1/notifications/read` | Mark all or up to a specific notification as read |
+  | `POST` | `/api/v1/notifications/:id/read` | Mark a specific single notification as read |
+  | `DELETE` | `/api/v1/notifications/:id` | Soft-delete a single notification |
+  | `DELETE` | `/api/v1/notifications` | Clear all or only read notifications from inbox |
+  | `POST` | `/api/v1/groups/:groupID/announcements` | Group owner manual broadcast announcement |
+}

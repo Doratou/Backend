@@ -17,6 +17,9 @@ type Delivery interface {
 	// RetryCount returns the number of times this message has been retried.
 	RetryCount() int
 
+	// Urgency returns the business urgency tier of this message.
+	Urgency() Urgency
+
 	// Ack acknowledges the delivery of this message.
 	Ack(multiple bool) error
 

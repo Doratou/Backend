@@ -36,6 +36,9 @@ func (c *Consumer) Consume(ctx context.Context, queue string, handler domain_bro
 		PrefetchCount: 10,
 		Concurrency:   1,
 		AutoAck:       false,
+		Exclusive:     false,
+		NoLocal:       false,
+		NoWait:        false,
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -188,10 +191,20 @@ func (c *Consumer) workerLoop(ctx context.Context, queue string, handler domain_
 
 func (c *Consumer) handleFailure(ctx context.Context, queue string, d domain_broker.Delivery, err error, policy *domain_broker.RetryPolicy) {
 	msg := d.Message()
+	routingKey := d.RoutingKey()
+	if routingKey == "" {
+		routingKey = queue
+	}
 
 	// 1. Explicit permanent rejection requested
 	if errors.Is(err, domain_broker.ErrReject) {
 		log.Printf("[RABBITMQ NOTICE] message %s rejected permanently: %v", msg.ID, err)
+		if policy != nil && policy.DeadLetterExchange != "" && c.publisher != nil {
+			if dlqErr := c.publisher.PublishToDLQ(ctx, policy.DeadLetterExchange, routingKey, msg, d.RetryCount(), err); dlqErr == nil {
+				_ = d.Ack(false)
+				return
+			}
+		}
 		if rejectErr := d.Reject(false); rejectErr != nil {
 			log.Printf("[RABBITMQ WARNING] failed to reject message %s: %v", msg.ID, rejectErr)
 		}
@@ -203,11 +216,20 @@ func (c *Consumer) handleFailure(ctx context.Context, queue string, d domain_bro
 		retryCount := d.RetryCount()
 		if retryCount < policy.MaxRetries {
 			delay := c.calculateBackoffDelay(policy, retryCount)
-			log.Printf("[RABBITMQ NOTICE] retrying message %s (attempt %d/%d) in %v...",
-				msg.ID, retryCount+1, policy.MaxRetries, delay)
+			urgency := d.Urgency()
+			newPriority := domain_broker.CalculatePriority(urgency, retryCount+1, policy.MaxRetries)
+			log.Printf("[RABBITMQ NOTICE] retrying message %s (attempt %d/%d, urgency %d -> priority %d) in %v...",
+				msg.ID, retryCount+1, policy.MaxRetries, urgency, newPriority, delay)
 
 			retryExchange := policy.RetryExchange
-			retryErr := c.publisher.PublishToRetry(ctx, retryExchange, queue, msg, retryCount, delay)
+			if retryExchange == "" {
+				retryExchange = domain_broker.NotificationRetryExchange
+			}
+
+			retryErr := c.publisher.PublishToRetry(ctx, retryExchange, routingKey, msg, retryCount, delay,
+				domain_broker.WithPriority(newPriority),
+				domain_broker.WithUrgency(urgency),
+			)
 			if retryErr == nil {
 				// Safely acknowledge original delivery since it is now buffered in retry queue
 				_ = d.Ack(false)
@@ -215,8 +237,15 @@ func (c *Consumer) handleFailure(ctx context.Context, queue string, d domain_bro
 			}
 			log.Printf("[RABBITMQ ERROR] failed to publish message %s to retry exchange: %v. Falling back to nack.", msg.ID, retryErr)
 		} else {
-			log.Printf("[RABBITMQ WARNING] message %s exceeded max retries (%d). Rejecting to DLQ/discard.",
+			log.Printf("[RABBITMQ WARNING] message %s exceeded max retries (%d). Routing to DLQ.",
 				msg.ID, policy.MaxRetries)
+			if policy.DeadLetterExchange != "" {
+				if dlqErr := c.publisher.PublishToDLQ(ctx, policy.DeadLetterExchange, routingKey, msg, retryCount, err); dlqErr == nil {
+					_ = d.Ack(false)
+					return
+				}
+				log.Printf("[RABBITMQ ERROR] failed to publish message %s to DLX: %v", msg.ID, err)
+			}
 			_ = d.Reject(false)
 			return
 		}

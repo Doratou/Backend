@@ -19,12 +19,46 @@ type Environment struct {
 	Email      EmailConfig   `mapstructure:",squash"`
 	OAuth      OAuthConfig   `mapstructure:",squash"`
 
-	Invite     InvitationConfig  `mapstructure:",squash"`
-	Friendship FriendshipConfig  `mapstructure:",squash"`
-	RustFS     RustFSConfig      `mapstructure:",squash"`
-	PoW        PoWConfig         `mapstructure:",squash"`
-	Google     GoogleOAuthConfig `mapstructure:",squash"`
-	AvalAI     AvalAIConfig      `mapstructure:",squash"`
+	Invite       InvitationConfig   `mapstructure:",squash"`
+	Friendship   FriendshipConfig   `mapstructure:",squash"`
+	RustFS       RustFSConfig       `mapstructure:",squash"`
+	PoW          PoWConfig          `mapstructure:",squash"`
+	Google       GoogleOAuthConfig  `mapstructure:",squash"`
+	AvalAI       AvalAIConfig       `mapstructure:",squash"`
+	Workers      WorkerConfig       `mapstructure:",squash"`
+	QueueTTL     QueueTTLConfig     `mapstructure:",squash"`
+	Notification NotificationConfig `mapstructure:",squash"`
+}
+
+type NotificationConfig struct {
+	RealtimeTTL    time.Duration `mapstructure:"NOTIFICATION_WS_REALTIME_TTL"`
+	StandardTTL    time.Duration `mapstructure:"NOTIFICATION_WS_STANDARD_TTL"`
+	NormalTTL      time.Duration `mapstructure:"NOTIFICATION_WS_NORMAL_TTL"`
+	SeedDemoEvents bool          `mapstructure:"NOTIFICATION_SEED_DEMO_EVENTS"`
+}
+
+type QueueTTLConfig struct {
+	EmailQueueTTL time.Duration `mapstructure:"EMAIL_QUEUE_TTL"`
+	SMSQueueTTL   time.Duration `mapstructure:"SMS_QUEUE_TTL"`
+	WSQueueTTL    time.Duration `mapstructure:"WS_QUEUE_TTL"`
+	DLQMessageTTL time.Duration `mapstructure:"DLQ_MESSAGE_TTL"`
+}
+
+type WorkerConfig struct {
+	EmailConcurrency int           `mapstructure:"EMAIL_WORKER_CONCURRENCY"`
+	EmailPrefetch    int           `mapstructure:"EMAIL_WORKER_PREFETCH"`
+	EmailMaxRetries  int           `mapstructure:"EMAIL_WORKER_MAX_RETRIES"`
+	EmailRetryDelay  time.Duration `mapstructure:"EMAIL_WORKER_RETRY_DELAY"`
+
+	SMSConcurrency int           `mapstructure:"SMS_WORKER_CONCURRENCY"`
+	SMSPrefetch    int           `mapstructure:"SMS_WORKER_PREFETCH"`
+	SMSMaxRetries  int           `mapstructure:"SMS_WORKER_MAX_RETRIES"`
+	SMSRetryDelay  time.Duration `mapstructure:"SMS_WORKER_RETRY_DELAY"`
+
+	WSConcurrency int           `mapstructure:"WS_WORKER_CONCURRENCY"`
+	WSPrefetch    int           `mapstructure:"WS_WORKER_PREFETCH"`
+	WSMaxRetries  int           `mapstructure:"WS_WORKER_MAX_RETRIES"`
+	WSRetryDelay  time.Duration `mapstructure:"WS_WORKER_RETRY_DELAY"`
 }
 type OAuthConfig struct {
 	Protcol string `mapstructure:"OAUTH_PROTCOL"`
