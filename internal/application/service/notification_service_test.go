@@ -203,7 +203,7 @@ func (m *mockGroupRepo) SetMemberInactiveByID(ctx context.Context, groupID, memb
 func (m *mockGroupRepo) TransferOwnership(ctx context.Context, groupID, newOwnerID int64) error {
 	return nil
 }
-func (m *mockGroupRepo) FindByMember(ctx context.Context, userID int64, status *enum.GroupStatus, limit, offset int) ([]entity.Group, int64, error) {
+func (m *mockGroupRepo) FindByMember(ctx context.Context, userID int64, filter domain_repo.GroupListFilter, limit, offset int) ([]domain_repo.GroupWithMemberCount, int64, error) {
 	return nil, 0, nil
 }
 func (m *mockGroupRepo) FindAll(ctx context.Context, status *enum.GroupStatus, limit, offset int) ([]entity.Group, int64, error) {

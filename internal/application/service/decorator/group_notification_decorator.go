@@ -98,8 +98,8 @@ func (d *groupNotificationDecorator) Create(ctx context.Context, userID int64, r
 	return d.next.Create(ctx, userID, req)
 }
 
-func (d *groupNotificationDecorator) ListMine(ctx context.Context, userID int64, status *string, limit, offset int) ([]dto.GroupResponse, int64, error) {
-	return d.next.ListMine(ctx, userID, status, limit, offset)
+func (d *groupNotificationDecorator) ListMine(ctx context.Context, userID int64, filter dto.ListUserGroupsFilter, limit, offset int) ([]dto.GroupResponse, int64, error) {
+	return d.next.ListMine(ctx, userID, filter, limit, offset)
 }
 
 func (d *groupNotificationDecorator) ListAll(ctx context.Context, status *string, limit, offset int) ([]dto.GroupResponse, int64, error) {
