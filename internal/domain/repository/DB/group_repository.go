@@ -2,10 +2,25 @@ package DB
 
 import (
 	"context"
+	"time"
 
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
 )
+
+type GroupListFilter struct {
+	Status      *enum.GroupStatus
+	IsPremium   *bool
+	Role        *enum.GroupMemberRole
+	CreatedFrom *time.Time
+	CreatedTo   *time.Time
+	SortBy      enum.GroupSortBy
+}
+
+type GroupWithMemberCount struct {
+	Group       entity.Group
+	MemberCount int64
+}
 
 type GroupRepository interface {
 	CreateWithOwner(ctx context.Context, group *entity.Group) error
@@ -15,7 +30,7 @@ type GroupRepository interface {
 	SetMemberInactive(ctx context.Context, groupID, userID int64) error
 	SetMemberInactiveByID(ctx context.Context, groupID, memberID int64) error
 	TransferOwnership(ctx context.Context, groupID, newOwnerID int64) error
-	FindByMember(ctx context.Context, userID int64, status *enum.GroupStatus, limit, offset int) ([]entity.Group, int64, error)
+	FindByMember(ctx context.Context, userID int64, filter GroupListFilter, limit, offset int) ([]GroupWithMemberCount, int64, error)
 	FindAll(ctx context.Context, status *enum.GroupStatus, limit, offset int) ([]entity.Group, int64, error)
 	IsActiveMember(ctx context.Context, groupID, userID int64) (bool, error)
 	Update(ctx context.Context, group *entity.Group) error

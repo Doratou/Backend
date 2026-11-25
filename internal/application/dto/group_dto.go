@@ -26,6 +26,14 @@ type CloneGroupRequest struct {
 	Description *string `json:"description" binding:"omitempty,max=5000"`
 }
 
+type ListUserGroupsFilter struct {
+	Status    *string
+	IsPremium *string
+	Role      *string
+	Year      *string
+	SortBy    *string
+}
+
 type ChangeGroupStatusRequest struct {
 	Status enum.GroupStatus `json:"status" binding:"required,oneof=ACTIVE SETTLING CLOSED"`
 }

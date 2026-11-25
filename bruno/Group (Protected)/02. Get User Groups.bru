@@ -11,9 +11,13 @@ get {
 }
 
 params:query {
-  limit: 2
   page: 1
+  limit: 20
   ~status: ACTIVE
+  ~is_premium: true
+  ~role: OWNER
+  ~year: 1404
+  ~sort_by: NEWEST
 }
 
 headers {
@@ -21,7 +25,7 @@ headers {
 }
 
 vars:pre-request {
-  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzODE2NjA4LCJpYXQiOjE3OTM3MzAyMDgsImp0aSI6IjAxYmE3OGY1LWQyOWYtNDg0ZC1iZGQyLWRiNGNkZGEyYzhhNiJ9.Mg0ShkJY4y97KU8CSN8eryNaa4ybFzHfZh5n0zTJNoU
+  accessToken: <access-token>
 }
 
 settings {
@@ -32,31 +36,35 @@ settings {
 
 docs {
   ## Method, Endpoint, and Auth
-
+  
   `GET /api/v1/groups` — Bearer access token required.
-
+  
   ## Description
-
-  Returns the authenticated user's active group memberships with optional status filtering and pagination.
-
+  
+  Returns the authenticated user's active group memberships with optional filtering, sorting, and pagination.
+  
   ## Request
-
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | `Bearer <access-token>` |
-
+  
   ### Query Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | `page` | `integer` | No | 1-based page number; defaults to 1. |
-  | `limit` | `integer` | No | Page size from 1 to 100; defaults to 20. |
+  | `page` | `integer` | No | 1-based page number; defaults to `1`. |
+  | `limit` | `integer` | No | Page size from `1` to `100`; defaults to `20`. |
   | `status` | `string` | No | `ACTIVE`, `SETTLING` or `CLOSED`. Omit to list all three states. |
-
+  | `is_premium` | `boolean` | No | Filter by group type: `true` (premium) or `false` (normal). Omit for all. |
+  | `role` | `string` | No | Filter by the current user's role in the group: `OWNER` (creator) or `MEMBER`. Omit for all. |
+  | `year` | `integer` | No | Filter by trip creation year. Supports Jalali/Solar Hijri years (`1300`–`1599`, e.g. `1403`, `1404`, `1405`) or Gregorian years (`1900`–`2200`). Omit for all years. |
+  | `sort_by` | `string` | No | Sort order: `NEWEST` (default), `OLDEST`, `TITLE_ASC`, `MOST_MEMBERS`, or `ARCHIVED_AT`. |
+  
   ## Response
-
+  
   **`200 OK`**
   ```json
   {
@@ -69,6 +77,7 @@ docs {
           "created_by_user_id": 7,
           "status": "ACTIVE",
           "is_premium": false,
+          "member_count": 4,
           "created_at": "2026-11-04T10:00:00Z",
           "updated_at": "2026-11-04T10:00:00Z"
         }
@@ -81,11 +90,15 @@ docs {
     }
   }
   ```
-
+  
   ## Errors
-
+  
   - `400 GROUP_INVALID_PAGINATION` — Invalid `page` or `limit` (including page/offset overflow).
-  - `400 GROUP_INVALID_STATUS` — Status is not `ACTIVE`, `SETTLING` or `CLOSED`.
+  - `400 GROUP_INVALID_STATUS` — `status` is not `ACTIVE`, `SETTLING` or `CLOSED`.
+  - `400 GROUP_INVALID_IS_PREMIUM` — `is_premium` is not `true` or `false`.
+  - `400 GROUP_INVALID_ROLE` — `role` is not `OWNER` or `MEMBER`.
+  - `400 GROUP_INVALID_YEAR` — `year` is not a valid Jalali (`1300`–`1599`) or Gregorian (`1900`–`2200`) year.
+  - `400 GROUP_INVALID_SORT_BY` — `sort_by` is not `NEWEST`, `OLDEST`, `TITLE_ASC`, `MOST_MEMBERS` or `ARCHIVED_AT`.
   - `401 MISSING_TOKEN` — Access token is missing or invalid.
   - `500 INTERNAL_SERVER_ERROR` — Groups could not be retrieved.
 }

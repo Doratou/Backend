@@ -140,12 +140,48 @@ func (r *groupRepository) TransferOwnership(ctx context.Context, groupID, newOwn
 	return nil
 }
 
-func (r *groupRepository) FindByMember(ctx context.Context, userID int64, status *enum.GroupStatus, limit, offset int) ([]entity.Group, int64, error) {
-	var groups []entity.Group
+type groupWithMemberCountRow struct {
+	entity.Group
+	MemberCount int64 `gorm:"column:member_count"`
+}
+
+func groupOrderClause(sortBy enum.GroupSortBy) string {
+	switch sortBy {
+	case enum.GroupSortByOldest:
+		return "groups.created_at ASC"
+	case enum.GroupSortByTitleAsc:
+		return "groups.title ASC, groups.created_at DESC"
+	case enum.GroupSortByMostMembers:
+		return "member_count DESC, groups.created_at DESC"
+	case enum.GroupSortByArchivedAt:
+		return "groups.archived_at DESC NULLS LAST, groups.created_at DESC"
+	default:
+		return "groups.created_at DESC"
+	}
+}
+
+func (r *groupRepository) FindByMember(ctx context.Context, userID int64, filter domainrepo.GroupListFilter, limit, offset int) ([]domainrepo.GroupWithMemberCount, int64, error) {
 	query := r.getDB(ctx).Model(&entity.Group{}).Joins("JOIN group_members ON group_members.group_id = groups.id").
 		Where("group_members.user_id = ? AND group_members.status = ? AND groups.deleted_at IS NULL", userID, enum.GroupMemberStatusActive)
-	if status != nil {
-		query = query.Where("groups.status = ?", *status)
+	if filter.Status != nil {
+		query = query.Where("groups.status = ?", *filter.Status)
+	}
+	if filter.IsPremium != nil {
+		query = query.Where("groups.is_premium = ?", *filter.IsPremium)
+	}
+	if filter.Role != nil {
+		switch *filter.Role {
+		case enum.GroupMemberRoleOwner:
+			query = query.Where("groups.created_by_user_id = ?", userID)
+		case enum.GroupMemberRoleMember:
+			query = query.Where("groups.created_by_user_id <> ?", userID)
+		}
+	}
+	if filter.CreatedFrom != nil {
+		query = query.Where("groups.created_at >= ?", *filter.CreatedFrom)
+	}
+	if filter.CreatedTo != nil {
+		query = query.Where("groups.created_at < ?", *filter.CreatedTo)
 	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -157,10 +193,23 @@ func (r *groupRepository) FindByMember(ctx context.Context, userID int64, status
 	if offset < 0 {
 		offset = 0
 	}
-	if err := query.Order("groups.created_at DESC").Limit(limit).Offset(offset).Find(&groups).Error; err != nil {
+	var rows []groupWithMemberCountRow
+	if err := query.
+		Select("groups.*, (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = groups.id AND gm.status = ?) AS member_count", enum.GroupMemberStatusActive).
+		Order(groupOrderClause(filter.SortBy)).
+		Limit(limit).
+		Offset(offset).
+		Scan(&rows).Error; err != nil {
 		return nil, 0, exception.Wrap(exception.ErrInternal, err)
 	}
-	return groups, total, nil
+	items := make([]domainrepo.GroupWithMemberCount, 0, len(rows))
+	for i := range rows {
+		items = append(items, domainrepo.GroupWithMemberCount{
+			Group:       rows[i].Group,
+			MemberCount: rows[i].MemberCount,
+		})
+	}
+	return items, total, nil
 }
 
 func (r *groupRepository) FindAll(ctx context.Context, status *enum.GroupStatus, limit, offset int) ([]entity.Group, int64, error) {

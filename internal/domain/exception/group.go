@@ -34,6 +34,10 @@ var (
 	ErrGroupInvalidMemberID         = &AppError{Code: "GROUP_INVALID_MEMBER_ID", Message: "memberID must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidPagination       = &AppError{Code: "GROUP_INVALID_PAGINATION", Message: "page must be a positive integer and limit must be an integer from 1 to 100", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidStatus           = &AppError{Code: "GROUP_INVALID_STATUS", Message: "status must be ACTIVE, SETTLING or CLOSED", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrGroupInvalidIsPremium        = &AppError{Code: "GROUP_INVALID_IS_PREMIUM", Message: "is_premium must be true or false", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrGroupInvalidRole             = &AppError{Code: "GROUP_INVALID_ROLE", Message: "role must be OWNER or MEMBER", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrGroupInvalidYear             = &AppError{Code: "GROUP_INVALID_YEAR", Message: "year must be a valid Jalali (1300-1599) or Gregorian (1900-2200) year", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
+	ErrGroupInvalidSortBy           = &AppError{Code: "GROUP_INVALID_SORT_BY", Message: "sort_by must be NEWEST, OLDEST, TITLE_ASC, MOST_MEMBERS or ARCHIVED_AT", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrGroupInvalidTransferOwner    = &AppError{Code: "GROUP_INVALID_TRANSFER_OWNER", Message: "new_owner_id must be a positive integer", HTTPStatus: http.StatusBadRequest, Err: ErrDomainBadRequest}
 	ErrAlreadyGroupMember           = &AppError{Code: "ALREADY_GROUP_MEMBER", Message: "you are already an active member of this group", HTTPStatus: http.StatusConflict, Err: ErrDomainAlreadyGroupMember}
 	ErrGroupInactive                = &AppError{Code: "GROUP_INACTIVE", Message: "group is inactive and cannot accept new members", HTTPStatus: http.StatusConflict, Err: ErrDomainGroupInactive}

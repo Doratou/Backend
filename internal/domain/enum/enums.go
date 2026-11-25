@@ -86,6 +86,26 @@ func (g GroupMemberRole) IsValid() bool {
 	}
 }
 
+// GroupSortBy enum values: "NEWEST", "OLDEST", "TITLE_ASC", "MOST_MEMBERS", "ARCHIVED_AT".
+type GroupSortBy string
+
+const (
+	GroupSortByNewest      GroupSortBy = "NEWEST"
+	GroupSortByOldest      GroupSortBy = "OLDEST"
+	GroupSortByTitleAsc    GroupSortBy = "TITLE_ASC"
+	GroupSortByMostMembers GroupSortBy = "MOST_MEMBERS"
+	GroupSortByArchivedAt  GroupSortBy = "ARCHIVED_AT"
+)
+
+func (g GroupSortBy) IsValid() bool {
+	switch g {
+	case GroupSortByNewest, GroupSortByOldest, GroupSortByTitleAsc, GroupSortByMostMembers, GroupSortByArchivedAt:
+		return true
+	default:
+		return false
+	}
+}
+
 // DirectInviteStatus enum values: "PENDING", "ACCEPTED", "REJECTED".
 type DirectInviteStatus string
 

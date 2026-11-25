@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Doratou/Backend/internal/application/dto"
 	"github.com/Doratou/Backend/internal/domain/entity"
@@ -46,18 +48,18 @@ func (s *groupService) Create(ctx context.Context, userID int64, req dto.CreateG
 	return &res, nil
 }
 
-func (s *groupService) ListMine(ctx context.Context, userID int64, status *string, limit, offset int) ([]dto.GroupResponse, int64, error) {
-	groupStatus, err := parseGroupStatus(status)
+func (s *groupService) ListMine(ctx context.Context, userID int64, filter dto.ListUserGroupsFilter, limit, offset int) ([]dto.GroupResponse, int64, error) {
+	repoFilter, err := parseGroupListFilter(filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	groups, total, err := s.groups.FindByMember(ctx, userID, groupStatus, limit, offset)
+	items, total, err := s.groups.FindByMember(ctx, userID, repoFilter, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
-	result := make([]dto.GroupResponse, 0, len(groups))
-	for i := range groups {
-		result = append(result, toGroupResponse(&groups[i], 0))
+	result := make([]dto.GroupResponse, 0, len(items))
+	for i := range items {
+		result = append(result, toGroupResponse(&items[i].Group, items[i].MemberCount))
 	}
 	return result, total, nil
 }
@@ -89,6 +91,137 @@ func parseGroupStatus(status *string) (*enum.GroupStatus, error) {
 	}
 	parsed := enum.GroupStatus(value)
 	return &parsed, nil
+}
+
+func parseGroupListFilter(filter dto.ListUserGroupsFilter) (domainrepo.GroupListFilter, error) {
+	status, err := parseGroupStatus(filter.Status)
+	if err != nil {
+		return domainrepo.GroupListFilter{}, err
+	}
+	isPremium, err := parseGroupIsPremium(filter.IsPremium)
+	if err != nil {
+		return domainrepo.GroupListFilter{}, err
+	}
+	role, err := parseGroupMemberRole(filter.Role)
+	if err != nil {
+		return domainrepo.GroupListFilter{}, err
+	}
+	createdFrom, createdTo, err := parseGroupYearRange(filter.Year)
+	if err != nil {
+		return domainrepo.GroupListFilter{}, err
+	}
+	sortBy, err := parseGroupSortBy(filter.SortBy)
+	if err != nil {
+		return domainrepo.GroupListFilter{}, err
+	}
+	return domainrepo.GroupListFilter{
+		Status:      status,
+		IsPremium:   isPremium,
+		Role:        role,
+		CreatedFrom: createdFrom,
+		CreatedTo:   createdTo,
+		SortBy:      sortBy,
+	}, nil
+}
+
+func parseGroupIsPremium(raw *string) (*bool, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseBool(strings.ToLower(*raw))
+	if err != nil {
+		return nil, exception.ErrGroupInvalidIsPremium
+	}
+	return &parsed, nil
+}
+
+func parseGroupMemberRole(raw *string) (*enum.GroupMemberRole, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	value := enum.GroupMemberRole(strings.ToUpper(*raw))
+	if !value.IsValid() {
+		return nil, exception.ErrGroupInvalidRole
+	}
+	return &value, nil
+}
+
+func parseGroupSortBy(raw *string) (enum.GroupSortBy, error) {
+	if raw == nil {
+		return enum.GroupSortByNewest, nil
+	}
+	value := enum.GroupSortBy(strings.ToUpper(*raw))
+	if !value.IsValid() {
+		return "", exception.ErrGroupInvalidSortBy
+	}
+	return value, nil
+}
+
+func parseGroupYearRange(raw *string) (*time.Time, *time.Time, error) {
+	if raw == nil {
+		return nil, nil, nil
+	}
+	year, err := strconv.Atoi(*raw)
+	if err != nil {
+		return nil, nil, exception.ErrGroupInvalidYear
+	}
+
+	if year >= 1300 && year <= 1599 {
+		loc, locErr := time.LoadLocation("Asia/Tehran")
+		if locErr != nil {
+			loc = time.FixedZone("IRST", 3*3600+30*60)
+		}
+		sy, sm, sd := jalaliToGregorian(year, 1, 1)
+		ey, em, ed := jalaliToGregorian(year+1, 1, 1)
+		start := time.Date(sy, time.Month(sm), sd, 0, 0, 0, 0, loc).UTC()
+		end := time.Date(ey, time.Month(em), ed, 0, 0, 0, 0, loc).UTC()
+		return &start, &end, nil
+	}
+
+	if year >= 1900 && year <= 2200 {
+		start := time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
+		end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.UTC)
+		return &start, &end, nil
+	}
+
+	return nil, nil, exception.ErrGroupInvalidYear
+}
+
+// jalaliToGregorian converts a Jalali (Solar Hijri) date to Gregorian (year, month, day).
+func jalaliToGregorian(jy, jm, jd int) (int, int, int) {
+	jy += 1595
+	days := -355668 + (365 * jy) + ((jy / 33) * 8) + (((jy % 33) + 3) / 4) + jd
+	if jm < 7 {
+		days += (jm - 1) * 31
+	} else {
+		days += ((jm - 7) * 30) + 186
+	}
+	gy := 400 * (days / 146097)
+	days %= 146097
+	if days > 36524 {
+		days--
+		gy += 100 * (days / 36524)
+		days %= 36524
+		if days >= 365 {
+			days++
+		}
+	}
+	gy += 4 * (days / 1461)
+	days %= 1461
+	if days > 365 {
+		gy += (days - 1) / 365
+		days = (days - 1) % 365
+	}
+	gd := days + 1
+	salA := [13]int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if (gy%4 == 0 && gy%100 != 0) || (gy%400 == 0) {
+		salA[2] = 29
+	}
+	var gm int
+	for gm = 1; gm <= 12 && gd > salA[gm]; gm++ {
+		gd -= salA[gm]
+	}
+	return gy, gm, gd
 }
 
 func (s *groupService) ownedGroup(ctx context.Context, userID int64, role enum.UserRole, groupID int64) (*entity.Group, error) {

@@ -73,14 +73,14 @@ func seedGroup(ctx context.Context, users domain_db.UserRepository, groups domai
 		log.Printf("[SEED NOTICE] Skipping group seeding: regular user or admin is not configured/available")
 		return nil
 	}
-	owned, _, err := groups.FindByMember(ctx, owner.ID, nil, 100, 0)
+	owned, _, err := groups.FindByMember(ctx, owner.ID, domain_db.GroupListFilter{}, 100, 0)
 	if err != nil {
 		return err
 	}
 	var group *entity.Group
 	for i := range owned {
-		if owned[i].Title == cfg.GroupTitle && owned[i].CreatedByUserID == owner.ID {
-			group = &owned[i]
+		if owned[i].Group.Title == cfg.GroupTitle && owned[i].Group.CreatedByUserID == owner.ID {
+			group = &owned[i].Group
 			break
 		}
 	}

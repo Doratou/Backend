@@ -47,11 +47,14 @@ func (h *GroupHandler) ListMine(c *gin.Context) {
 		failLogged(c, exception.ErrGroupInvalidPagination)
 		return
 	}
-	var status *string
-	if value, exists := c.GetQuery("status"); exists {
-		status = &value
+	filter := dto.ListUserGroupsFilter{
+		Status:    optionalNonEmptyQuery(c, "status"),
+		IsPremium: optionalNonEmptyQuery(c, "is_premium"),
+		Role:      optionalNonEmptyQuery(c, "role"),
+		Year:      optionalNonEmptyQuery(c, "year"),
+		SortBy:    optionalNonEmptyQuery(c, "sort_by"),
 	}
-	groups, total, err := h.service.ListMine(c.Request.Context(), userID, status, limit, offset)
+	groups, total, err := h.service.ListMine(c.Request.Context(), userID, filter, limit, offset)
 	if err != nil {
 		failLogged(c, err)
 		return
@@ -59,6 +62,14 @@ func (h *GroupHandler) ListMine(c *gin.Context) {
 	success(c, http.StatusOK, dto.PaginatedResponse[dto.GroupResponse]{
 		Items: groups, Pagination: dto.PaginationResponse{Page: page, Limit: limit, Total: total},
 	})
+}
+
+func optionalNonEmptyQuery(c *gin.Context, key string) *string {
+	value, exists := c.GetQuery(key)
+	if !exists || value == "" {
+		return nil
+	}
+	return &value
 }
 
 func (h *GroupHandler) ListAll(c *gin.Context) {
