@@ -28,6 +28,22 @@ type Environment struct {
 	Workers      WorkerConfig       `mapstructure:",squash"`
 	QueueTTL     QueueTTLConfig     `mapstructure:",squash"`
 	Notification NotificationConfig `mapstructure:",squash"`
+	WS           WSConfig           `mapstructure:",squash"`
+}
+
+type WSConfig struct {
+	Enabled            *bool         `mapstructure:"WS_ENABLED"`
+	AuthRequired       *bool         `mapstructure:"WS_AUTH_REQUIRED"`
+	InsecureSkipVerify bool          `mapstructure:"WS_INSECURE_SKIP_VERIFY"`
+	OriginPatterns     string        `mapstructure:"WS_ORIGIN_PATTERNS"`
+	ReadLimitBytes     int64         `mapstructure:"WS_READ_LIMIT_BYTES"`
+	SendBufferSize     int           `mapstructure:"WS_SEND_BUFFER_SIZE"`
+	WriteTimeout       time.Duration `mapstructure:"WS_WRITE_TIMEOUT"`
+	PingInterval       time.Duration `mapstructure:"WS_PING_INTERVAL"`
+	PongTimeout        time.Duration `mapstructure:"WS_PONG_TIMEOUT"`
+	ShutdownTimeout    time.Duration `mapstructure:"WS_SHUTDOWN_TIMEOUT"`
+	MaxConnsPerUser    int           `mapstructure:"WS_MAX_CONNS_PER_USER"`
+	SlowConsumerPolicy string        `mapstructure:"WS_SLOW_CONSUMER_POLICY"`
 }
 
 type NotificationConfig struct {

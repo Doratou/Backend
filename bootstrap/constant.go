@@ -10,6 +10,7 @@ type Constant struct {
 	Attachment AttachmentConst
 	Friendship FriendshipConst
 	RabbitMQ   RabbitMQConst
+	WS         WSConst
 }
 
 type DBConst struct {
@@ -55,6 +56,19 @@ type RabbitMQConst struct {
 	DefaultRetryDelay     time.Duration
 }
 
+type WSConst struct {
+	DefaultEnabled            bool
+	DefaultAuthRequired       bool
+	DefaultReadLimitBytes     int64
+	DefaultSendBufferSize     int
+	DefaultWriteTimeout       time.Duration
+	DefaultPingInterval       time.Duration
+	DefaultPongTimeout        time.Duration
+	DefaultShutdownTimeout    time.Duration
+	DefaultMaxConnsPerUser    int
+	DefaultSlowConsumerPolicy string
+}
+
 func NewConstant() *Constant {
 	return &Constant{
 		Database: DBConst{
@@ -92,6 +106,18 @@ func NewConstant() *Constant {
 			DefaultPublishTimeout: 5 * time.Second,
 			DefaultMaxRetries:     3,
 			DefaultRetryDelay:     10 * time.Second,
+		},
+		WS: WSConst{
+			DefaultEnabled:            true,
+			DefaultAuthRequired:       true,
+			DefaultReadLimitBytes:     64 * 1024,
+			DefaultSendBufferSize:     64,
+			DefaultWriteTimeout:       5 * time.Second,
+			DefaultPingInterval:       30 * time.Second,
+			DefaultPongTimeout:        10 * time.Second,
+			DefaultShutdownTimeout:    5 * time.Second,
+			DefaultMaxConnsPerUser:    0,
+			DefaultSlowConsumerPolicy: "disconnect",
 		},
 	}
 }
