@@ -124,7 +124,7 @@ func main() {
 		setupCtx, cancelSetup := context.WithTimeout(context.Background(), 10*time.Second)
 		topology := brokerInfra.NewTopology(rmqConnMgr)
 		qTTL := cfg.Environment.QueueTTL
-		if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.WSQueueTTL); err != nil {
+		if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.WSQueueTTL, qTTL.DLQMessageTTL); err != nil {
 			log.Printf("[RABBITMQ WARNING] failed to declare doratou topology: %v", err)
 		} else {
 			log.Print("RabbitMQ Doratou notification topology initialized")

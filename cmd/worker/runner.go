@@ -50,7 +50,7 @@ func Run(workerName string, fn WorkerFunc) {
 
 	setupCtx, cancelSetup := context.WithTimeout(context.Background(), 10*time.Second)
 	qTTL := cfg.Environment.QueueTTL
-	if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.WSQueueTTL); err != nil {
+	if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.WSQueueTTL, qTTL.DLQMessageTTL); err != nil {
 		log.Printf("[%s WORKER WARNING] failed to setup doratou topology: %v", workerName, err)
 	} else {
 		log.Printf("[%s WORKER] Doratou notification topology verified and ready", workerName)
