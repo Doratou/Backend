@@ -26,6 +26,13 @@ type Environment struct {
 	Google     GoogleOAuthConfig `mapstructure:",squash"`
 	AvalAI     AvalAIConfig      `mapstructure:",squash"`
 	Workers    WorkerConfig      `mapstructure:",squash"`
+	QueueTTL   QueueTTLConfig    `mapstructure:",squash"`
+}
+
+type QueueTTLConfig struct {
+	EmailQueueTTL time.Duration `mapstructure:"EMAIL_QUEUE_TTL"`
+	SMSQueueTTL   time.Duration `mapstructure:"SMS_QUEUE_TTL"`
+	WSQueueTTL    time.Duration `mapstructure:"WS_QUEUE_TTL"`
 }
 
 type WorkerConfig struct {

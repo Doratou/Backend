@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -115,6 +116,10 @@ func (p *Publisher) Publish(ctx context.Context, exchange, routingKey string, ms
 		CorrelationId:   msg.CorrelationID,
 		ReplyTo:         msg.ReplyTo,
 		Body:            msg.Body,
+	}
+
+	if options.TTL > 0 {
+		publishing.Expiration = strconv.FormatInt(options.TTL.Milliseconds(), 10)
 	}
 
 	p.chMu.Lock()

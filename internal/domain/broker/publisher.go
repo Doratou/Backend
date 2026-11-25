@@ -11,6 +11,7 @@ type PublishOptions struct {
 	Mandatory  bool
 	Headers    Headers
 	Timeout    time.Duration
+	TTL        time.Duration
 }
 
 // PublishOption configures a publish operation.
@@ -46,6 +47,13 @@ func WithPublishHeaders(headers Headers) PublishOption {
 func WithPublishTimeout(timeout time.Duration) PublishOption {
 	return func(o *PublishOptions) {
 		o.Timeout = timeout
+	}
+}
+
+// WithTTL sets a per-message Time-To-Live (expiration duration).
+func WithTTL(ttl time.Duration) PublishOption {
+	return func(o *PublishOptions) {
+		o.TTL = ttl
 	}
 }
 
