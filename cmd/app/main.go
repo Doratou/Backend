@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/service"
 	"github.com/Doratou/Backend/internal/application/service/decorator"
+	domain_ws "github.com/Doratou/Backend/internal/domain/websocket"
 	"github.com/Doratou/Backend/internal/infrastructure/ai"
 	brokerInfra "github.com/Doratou/Backend/internal/infrastructure/broker/rabbitmq"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
@@ -128,7 +130,7 @@ func main() {
 		setupCtx, cancelSetup := context.WithTimeout(context.Background(), 10*time.Second)
 		topology := brokerInfra.NewTopology(rmqConnMgr)
 		qTTL := cfg.Environment.QueueTTL
-		if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.WSQueueTTL, qTTL.DLQMessageTTL); err != nil {
+		if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.DLQMessageTTL); err != nil {
 			log.Printf("[RABBITMQ WARNING] failed to declare doratou topology: %v", err)
 		} else {
 			log.Print("RabbitMQ Doratou notification topology initialized")
@@ -310,11 +312,28 @@ func main() {
 		redisTrxManager,
 	)
 
+	wsEnabled := cfg.Constant.WS.DefaultEnabled
+	if cfg.Environment.WS.Enabled != nil {
+		wsEnabled = *cfg.Environment.WS.Enabled
+	}
+	var (
+		wsCfg     wsInfra.Config
+		wsRelay   *wsInfra.RedisRelay
+		wsPub     domain_ws.Publisher
+		wsHub     *wsInfra.InMemoryHub
+		wsHandler *handler.WSHandler
+	)
+	if wsEnabled {
+		wsCfg = buildWSConfig(cfg.Environment.WS, cfg.Constant.WS)
+		wsRelay = wsInfra.NewRedisRelay(redisCache.GetClient(), wsCfg.PubSubChannel)
+		wsPub = wsRelay
+	}
+
 	notificationService := service.NewNotificationService(
 		notificationRepo,
 		groupRepo,
 		dbTrxManager,
-		rmqPublisher,
+		wsPub,
 		service.NotificationServiceConfig{
 			RealtimeTTL: cfg.Environment.Notification.RealtimeTTL,
 			StandardTTL: cfg.Environment.Notification.StandardTTL,
@@ -376,22 +395,12 @@ func main() {
 	tokenPriceHandler := handler.NewTokenPriceHandler(tokenPriceService)
 
 	// 8.1 WebSocket Infrastructure (Hub, JWT Authenticator, HTTP Upgrade Server)
-	wsEnabled := cfg.Constant.WS.DefaultEnabled
-	if cfg.Environment.WS.Enabled != nil {
-		wsEnabled = *cfg.Environment.WS.Enabled
-	}
-	var (
-		wsHub     *wsInfra.InMemoryHub
-		wsHandler *handler.WSHandler
-		wsCfg     wsInfra.Config
-	)
 	if wsEnabled {
-		wsCfg = buildWSConfig(cfg.Environment.WS, cfg.Constant.WS)
 		wsHub = wsInfra.NewInMemoryHub(wsCfg)
 		wsAuth := wsInfra.NewJWTAuthenticator(jwtMaker, tokenRepo)
 		wsServer := wsInfra.NewServer(wsHub, wsCfg, wsInfra.WithAuthenticator(wsAuth))
 		wsHandler = handler.NewWSHandler(wsServer, wsServer)
-		log.Printf("WebSocket infrastructure initialized (route: /api/v1/ws, auth_required: %v)", wsCfg.RequireAuth)
+		log.Printf("WebSocket infrastructure initialized (route: /api/v1/ws, auth_required: %v, pubsub_channel: %s)", wsCfg.RequireAuth, wsCfg.PubSubChannel)
 	}
 
 	engine := router.New(router.Dependencies{
@@ -423,6 +432,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	var wsRelayWG sync.WaitGroup
+	if wsEnabled && wsRelay != nil && wsHub != nil {
+		wsRelayWG.Add(1)
+		go func() {
+			defer wsRelayWG.Done()
+			if err := wsRelay.Run(ctx, wsHub); err != nil && !errors.Is(err, context.Canceled) {
+				log.Printf("[WS REDIS RELAY ERROR] stopped with error: %v", err)
+			}
+		}()
+	}
+
 	server := &http.Server{
 		Addr:              net.JoinHostPort(cfg.Environment.HttpServer.Domain, cfg.Environment.HttpServer.Port),
 		Handler:           engine,
@@ -438,6 +458,7 @@ func main() {
 
 	<-ctx.Done()
 	log.Print("Shutdown signal received, shutting down gracefully...")
+	wsRelayWG.Wait()
 	if wsHub != nil {
 		wsShutdownCtx, cancelWSShutdown := context.WithTimeout(context.Background(), wsCfg.ShutdownTimeout)
 		if err := wsHub.Close(wsShutdownCtx); err != nil {
@@ -519,6 +540,12 @@ func buildWSConfig(envCfg bootstrap.WSConfig, constCfg bootstrap.WSConst) wsInfr
 		cfg.SlowConsumerPolicy = wsInfra.SlowConsumerDrop
 	} else {
 		cfg.SlowConsumerPolicy = wsInfra.SlowConsumerDisconnect
+	}
+
+	if ch := strings.TrimSpace(envCfg.PubSubChannel); ch != "" {
+		cfg.PubSubChannel = ch
+	} else if constCfg.DefaultPubSubChannel != "" {
+		cfg.PubSubChannel = constCfg.DefaultPubSubChannel
 	}
 
 	return cfg

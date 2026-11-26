@@ -11,7 +11,7 @@ import (
 
 // SetupDoratouTopology declares the notification direct exchange, retry exchange, and DLX,
 // along with main, delayed retry, and channel-specific dead-letter queues idempotently.
-func (t *Topology) SetupDoratouTopology(ctx context.Context, emailTTL, smsTTL, wsTTL, dlqTTL time.Duration) error {
+func (t *Topology) SetupDoratouTopology(ctx context.Context, emailTTL, smsTTL, dlqTTL time.Duration) error {
 	// 1. Declare Exchanges: Main Notification, Retry, and Dead-Letter Exchanges
 	exchanges := []string{
 		domain_broker.NotificationExchange,
@@ -45,13 +45,6 @@ func (t *Topology) SetupDoratouTopology(ctx context.Context, emailTTL, smsTTL, w
 			dlqQueue:   domain_broker.SMSDLQ,
 			routingKey: domain_broker.SMSRoutingKey,
 			ttl:        smsTTL,
-		},
-		{
-			mainQueue:  domain_broker.WSQueue,
-			retryQueue: domain_broker.WSRetryQueue,
-			dlqQueue:   domain_broker.WSDLQ,
-			routingKey: domain_broker.WSRoutingKey,
-			ttl:        wsTTL,
 		},
 	}
 

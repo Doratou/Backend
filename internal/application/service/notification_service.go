@@ -9,15 +9,15 @@ import (
 
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
-	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
 	"github.com/Doratou/Backend/internal/domain/broker/payload"
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/exception"
 	domain_repo "github.com/Doratou/Backend/internal/domain/repository/DB"
+	domain_ws "github.com/Doratou/Backend/internal/domain/websocket"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 )
 
-// NotificationServiceConfig holds tier-based TTL durations for WebSocket notification delivery.
+// NotificationServiceConfig holds optional delivery configuration for NotificationService.
 type NotificationServiceConfig struct {
 	RealtimeTTL time.Duration
 	StandardTTL time.Duration
@@ -28,7 +28,7 @@ type notificationService struct {
 	repo      domain_repo.NotificationRepository
 	groupRepo domain_repo.GroupRepository
 	dbTrx     database.TrxManager
-	brokerPub domain_broker.Publisher
+	wsPub     domain_ws.Publisher
 	cfg       NotificationServiceConfig
 }
 
@@ -37,7 +37,7 @@ func NewNotificationService(
 	repo domain_repo.NotificationRepository,
 	groupRepo domain_repo.GroupRepository,
 	dbTrx database.TrxManager,
-	brokerPub domain_broker.Publisher,
+	wsPub domain_ws.Publisher,
 	cfg NotificationServiceConfig,
 ) adapter.NotificationService {
 	if cfg.RealtimeTTL <= 0 {
@@ -53,92 +53,47 @@ func NewNotificationService(
 		repo:      repo,
 		groupRepo: groupRepo,
 		dbTrx:     dbTrx,
-		brokerPub: brokerPub,
+		wsPub:     wsPub,
 		cfg:       cfg,
 	}
 }
 
-// defaultUrgencyForEvent encapsulates the application business logic for determining
-// the intrinsic delivery urgency level for each specific event type.
-func defaultUrgencyForEvent(e payload.WSEvent) domain_broker.Urgency {
-	switch e {
-	case payload.WSEventFriendRequestReceived,
-		payload.WSEventFriendRequestResponded,
-		payload.WSEventSettlementPaid,
-		payload.WSEventDrawResult,
-		payload.WSEventAdminReportAnswered,
-		payload.WSEventGroupInviteReceived,
-		payload.WSEventGroupAnnouncement:
-		return domain_broker.UrgencyRealtime
-	case payload.WSEventPollCreated,
-		payload.WSEventPollClosed,
-		payload.WSEventDrawCreated,
-		payload.WSEventChecklistUpdated,
-		payload.WSEventGroupMemberJoined,
-		payload.WSEventGroupMemberLeft:
-		return domain_broker.UrgencyStandard
-	case payload.WSEventTokenPriceUpdated:
-		return domain_broker.UrgencyNormal
+func marshalRelayData(data any) (json.RawMessage, error) {
+	if data == nil {
+		return nil, nil
+	}
+	switch v := data.(type) {
+	case json.RawMessage:
+		return v, nil
+	case []byte:
+		return json.RawMessage(v), nil
 	default:
-		return domain_broker.UrgencyStandard
+		raw, err := json.Marshal(data)
+		if err != nil {
+			return nil, err
+		}
+		return raw, nil
 	}
 }
 
-// resolveDeliveryParameters determines the final urgency and TTL by evaluating
-// caller-supplied options first, then falling back to event-type defaults and configured tier TTLs.
-func (s *notificationService) resolveDeliveryParameters(event payload.WSEvent, opts ...adapter.DispatchOption) (domain_broker.Urgency, time.Duration) {
-	var custom adapter.DispatchOptions
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&custom)
-		}
-	}
-
-	// 1. Resolve Urgency: Caller override > Event-type inherent default
-	urgency := custom.Urgency
-	if urgency == 0 {
-		urgency = defaultUrgencyForEvent(event)
-	}
-
-	// 2. Resolve TTL: Caller override > Configured tier TTL from .env
-	ttl := custom.TTL
-	if ttl <= 0 {
-		switch urgency {
-		case domain_broker.UrgencyRealtime:
-			ttl = s.cfg.RealtimeTTL
-			if ttl <= 0 {
-				ttl = time.Minute
-			}
-		case domain_broker.UrgencyNormal:
-			ttl = s.cfg.NormalTTL
-			if ttl <= 0 {
-				ttl = 15 * time.Minute
-			}
-		default:
-			ttl = s.cfg.StandardTTL
-			if ttl <= 0 {
-				ttl = 5 * time.Minute
-			}
-		}
-	}
-
-	return urgency, ttl
-}
-
-// publishWS encapsulates event dispatching to RabbitMQ with event-driven dynamic urgency and TTL.
-func (s *notificationService) publishWS(ctx context.Context, p payload.WSPayload, opts ...adapter.DispatchOption) {
-	if s.brokerPub == nil {
+// publishWS dispatches real-time WebSocket events directly through the Pub/Sub publisher (e.g. Redis).
+func (s *notificationService) publishWS(ctx context.Context, msg domain_ws.RelayMessage, data any) {
+	if s.wsPub == nil {
 		return
 	}
 
-	urgency, ttl := s.resolveDeliveryParameters(p.Event, opts...)
+	rawData, err := marshalRelayData(data)
+	if err != nil {
+		log.Printf("[NOTIFICATION PUBLISHER WARNING] failed to marshal WS event %q data: %v", msg.Event, err)
+		return
+	}
+	msg.Data = rawData
+	if msg.Timestamp.IsZero() {
+		msg.Timestamp = time.Now().UTC()
+	}
 
-	p.Timestamp = time.Now()
-	if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.WSRoutingKey, p,
-		domain_broker.WithTTL(ttl),
-		domain_broker.WithUrgency(urgency),
-	); err != nil {
-		log.Printf("[NOTIFICATION PUBLISHER WARNING] failed to publish WS event %q to rabbitmq: %v", p.Event, err)
+	if err := s.wsPub.Publish(ctx, msg); err != nil {
+		log.Printf("[NOTIFICATION PUBLISHER WARNING] failed to publish WS event %q to pubsub: %v", msg.Event, err)
 	}
 }
 
@@ -413,11 +368,13 @@ func (s *notificationService) CreateGroupAnnouncement(ctx context.Context, owner
 		return nil, exception.Wrap(exception.ErrInternal, err)
 	}
 
+	recipientIDs := make([]int64, 0, len(members))
 	notifs := make([]*entity.Notification, 0, len(members))
 	for _, m := range members {
 		if m.UserID == ownerUserID {
 			continue // Exclude owner
 		}
+		recipientIDs = append(recipientIDs, m.UserID)
 		notif := &entity.Notification{
 			RecipientID: m.UserID,
 			ActorID:     &ownerUserID,
@@ -432,16 +389,16 @@ func (s *notificationService) CreateGroupAnnouncement(ctx context.Context, owner
 		if err := s.repo.CreateBatch(ctx, notifs); err != nil {
 			return nil, err
 		}
-	}
 
-	// Dispatch real-time WebSocket event via RabbitMQ (uses intrinsic UrgencyRealtime and RealtimeTTL)
-	s.publishWS(ctx, payload.WSPayload{
-		Event:      payload.WSEventGroupAnnouncement,
-		TargetType: payload.TargetGroups,
-		TargetIDs:  []int64{groupID},
-		Data:       announcementData,
-		SenderID:   ownerUserID,
-	})
+		// Dispatch real-time WebSocket event directly via Pub/Sub to active group members.
+		s.publishWS(ctx, domain_ws.RelayMessage{
+			Event:      string(payload.WSEventGroupAnnouncement),
+			TargetType: domain_ws.RelayTargetUsers,
+			TargetIDs:  recipientIDs,
+			Channel:    fmt.Sprintf("group:%d", groupID),
+			SenderID:   ownerUserID,
+		}, announcementData)
+	}
 
 	return &dto.GroupAnnouncementResponse{
 		DispatchedCount: len(notifs),
@@ -472,13 +429,17 @@ func (s *notificationService) DispatchToUser(ctx context.Context, recipientID in
 	if actorID != nil {
 		senderID = *actorID
 	}
-	s.publishWS(ctx, payload.WSPayload{
-		Event:      event,
-		TargetType: payload.TargetUsers,
+	var ch string
+	if groupID != nil && *groupID > 0 {
+		ch = fmt.Sprintf("group:%d", *groupID)
+	}
+	s.publishWS(ctx, domain_ws.RelayMessage{
+		Event:      string(event),
+		TargetType: domain_ws.RelayTargetUsers,
 		TargetIDs:  []int64{recipientID},
-		Data:       data,
+		Channel:    ch,
 		SenderID:   senderID,
-	}, opts...)
+	}, data)
 
 	return nil
 }
@@ -520,13 +481,17 @@ func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs 
 	if actorID != nil {
 		senderID = *actorID
 	}
-	s.publishWS(ctx, payload.WSPayload{
-		Event:      event,
-		TargetType: payload.TargetUsers,
+	var ch string
+	if groupID != nil && *groupID > 0 {
+		ch = fmt.Sprintf("group:%d", *groupID)
+	}
+	s.publishWS(ctx, domain_ws.RelayMessage{
+		Event:      string(event),
+		TargetType: domain_ws.RelayTargetUsers,
 		TargetIDs:  recipientIDs,
-		Data:       data,
+		Channel:    ch,
 		SenderID:   senderID,
-	}, opts...)
+	}, data)
 
 	return nil
 }
@@ -559,13 +524,13 @@ func (s *notificationService) DispatchToGroup(ctx context.Context, groupID int64
 	if actorID != nil {
 		senderID = *actorID
 	}
-	s.publishWS(ctx, payload.WSPayload{
-		Event:      event,
-		TargetType: payload.TargetGroups,
-		TargetIDs:  []int64{groupID},
-		Data:       data,
+	s.publishWS(ctx, domain_ws.RelayMessage{
+		Event:      string(event),
+		TargetType: domain_ws.RelayTargetUsers,
+		TargetIDs:  recipientUserIDs,
+		Channel:    fmt.Sprintf("group:%d", groupID),
 		SenderID:   senderID,
-	}, opts...)
+	}, data)
 
 	return nil
 }
@@ -575,11 +540,10 @@ func (s *notificationService) Broadcast(ctx context.Context, actorID *int64, eve
 	if actorID != nil {
 		senderID = *actorID
 	}
-	s.publishWS(ctx, payload.WSPayload{
-		Event:      event,
-		TargetType: payload.TargetBroadcast,
-		Data:       data,
+	s.publishWS(ctx, domain_ws.RelayMessage{
+		Event:      string(event),
+		TargetType: domain_ws.RelayTargetBroadcast,
 		SenderID:   senderID,
-	}, opts...)
+	}, data)
 	return nil
 }
