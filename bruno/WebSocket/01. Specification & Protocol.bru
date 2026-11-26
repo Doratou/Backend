@@ -1,0 +1,170 @@
+meta {
+  name: 01. Specification & Protocol
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  # Doratou WebSocket Infrastructure — Frontend Integration Guide
+
+  This document specifies the WebSocket transport protocol, authentication, wire envelope format, built-in control events, heartbeat behavior, and close codes implemented by the backend infrastructure (`github.com/coder/websocket`).
+
+  ---
+
+  ## 1. Connection Endpoint & Transport
+
+  * **Local URL:** `ws://127.0.0.1:8080/api/v1/ws` (or `{{wsBaseUrl}}/api/v1/ws`)
+  * **Production URL:** `wss://<your-domain>/api/v1/ws`
+  * **Subprotocols:** None required (leave empty in browser `new WebSocket(url)`).
+
+  ---
+
+  ## 2. Authentication
+
+  Before upgrading the HTTP connection (`101 Switching Protocols`), the server validates the JWT **Access Token** and checks the Redis revocation blacklist.
+
+  Two token transport methods are supported (checked in order):
+  1. **Authorization Header** *(non-browser clients, mobile, Bruno, Postman)*:
+     `Authorization: Bearer <access_token>`
+  2. **Query Parameter** *(browser `WebSocket` API, since browsers cannot set custom `Authorization` headers during handshake)*:
+     `ws://127.0.0.1:8080/api/v1/ws?token=<access_token>`
+
+  ### Handshake Auth Failure Responses (HTTP JSON before upgrade)
+  * `401 MISSING_TOKEN` — No token provided (when `WS_AUTH_REQUIRED=true`)
+  * `401 TOKEN_EXPIRED` — Access token has expired (client should refresh token via `POST /api/v1/auth/refresh` before reconnecting)
+  * `401 TOKEN_INVALID` — Malformed token, wrong signature, or refresh token passed instead of access token
+  * `401 TOKEN_REVOKED` — Token has been logged out / blacklisted
+
+  ---
+
+  ## 3. CORS / Origin Rules
+
+  * Same-origin connections and non-browser clients (no `Origin` header) are allowed automatically.
+  * Cross-origin browser apps (e.g. `http://localhost:5173` connecting to `:8080`) require the **host** (`localhost:5173`, without `http://`) to be listed in `WS_ORIGIN_PATTERNS` (or `WS_INSECURE_SKIP_VERIFY=true` in local dev only).
+  * Disallowed origins receive `403 Forbidden` during the handshake.
+
+  ---
+
+  ## 4. Generic JSON Wire Format (`Envelope`)
+
+  Every text/binary message exchanged over the socket uses this JSON envelope:
+
+  ```json
+  {
+    "id": "optional-correlation-id",
+    "event": "event.name",
+    "channel": "optional-room-or-topic",
+    "data": {},
+    "timestamp": "2026-11-26T10:30:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `string` | No | Optional client/server correlation ID. Echoed back on control acks (`ws.pong`, `ws.subscribed`, `ws.unsubscribed`, `ws.error`). |
+  | `event` | `string` | Yes | Event identifier (must be non-empty). |
+  | `channel` | `string` | No | Optional channel/room scope (e.g. `room:test`). |
+  | `data` | `any (JSON)` | No | Event-specific JSON payload. |
+  | `timestamp` | `RFC3339` | Server-set | UTC timestamp of message creation. |
+
+  ---
+
+  ## 5. Built-in Infrastructure Control Events
+
+  ### Server -> Client
+  1. **`ws.connected`** *(sent immediately after handshake)*
+     ```json
+     {
+       "event": "ws.connected",
+       "data": {
+         "conn_id": "d2f1c8e4-9b7a-4b2c-8e1a-1234567890ab",
+         "user_id": 7
+       },
+       "timestamp": "2026-11-26T10:30:00Z"
+     }
+     ```
+  2. **`ws.pong`** *(reply to `ws.ping`)*
+     ```json
+     {
+       "id": "ping-1",
+       "event": "ws.pong",
+       "timestamp": "2026-11-26T10:30:05Z"
+     }
+     ```
+  3. **`ws.subscribed`** / **`ws.unsubscribed`** *(reply to `ws.subscribe` / `ws.unsubscribe`)*
+     ```json
+     {
+       "id": "sub-1",
+       "event": "ws.subscribed",
+       "channel": "room:test",
+       "data": {
+         "channel": "room:test"
+       },
+       "timestamp": "2026-11-26T10:30:10Z"
+     }
+     ```
+  4. **`ws.error`** *(non-fatal error for malformed JSON or invalid control command)*
+     ```json
+     {
+       "id": "optional-id",
+       "event": "ws.error",
+       "data": {
+         "code": "INVALID_ENVELOPE",
+         "message": "message must be a valid JSON envelope"
+       },
+       "timestamp": "2026-11-26T10:30:12Z"
+     }
+     ```
+
+  ### Client -> Server
+  1. **`ws.ping`**: `{ "id": "ping-1", "event": "ws.ping" }`
+  2. **`ws.subscribe`**: `{ "id": "sub-1", "event": "ws.subscribe", "channel": "room:test" }`
+  3. **`ws.unsubscribe`**: `{ "id": "unsub-1", "event": "ws.unsubscribe", "channel": "room:test" }`
+
+  *(Note: `channel` can be passed either in top-level `"channel"` or inside `"data": {"channel": "..."}`.)*
+
+  ---
+
+  ## 6. Heartbeat, Limits & Close Codes
+
+  * **Protocol Heartbeat:** Server sends WebSocket `Ping` frames every `30s` (`WS_PING_INTERVAL`) and expects `Pong` within `10s` (`WS_PONG_TIMEOUT`). Browsers handle RFC 6455 `Pong` automatically.
+  * **Max Inbound Message Size:** `64 KiB` (`WS_READ_LIMIT_BYTES=65536`).
+  * **Outbound Send Buffer:** `64` messages per connection (`WS_SEND_BUFFER_SIZE=64`). Slow consumers that stall may be disconnected (`WS_SLOW_CONSUMER_POLICY=disconnect`).
+
+  | Close Code | Meaning | Frontend Action |
+  | --- | --- | --- |
+  | `1000` | Normal closure | Do not reconnect unless user initiates. |
+  | `1001` | Server shutting down / restarting (`Going Away`) | Reconnect automatically using exponential backoff + jitter. |
+  | `1008` | Policy violation (slow consumer buffer full or max concurrent connections exceeded) | Reconnect with backoff (or alert if too many tabs open). |
+  | `1009` | Message exceeded `64 KiB` read limit | Fix payload size; do not blindly retry the same oversized frame. |
+
+  ---
+
+  ## 7. Browser TypeScript / JS Example
+
+  ```ts
+  const token = encodeURIComponent(accessToken);
+  const ws = new WebSocket(`ws://127.0.0.1:8080/api/v1/ws?token=${token}`);
+
+  ws.onopen = () => {
+    // Optional app-level ping or channel subscribe
+    ws.send(JSON.stringify({ id: "sub-1", event: "ws.subscribe", channel: "room:test" }));
+  };
+
+  ws.onmessage = (msg) => {
+    const envelope = JSON.parse(msg.data);
+    console.log("WS event:", envelope.event, envelope.data);
+  };
+
+  ws.onclose = (ev) => {
+    console.log("WS closed:", ev.code, ev.reason);
+    // If ev.code !== 1000, refresh token if needed and reconnect with exponential backoff + jitter
+  };
+  ```
+}

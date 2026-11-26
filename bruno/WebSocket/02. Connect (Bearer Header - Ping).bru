@@ -1,0 +1,42 @@
+meta {
+  name: 02. Connect (Bearer Header - Ping)
+  type: ws
+  seq: 2
+}
+
+ws {
+  url: {{wsBaseUrl}}/api/v1/ws
+  body: ws
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:ws {
+  name: ws.ping
+  content: '''
+    {
+      "id": "ping-1",
+      "event": "ws.ping"
+    }
+  '''
+}
+
+docs {
+  # Connect WebSocket (Bearer Header)
+
+  **Protocol:** `WebSocket` (`ws://` / `wss://`)
+  **Endpoint:** `/api/v1/ws`
+  **Auth:** `Authorization: Bearer {{token}}` (Access Token)
+
+  ## Description
+  Opens an authenticated WebSocket connection using the `Authorization` header (recommended for non-browser clients, Bruno, Postman, and mobile apps).
+
+  Upon connection, the server immediately emits `ws.connected` with your `conn_id` and `user_id`.
+  Use the pre-configured message body to test sending an application-level `ws.ping` frame; the server replies with `ws.pong` carrying `"id": "ping-1"`.
+
+  ## Prerequisite
+  Run `Auth -> 05. Login (Identifier + Password)` first so `{{token}}` is populated in your environment.
+}
