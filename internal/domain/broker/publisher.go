@@ -12,6 +12,8 @@ type PublishOptions struct {
 	Headers    Headers
 	Timeout    time.Duration
 	TTL        time.Duration
+	Urgency    Urgency
+	Priority   uint8
 }
 
 // PublishOption configures a publish operation.
@@ -54,6 +56,20 @@ func WithPublishTimeout(timeout time.Duration) PublishOption {
 func WithTTL(ttl time.Duration) PublishOption {
 	return func(o *PublishOptions) {
 		o.TTL = ttl
+	}
+}
+
+// WithUrgency sets the business urgency tier of the message.
+func WithUrgency(urgency Urgency) PublishOption {
+	return func(o *PublishOptions) {
+		o.Urgency = urgency
+	}
+}
+
+// WithPriority explicitly sets the raw AMQP priority of the message.
+func WithPriority(priority uint8) PublishOption {
+	return func(o *PublishOptions) {
+		o.Priority = priority
 	}
 }
 

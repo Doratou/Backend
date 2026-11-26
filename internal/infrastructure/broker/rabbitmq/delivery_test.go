@@ -74,3 +74,21 @@ func TestDeliveryWrapper_RetryCount(t *testing.T) {
 		}
 	})
 }
+
+func TestDeliveryWrapper_Urgency(t *testing.T) {
+	t.Run("default when missing", func(t *testing.T) {
+		d := NewDelivery(amqp.Delivery{})
+		if u := d.Urgency(); u != 1 {
+			t.Errorf("expected default UrgencyNormal (1), got %d", u)
+		}
+	})
+
+	t.Run("with x-urgency header", func(t *testing.T) {
+		d := NewDelivery(amqp.Delivery{
+			Headers: amqp.Table{"x-urgency": uint8(3)},
+		})
+		if u := d.Urgency(); u != 3 {
+			t.Errorf("expected UrgencyRealtime (3), got %d", u)
+		}
+	})
+}
