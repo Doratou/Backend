@@ -30,7 +30,7 @@ docs {
   
   ## Description
   
-  Allows the group owner to broadcast a custom announcement with arbitrary title and message to all active group members. The owner themselves is excluded from receiving duplicate self-notifications. Persists notification records in the database for all members and immediately publishes a `group.announcement` event to RabbitMQ for real-time WebSocket delivery.
+  Allows the group owner to broadcast a custom announcement with arbitrary title and message to all active group members. The owner themselves is excluded from receiving duplicate self-notifications. Persists notification records in the database for all members and immediately publishes a `group.announcement` event (`channel: "group:<groupID>"`) via Redis Pub/Sub for real-time WebSocket delivery. See `WebSocket -> 02. Event Catalog & Payloads` for the exact WebSocket payload contract.
   
   ## Request
   
