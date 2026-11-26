@@ -42,5 +42,5 @@ docs {
 
   ## Scope
 
-  This feature records external payments and decisions. It does not send money, charge wallets, schedule notifications or expose debt graph/report endpoints. Current balances are calculated only for the creation warning. Final SUCCESS records remain the source for future balance/report calculations.
+  This feature records external payments and decisions. A SUCCESS payment records its effect on the balance at confirmation. The Financial Reports folder contains the expense history graphs and the exact minimum settlement plan. A PENDING payment registered against an earlier balance can include `SETTLEMENT_BALANCE_CHANGED` in its warnings. Refresh payment details before confirmation. Confirmation applies an actual payment to the current ledger and remains available to the active receiver.
 }

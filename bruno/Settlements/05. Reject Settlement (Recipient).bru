@@ -59,7 +59,7 @@ docs {
   | can_confirm / can_reject / can_delete | Permissions calculated for the authenticated caller. UI hints; backend always enforces authorization. |
   | attachment_ids | IDs of attached SETTLEMENT_RECEIPT files; [] when none. |
   | attachments | Receipt metadata: id, original_filename, mime_type, file_size_bytes, nullable access_url. |
-  | warnings | Create-only advisory messages; [] for other successful operations. |
+  | warnings | Empty array on successful rejection. |
 
 
   ```json

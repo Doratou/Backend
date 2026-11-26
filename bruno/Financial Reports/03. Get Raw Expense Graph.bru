@@ -1,0 +1,207 @@
+meta {
+  name: 03. Get Raw Expense Graph
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{settlementGroupId}}/reports/expenses/graph
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Raw Expense Graph
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/reports/expenses/graph`
+  **Auth:** Bearer access token
+
+  ## Description
+
+  Returns the complete directed graph of recorded expense shares. An edge runs from the member assigned a share to the member who paid the expense. Use `share_id` as the edge key so three expenses from Ali to Reza render as three arrows. Each edge carries its own title, amount and occurrence time.
+
+  Only positive shares payable to another member produce edges. Nodes represent the members referenced by those edges, ordered by membership ID ascending. Edges are ordered by occurrence time descending with nulls last, then by expense ID descending and share ID ascending.
+
+  Reza is a former member in this example. His raw shares and all three arrows from Ali remain visible. Expense edits and deletions are reflected. Confirming a payment only updates settlement planning.
+
+  Every report requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group with no departure timestamp. Group owners and system admins need active membership too. All example IDs are illustrative.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `group_status` | `ACTIVE`, `SETTLING`, `CLOSED` | All three states allow reports to be read. |
+  | `currency` | `TOMAN` | All amount fields are expressed in integer toman. |
+
+  Status values are uppercase and case-sensitive. Member flags and permission flags are JSON booleans.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
+
+  ### Path parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Group ID in the range 1 to 9223372036854775807. Bruno variable `settlementGroupId`. |
+
+  ### Query parameters
+  This route has no query parameters. It returns the complete graph or plan.
+
+  No request body is required.
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "group_id": 10,
+      "group_status": "ACTIVE",
+      "viewer_member_id": 30,
+      "currency": "TOMAN",
+      "nodes": [
+        {
+          "member_id": 30,
+          "user_id": 130,
+          "name": "Ali",
+          "avatar_url": null,
+          "is_former_member": false
+        },
+        {
+          "member_id": 31,
+          "user_id": 131,
+          "name": "Reza",
+          "avatar_url": null,
+          "is_former_member": true
+        },
+        {
+          "member_id": 32,
+          "user_id": 132,
+          "name": "Sara",
+          "avatar_url": null,
+          "is_former_member": false
+        }
+      ],
+      "edges": [
+        {
+          "from_member_id": 31,
+          "to_member_id": 32,
+          "amount_toman": 200000,
+          "share_id": 144,
+          "expense_id": 44,
+          "expense_title": "Hotel",
+          "occurred_at": "2026-11-20T13:00:00Z"
+        },
+        {
+          "from_member_id": 30,
+          "to_member_id": 31,
+          "amount_toman": 20000,
+          "share_id": 143,
+          "expense_id": 43,
+          "expense_title": "Shopping",
+          "occurred_at": "2026-11-20T12:00:00Z"
+        },
+        {
+          "from_member_id": 30,
+          "to_member_id": 31,
+          "amount_toman": 60000,
+          "share_id": 142,
+          "expense_id": 42,
+          "expense_title": "Taxi",
+          "occurred_at": "2026-11-20T11:00:00Z"
+        },
+        {
+          "from_member_id": 30,
+          "to_member_id": 31,
+          "amount_toman": 120000,
+          "share_id": 141,
+          "expense_id": 41,
+          "expense_title": "Dinner",
+          "occurred_at": "2026-11-20T10:00:00Z"
+        }
+      ]
+    }
+  }
+  ```
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `group_id` | Integer. Group addressed by groupID. |
+  | `viewer_member_id` | Integer. Membership ID derived from the access token. Use to highlight the current member. |
+  | `group_status` | Current group lifecycle enum. |
+  | `currency` | Fixed string TOMAN. Amount fields ending in _toman are integer toman. |
+  | `nodes` | Profiles for the memberships referenced by returned edges. |
+  | `edges` | Separate expense-share arrows. The group graph is returned in full. |
+  | `from_member_id` | Integer. Group membership ID of the sender (expense participant or proposed payer). |
+  | `to_member_id` | Integer. Group membership ID of the receiver (expense payer or proposed recipient). |
+  | `amount_toman` | Positive integer. Amount of one recorded share or proposed transfer. |
+  | `share_id` | Integer. ID of the individual expense share. Use as the stable key for distinct rows or parallel edges. |
+  | `expense_id` | Integer. Source expense ID. Use `GET /api/v1/groups/:groupID/expenses/:expenseID` to open expense details. |
+  | `expense_title` | String. Current title of this expense, useful as the reason shown beside the amount. |
+  | `occurred_at` | RFC 3339 expense occurrence timestamp or null. The timestamp can include a UTC offset. |
+
+  ### Member profile fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `member_id` | Integer. ID of this group membership. Match this ID when connecting nodes or creating a settlement. |
+  | `user_id` | Integer. Account ID for the user profile API. |
+  | `name` | String. Current display name. |
+  | `avatar_url` | Temporary URL or null. Render a fallback for null and refetch if the URL expires. |
+  | `is_former_member` | JSON boolean. True for an inactive membership or a membership with a departure timestamp. |
+
+  ### Empty result
+
+  In a separate group without positive shares payable to another member, both graph arrays are empty.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "group_id": 11,
+      "viewer_member_id": 60,
+      "group_status": "ACTIVE",
+      "currency": "TOMAN",
+      "nodes": [],
+      "edges": []
+    }
+  }
+  ```
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not supply a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, is a refresh token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is inactive. |
+  | 403 | `FINANCIAL_REPORT_FORBIDDEN` | `only active group members can access financial reports` | The caller lacks active membership in the addressed group. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or token-blacklist operation failed. |
+
+  Internal causes stay server-side. The error response contains success=false, code and error.
+
+  ```json
+  {
+    "success": false,
+    "code": "FINANCIAL_REPORT_FORBIDDEN",
+    "error": "only active group members can access financial reports"
+  }
+  ```
+}

@@ -96,7 +96,7 @@ docs {
   | can_confirm / can_reject / can_delete | Permissions calculated for the authenticated caller. UI hints; backend always enforces authorization. |
   | attachment_ids | IDs of attached SETTLEMENT_RECEIPT files; [] when none. |
   | attachments | Receipt metadata: id, original_filename, mime_type, file_size_bytes, nullable access_url. |
-  | warnings | Create-only advisory messages; [] for other successful operations. |
+  | warnings | May include PAYMENT_EXCEEDS_CURRENT_DEBT when registering more than your current net debt. |
 
 
   ```json
@@ -164,6 +164,7 @@ docs {
   | 404 | `ATTACHMENT_NOT_FOUND` | `attachment not found` | Supplied receipt ID missing/deleted. |
   | 409 | `SETTLEMENT_NOT_PENDING` | `only pending payments can be confirmed, rejected or deleted` | Already SUCCESS/REJECT/CANCELED. Repeating DELETE after soft deletion returns 404. |
   | 409 | `SETTLEMENT_GROUP_CLOSED` | `payments cannot be changed after the group is closed` | Group CLOSED; create/confirm/reject/delete forbidden. |
+  | 422 | `FINANCIAL_AMOUNT_OUT_OF_RANGE` | `financial balance exceeds the supported range` | A balance calculation exceeds the signed BIGINT range. |
   | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Unexpected database/internal failure. |
   | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt/avatar URL resolution unavailable. |
 
