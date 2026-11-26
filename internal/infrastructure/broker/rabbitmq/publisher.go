@@ -106,11 +106,21 @@ func (p *Publisher) Publish(ctx context.Context, exchange, routingKey string, ms
 		deliveryMode = amqp.Persistent
 	}
 
+	// Compute priority: explicit priority overrides urgency calculation
+	priority := options.Priority
+	if priority == 0 && options.Urgency > 0 {
+		priority = domain_broker.CalculatePriority(options.Urgency, 0, 0)
+	}
+	if options.Urgency > 0 {
+		headers[domain_broker.HeaderUrgency] = uint8(options.Urgency)
+	}
+
 	publishing := amqp.Publishing{
 		Headers:         headers,
 		ContentType:     contentType,
 		ContentEncoding: "utf-8",
 		DeliveryMode:    deliveryMode,
+		Priority:        priority,
 		MessageId:       msgID,
 		Timestamp:       timestamp,
 		CorrelationId:   msg.CorrelationID,
@@ -166,7 +176,7 @@ func (p *Publisher) PublishJSON(ctx context.Context, exchange, routingKey string
 }
 
 // PublishToRetry routes a failed message to a delayed retry exchange/queue with incremented retry count and optional TTL.
-func (p *Publisher) PublishToRetry(ctx context.Context, retryExchange, mainQueue string, originalMsg domain_broker.Message, retryCount int, delay time.Duration) error {
+func (p *Publisher) PublishToRetry(ctx context.Context, retryExchange, mainQueue string, originalMsg domain_broker.Message, retryCount int, delay time.Duration, opts ...domain_broker.PublishOption) error {
 	headers := make(domain_broker.Headers)
 	if originalMsg.Headers != nil {
 		for k, v := range originalMsg.Headers {
@@ -181,6 +191,7 @@ func (p *Publisher) PublishToRetry(ctx context.Context, retryExchange, mainQueue
 
 	var publishOpts []domain_broker.PublishOption
 	publishOpts = append(publishOpts, domain_broker.WithPersistent(true))
+	publishOpts = append(publishOpts, opts...)
 
 	// If a specific per-message delay was supplied and not handled solely by the queue TTL:
 	if delay > 0 {
@@ -215,6 +226,11 @@ func (p *Publisher) PublishWithExpiration(ctx context.Context, exchange, routing
 		return err
 	}
 
+	var options domain_broker.PublishOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	headers := make(amqp.Table)
 	if msg.Headers != nil {
 		for k, v := range msg.Headers {
@@ -237,11 +253,20 @@ func (p *Publisher) PublishWithExpiration(ctx context.Context, exchange, routing
 		contentType = "application/json"
 	}
 
+	priority := options.Priority
+	if priority == 0 && options.Urgency > 0 {
+		priority = domain_broker.CalculatePriority(options.Urgency, 0, 0)
+	}
+	if options.Urgency > 0 {
+		headers[domain_broker.HeaderUrgency] = uint8(options.Urgency)
+	}
+
 	publishing := amqp.Publishing{
 		Headers:         headers,
 		ContentType:     contentType,
 		ContentEncoding: "utf-8",
 		DeliveryMode:    amqp.Persistent,
+		Priority:        priority,
 		MessageId:       msgID,
 		Timestamp:       timestamp,
 		CorrelationId:   msg.CorrelationID,
