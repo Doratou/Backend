@@ -133,7 +133,10 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 				HTMLBody:          message.HTMLBody,
 				InlineAttachments: attachments,
 			}
-			if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.EmailRoutingKey, emailPayload, domain_broker.WithTTL(s.cfg.TTL)); err != nil {
+			if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.EmailRoutingKey, emailPayload,
+				domain_broker.WithTTL(s.cfg.TTL),
+				domain_broker.WithUrgency(domain_broker.UrgencyRealtime),
+			); err != nil {
 				log.Printf("failed to publish OTP email to rabbitmq: %v", err)
 				return nil, exception.Wrap(exception.ErrInternal, err)
 			}
@@ -153,7 +156,10 @@ func (s *otpService) SendOTP(ctx context.Context, identifier string, otpType enu
 			Tokens:     map[string]string{"code": code},
 		}
 		if s.brokerPub != nil {
-			if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.SMSRoutingKey, smsPayload, domain_broker.WithTTL(s.cfg.TTL)); err != nil {
+			if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.SMSRoutingKey, smsPayload,
+				domain_broker.WithTTL(s.cfg.TTL),
+				domain_broker.WithUrgency(domain_broker.UrgencyRealtime),
+			); err != nil {
 				log.Printf("failed to publish OTP sms to rabbitmq: %v", err)
 				return nil, exception.Wrap(exception.ErrInternal, err)
 			} else {
