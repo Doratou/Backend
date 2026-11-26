@@ -11,75 +11,98 @@ get {
 }
 
 docs {
-  # Doratou WebSocket Infrastructure — Frontend Integration Guide
-  
-  This document specifies the WebSocket transport protocol, authentication, wire envelope format, built-in control events, heartbeat behavior, and close codes implemented by the backend infrastructure (`github.com/coder/websocket`).
-  
+  # Doratou WebSocket Protocol Specification
+
+  This document defines the WebSocket transport, handshake authentication, Origin policy, wire JSON `Envelope` contract, built-in transport control events, heartbeat rules, close codes, and offline catch-up synchronization protocol.
+
   ---
-  
-  ## 1. Connection Endpoint & Transport
-  
-  - **Local URL:** `{wsBaseUrl}}/api/v1/ws`
-  - **Production URL:** `wss://<your-domain>/api/v1/ws`
-  - **Subprotocols:** None required (leave empty in browser `new WebSocket(url)`).
-  
+
+  ## 1. Endpoints & Transport
+
+  | Environment | URL | Notes |
+  | --- | --- | --- |
+  | Local | `{{wsBaseUrl}}/api/v1/ws` | Default `ws://127.0.0.1:8080/api/v1/ws` |
+  | Production | `wss://<domain>/api/v1/ws` | TLS (`wss://`) required in production |
+
+  * **Subprotocols:** None required. Do not negotiate a custom `Sec-WebSocket-Protocol`.
+  * **Compression:** Disabled (`CompressionDisabled`).
+  * **Multiple Sessions:** A single user may hold multiple concurrent connections (multiple tabs and devices). Unless `WS_MAX_CONNS_PER_USER` (`> 0`) is enforced, all active connections for that `user_id` receive user-targeted events simultaneously.
+
   ---
-  
-  ## 2. Authentication
-  
-  Before upgrading the HTTP connection (`101 Switching Protocols`), the server validates the JWT **Access Token** and checks the Redis revocation blacklist.
-  
-  Two token transport methods are supported (checked in order):
-  
-  1. **Authorization Header** *(non-browser clients, mobile, Bruno, Postman)*: `Authorization: Bearer <access_token>`
-  2. **Query Parameter** *(browser* `WebSocket` *API, since browsers cannot set custom* `Authorization` *headers during handshake)*: `ws://127.0.0.1:8080/api/v1/ws?token=<access_token>`
-  
-  ### Handshake Auth Failure Responses (HTTP JSON before upgrade)
-  
-  - `401 MISSING_TOKEN` — No token provided (when `WS_AUTH_REQUIRED=true`)
-  - `401 TOKEN_EXPIRED` — Access token has expired (client should refresh token via `POST /api/v1/auth/refresh` before reconnecting)
-  - `401 TOKEN_INVALID` — Malformed token, wrong signature, or refresh token passed instead of access token
-  - `401 TOKEN_REVOKED` — Token has been logged out / blacklisted
-  
+
+  ## 2. Handshake Authentication
+
+  Before upgrading the HTTP connection to `101 Switching Protocols`, the server validates the JWT **Access Token** (signature, expiry, `token_type == "access"`) and verifies that the token `jti` is not blacklisted in Redis.
+
+  Tokens are accepted via two transports (checked in this exact order):
+
+  | Priority | Method | Format | Intended Client |
+  | --- | --- | --- | --- |
+  | 1 | `Authorization` Header | `Authorization: Bearer <access_token>` | Mobile apps, CLI, Bruno, Postman |
+  | 2 | Query Parameter | `/api/v1/ws?token=<access_token>` | Web browsers (which cannot attach custom headers to WebSocket handshakes) |
+
+  ### Handshake Rejection Responses (HTTP JSON before upgrade)
+
+  When `WS_AUTH_REQUIRED=true` (default), or when a malformed/invalid token is sent even in optional auth mode, the server aborts the handshake with an HTTP JSON error body:
+
+  ```json
+  {
+    "success": false,
+    "code": "TOKEN_EXPIRED",
+    "error": "authorization token has expired"
+  }
+  ```
+
+  | HTTP Status | `code` | Meaning | Required Client Action |
+  | --- | --- | --- | --- |
+  | `401` | `MISSING_TOKEN` | No token supplied in header or `?token=` | Authenticate or obtain access token before connecting |
+  | `401` | `TOKEN_EXPIRED` | Access token lifetime elapsed | Refresh via `POST /api/v1/auth/refresh` and reconnect |
+  | `401` | `TOKEN_INVALID` | Bad signature, malformed JWT, or refresh token passed | Re-authenticate or use an access token |
+  | `401` | `TOKEN_REVOKED` | Token was revoked (e.g. logout / password change) | Re-authenticate |
+  | `500` | `INTERNAL_ERROR` | Server error checking revocation store | Retry with backoff |
+
+  *(When `WS_AUTH_REQUIRED=false` and no token is provided, the connection is accepted as an anonymous session with `user_id: 0`, which receives only broadcast events.)*
+
   ---
-  
-  ## 3. CORS / Origin Rules
-  
-  - Same-origin connections and non-browser clients (no `Origin` header) are allowed automatically.
-  - Cross-origin browser apps (e.g. `http://localhost:5173` connecting to `:8080`) require the **host** (`localhost:5173`, without `http://`) to be listed in `WS_ORIGIN_PATTERNS` (or `WS_INSECURE_SKIP_VERIFY=true` in local dev only).
-  - Disallowed origins receive `403 Forbidden` during the handshake.
-  
+
+  ## 3. CORS / Origin Verification
+
+  * Same-origin browser requests (`Origin` host matches `Host` header) and non-browser clients (no `Origin` header) are permitted automatically.
+  * Cross-origin browser clients require the request origin **host** (e.g. `app.doratou.ir` or `localhost:5173`, **without** `http://` or `https://`) to match `WS_ORIGIN_PATTERNS` (unless `WS_INSECURE_SKIP_VERIFY=true` in local development).
+  * Unauthorized origins receive `403 Forbidden` during the handshake.
+
   ---
-  
-  ## 4. Generic JSON Wire Format (`Envelope`)
-  
-  Every text/binary message exchanged over the socket uses this JSON envelope:
-  
+
+  ## 4. Wire Format (`Envelope`)
+
+  All text/binary frames exchanged over the socket follow a uniform JSON envelope:
+
   ```json
   {
     "id": "optional-correlation-id",
     "event": "event.name",
-    "channel": "optional-room-or-topic",
+    "channel": "optional-channel-name",
     "data": {},
     "timestamp": "2026-11-26T10:30:00Z"
   }
   ```
-  
-  | Field | Type | Required | Description |
+
+  | Field | Type | Presence | Description |
   | --- | --- | --- | --- |
-  | `id` | `string` | No | Optional client/server correlation ID. Echoed back on control acks (`ws.pong`, `ws.subscribed`, `ws.unsubscribed`, `ws.error`). |
-  | `event` | `string` | Yes | Event identifier (must be non-empty). |
-  | `channel` | `string` | No | Optional channel/room scope (e.g. `room:test`). |
-  | `data` | `any (JSON)` | No | Event-specific JSON payload. |
-  | `timestamp` | `RFC3339` | Server-set | UTC timestamp of message creation. |
-  
+  | `id` | `string` | Optional | Correlation identifier; echoed on replies (`ws.pong`, `ws.subscribed`, `ws.unsubscribed`, `ws.error`) |
+  | `event` | `string` | Required | Non-empty event identifier |
+  | `channel` | `string` | Optional | Scope identifier. Set automatically to `"group:<group_id>"` on group-scoped domain notifications |
+  | `data` | `object` | Optional | Event-specific JSON payload |
+  | `timestamp` | `string (RFC3339)` | Server-set | UTC creation timestamp |
+
   ---
-  
-  ## 5. Built-in Infrastructure Control Events
-  
-  ### Server -&gt; Client
-  
-  1. `ws.connected` *(sent immediately after handshake)*
+
+  ## 5. Built-in Transport Control Events
+
+  ### Server -> Client
+
+  1. **`ws.connected`** — Emitted immediately after handshake registration:
+     ```json
      {
        "event": "ws.connected",
        "data": {
@@ -88,13 +111,17 @@ docs {
        },
        "timestamp": "2026-11-26T10:30:00Z"
      }
-  2. `ws.pong` *(reply to* `ws.ping`*)*
+     ```
+  2. **`ws.pong`** — Application-level heartbeat reply to `ws.ping`:
+     ```json
      {
        "id": "ping-1",
        "event": "ws.pong",
        "timestamp": "2026-11-26T10:30:05Z"
      }
-  3. `ws.subscribed` / `ws.unsubscribed` *(reply to* `ws.subscribe` */* `ws.unsubscribe`*)*
+     ```
+  3. **`ws.subscribed`** / **`ws.unsubscribed`** — Acknowledgment for optional `ws.subscribe` / `ws.unsubscribe`:
+     ```json
      {
        "id": "sub-1",
        "event": "ws.subscribed",
@@ -104,7 +131,9 @@ docs {
        },
        "timestamp": "2026-11-26T10:30:10Z"
      }
-  4. `ws.error` *(non-fatal error for malformed JSON or invalid control command)*
+     ```
+  4. **`ws.error`** — Non-fatal frame error (connection remains open):
+     ```json
      {
        "id": "optional-id",
        "event": "ws.error",
@@ -114,59 +143,58 @@ docs {
        },
        "timestamp": "2026-11-26T10:30:12Z"
      }
-  
-  ### Client -&gt; Server
-  
-  1. `ws.ping`: `{ "id": "ping-1", "event": "ws.ping" }`
-  2. `ws.subscribe`: `{ "id": "sub-1", "event": "ws.subscribe", "channel": "room:test" }`
-  3. `ws.unsubscribe`: `{ "id": "unsub-1", "event": "ws.unsubscribe", "channel": "room:test" }`
-  
-  *(Note:* `channel` *can be passed either in top-level* `"channel"` *or inside* `"data": {"channel": "..."}`*.)*
-  
-  ---
-  
-  ## 6. Heartbeat, Limits & Close Codes
-  
-  - **Protocol Heartbeat:** Server sends WebSocket `Ping` frames every `30s` (`WS_PING_INTERVAL`) and expects `Pong` within `10s` (`WS_PONG_TIMEOUT`). Browsers handle RFC 6455 `Pong` automatically.
-  - **Max Inbound Message Size:** `64 KiB` (`WS_READ_LIMIT_BYTES=65536`).
-  - **Outbound Send Buffer:** `64` messages per connection (`WS_SEND_BUFFER_SIZE=64`). Slow consumers that stall may be disconnected (`WS_SLOW_CONSUMER_POLICY=disconnect`).
-  
-  | Close Code | Meaning | Frontend Action |
+     ```
+
+  | Error `code` | Cause |
+  | --- | --- |
+  | `INVALID_ENVELOPE` | Inbound frame is not valid JSON or `event` is empty |
+  | `SUBSCRIBE_FAILED` | Empty/invalid `channel` on `ws.subscribe` |
+  | `UNSUBSCRIBE_FAILED` | Empty/invalid `channel` on `ws.unsubscribe` |
+  | `INBOUND_HANDLER_ERROR` | Custom inbound handler rejected the message |
+
+  ### Client -> Server
+
+  | Event | Payload | Purpose |
   | --- | --- | --- |
-  | `1000` | Normal closure | Do not reconnect unless user initiates. |
-  | `1001` | Server shutting down / restarting (`Going Away`) | Reconnect automatically using exponential backoff + jitter. |
-  | `1008` | Policy violation (slow consumer buffer full or max concurrent connections exceeded) | Reconnect with backoff (or alert if too many tabs open). |
-  | `1009` | Message exceeded `64 KiB` read limit | Fix payload size; do not blindly retry the same oversized frame. |
-  
+  | `ws.ping` | `{ "id": "ping-1", "event": "ws.ping" }` | Optional application-level ping |
+  | `ws.subscribe` | `{ "id": "sub-1", "event": "ws.subscribe", "channel": "room:test" }` | Optional generic room subscription (not used for notifications) |
+  | `ws.unsubscribe` | `{ "id": "unsub-1", "event": "ws.unsubscribe", "channel": "room:test" }` | Leave an optional generic room (does not close the socket) |
+
+  *(On `ws.subscribe` / `ws.unsubscribe`, `channel` may be provided either at top-level `"channel"` or inside `"data": { "channel": "..." }`.)*
+
   ---
-  
-  ## 7. Browser TypeScript / JS Example
-  
-  ```ts
-  const token = encodeURIComponent(accessToken);
-  const ws = new WebSocket(`ws://127.0.0.1:8080/api/v1/ws?token=${token}`);
-  
-  ws.onopen = () => {
-    // Optional app-level ping or channel subscribe
-    ws.send(JSON.stringify({ id: "sub-1", event: "ws.subscribe", channel: "room:test" }));
-  };
-  
-  ws.onmessage = (msg) => {
-    const envelope = JSON.parse(msg.data);
-    console.log("WS event:", envelope.event, envelope.data);
-  };
-  
-  ws.onclose = (ev) => {
-    console.log("WS closed:", ev.code, ev.reason);
-    // If ev.code !== 1000, refresh token if needed and reconnect with exponential backoff + jitter
-  };
-  ```
-  
+
+  ## 6. Real-Time Notification Delivery & Offline Catch-up
+
+  * **No manual subscription needed:** Once authenticated on `/api/v1/ws`, the connection automatically receives all personal (`TargetUsers`), group (`group:<group_id>`), and platform-wide (`token.price_updated`) notifications. Do **not** send `ws.subscribe` for user groups.
+  * **Server-side authorization:** Group notification delivery resolves active group membership from PostgreSQL at dispatch time. Users removed from a group stop receiving events immediately, even on still-open sockets.
+  * **Persistence & Catch-up Sync:** Every notification (except platform-wide `token.price_updated` broadcasts) is persisted in PostgreSQL before real-time Redis Pub/Sub dispatch.
+
+  ### Recommended Connection & Reconnect Lifecycle
+  1. Connect to `/api/v1/ws?token=<access_token>` and wait for `ws.connected`.
+  2. Call `GET /api/v1/notifications/sync?since_id=<last_seen_notification_id>` after initial connection or any reconnection to catch up on events created while offline.
+  3. On non-`1000` close codes (or network drop), reconnect using exponential backoff with jitter; if handshake returns `401 TOKEN_EXPIRED`, call `POST /api/v1/auth/refresh` first.
+
   ---
-  
-  ## 8. Real-Time Notifications Delivery (Redis Pub/Sub)
-  
-  - Once authenticated over `/api/v1/ws`, your connection **automatically receives** personal, group, and broadcast notifications — **no manual `ws.subscribe` is required for groups**.
-  - Group events include `"channel": "group:<group_id>"` in the `Envelope` for easy UI routing, while membership authorization is enforced server-side.
-  - Missed events while offline are persisted in PostgreSQL and can be caught up using `GET /api/v1/notifications/sync`.
+
+  ## 7. Heartbeat, Limits & Close Codes
+
+  | Parameter | Default | Env Key | Description |
+  | --- | --- | --- | --- |
+  | Max Inbound Frame | `64 KiB` (`65536` bytes) | `WS_READ_LIMIT_BYTES` | Frames exceeding this limit trigger `1009` |
+  | Outbound Buffer | `64` messages | `WS_SEND_BUFFER_SIZE` | Per-connection queued envelopes before slow-consumer policy applies |
+  | Write Timeout | `5s` | `WS_WRITE_TIMEOUT` | Per-frame write deadline |
+  | Server Ping Interval | `30s` | `WS_PING_INTERVAL` | Interval for RFC 6455 control `Ping` frames |
+  | Pong Timeout | `10s` | `WS_PONG_TIMEOUT` | Deadline for peer `Pong` response before closing dead socket |
+  | Max Conns / User | `0` (unlimited) | `WS_MAX_CONNS_PER_USER` | Concurrent connection limit per `user_id` on each node |
+  | Slow Consumer Policy | `disconnect` | `WS_SLOW_CONSUMER_POLICY` | `disconnect` (close with `1008`) or `drop` (drop newest frame) |
+
+  ### WebSocket Close Status Codes
+
+  | Code | Standard Name | Meaning | Client Protocol Action |
+  | --- | --- | --- | --- |
+  | `1000` | Normal Closure | Client or server closed cleanly | Do not auto-reconnect |
+  | `1001` | Going Away | Server shutting down / restarting | Auto-reconnect with backoff + jitter, then call `/notifications/sync` |
+  | `1008` | Policy Violation | Slow consumer buffer full or `WS_MAX_CONNS_PER_USER` exceeded | Reconnect with backoff (or prompt user if max tabs exceeded) |
+  | `1009` | Message Too Big | Client sent frame larger than `64 KiB` | Do not resend oversized frame |
 }

@@ -1,0 +1,531 @@
+meta {
+  name: 02. Event Catalog & Payloads
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  # WebSocket Real-Time Event Catalog & Payload Contracts
+
+  This document specifies all **14 real-time domain events** pushed by the backend to authenticated WebSocket clients inside the standard `Envelope` (`event`, optional `channel`, `data`, `timestamp`).
+
+  > **Type Note:** Across domain payloads in `data`, user identifiers (`sender_id`, `responder_id`, `debtor_id`, `creditor_id`, `creator_id`, `updated_by_id`, `user_id`, `winner_id`) are serialized as **JSON strings** (e.g. `"42"`), while resource IDs (`request_id`, `group_id`, `poll_id`, `draw_id`, `invite_id`, `report_id`, `settlement_id`, `*_avatar_id`) and Toman amounts are **JSON integers**.
+
+  ---
+
+  ## Summary Matrix
+
+  | # | `event` | Target Audience | `Envelope.channel` | Triggering REST Endpoint |
+  | --- | --- | --- | --- | --- |
+  | 1 | `friend_request.received` | Recipient user | *(omitted)* | `POST /api/v1/friendships/requests` |
+  | 2 | `friend_request.responded` | Original requester | *(omitted)* | `PATCH /api/v1/friendships/requests/:id/accept` or `.../reject` |
+  | 3 | `settlement.paid` | Creditor user | `group:<group_id>` | `POST /api/v1/groups/:groupID/settlements` |
+  | 4 | `poll.created` | All active group members | `group:<group_id>` | `POST /api/v1/groups/:groupID/polls` |
+  | 5 | `poll.closed` | All active group members | `group:<group_id>` | `PATCH /api/v1/groups/:groupID/polls/:pollID/close` |
+  | 6 | `draw.created` | All active group members | `group:<group_id>` | `POST /api/v1/groups/:groupID/draws` |
+  | 7 | `draw.result` | All active group members | `group:<group_id>` | `POST /api/v1/groups/:groupID/draws/:drawID/run` |
+  | 8 | `checklist.updated` | All active group members | `group:<group_id>` | `POST /groups/:groupID/checklist/items`, `PUT/DELETE .../claim`, `DELETE .../items/:itemID` |
+  | 9 | `admin_report.answered` | Original reporter | *(omitted)* | `PUT /api/v1/admin/reports/:id/review` *(terminal statuses)* |
+  | 10 | `group.member_joined` | Active group members | `group:<group_id>` | `POST /api/v1/invites/direct/:inviteID/respond` *(accept)* or `POST /api/v1/invites/links/:token/join` |
+  | 11 | `group.member_left` | Active members *(+ kicked user on kick)* | `group:<group_id>` | `DELETE /api/v1/groups/:groupID/leave` or `DELETE /api/v1/groups/:groupID/members/:memberID` |
+  | 12 | `group.invite_received` | Invited user | `group:<group_id>` | `POST /api/v1/invites/direct` |
+  | 13 | `token.price_updated` | All connected sessions *(Broadcast)* | *(omitted)* | `PUT /api/v1/admin/token-price` *(when price changes)* |
+  | 14 | `group.announcement` | Active group members *(excluding owner)* | `group:<group_id>` | `POST /api/v1/groups/:groupID/announcements` |
+
+  ---
+
+  ## 1. Friend Request Events
+
+  ### `friend_request.received`
+  **Trigger:** `POST /api/v1/friendships/requests`
+  **Recipient:** Target user (`receiver_user_id`)
+
+  ```json
+  {
+    "event": "friend_request.received",
+    "data": {
+      "request_id": 105,
+      "sender_id": "12",
+      "sender_name": "Ali",
+      "sender_avatar_id": 7,
+      "created_at": "2026-11-26T10:25:00Z"
+    },
+    "timestamp": "2026-11-26T10:25:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `request_id` | `int64` | Yes | Friend request record ID |
+  | `sender_id` | `string` | Yes | Requester user ID |
+  | `sender_name` | `string` | Yes | Requester display name |
+  | `sender_avatar_id` | `int64` | No | Omitted if user has no avatar (`0`) |
+  | `created_at` | `RFC3339` | Yes | Request timestamp |
+
+  ---
+
+  ### `friend_request.responded`
+  **Trigger:** `PATCH /api/v1/friendships/requests/:id/accept` or `PATCH /api/v1/friendships/requests/:id/reject`
+  **Recipient:** Original requester (`requester_user_id`)
+
+  ```json
+  {
+    "event": "friend_request.responded",
+    "data": {
+      "request_id": 105,
+      "responder_id": "19",
+      "responder_avatar_id": 0,
+      "responder_name": "Sara",
+      "status": "accepted",
+      "responded_at": "2026-11-26T10:28:00Z"
+    },
+    "timestamp": "2026-11-26T10:28:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `request_id` | `int64` | Yes | Friend request record ID |
+  | `responder_id` | `string` | Yes | Responder user ID |
+  | `responder_avatar_id` | `int64` | Yes | Responder avatar attachment ID (`0` if unset) |
+  | `responder_name` | `string` | Yes | Responder display name |
+  | `status` | `string` | Yes | `"accepted"` or `"rejected"` |
+  | `responded_at` | `RFC3339` | Yes | Response timestamp |
+
+  ---
+
+  ## 2. Settlement Events
+
+  ### `settlement.paid`
+  **Trigger:** `POST /api/v1/groups/:groupID/settlements`
+  **Recipient:** Creditor user (`to_member.user_id`)
+
+  ```json
+  {
+    "event": "settlement.paid",
+    "channel": "group:5",
+    "data": {
+      "settlement_id": 44,
+      "group_id": 5,
+      "group_name": "North Trip",
+      "debtor_id": "12",
+      "debtor_name": "Ali",
+      "creditor_id": "19",
+      "creditor_name": "Sara",
+      "amount_toman": 250000,
+      "settled_at": "2026-11-26T11:00:00Z"
+    },
+    "timestamp": "2026-11-26T11:00:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `settlement_id` | `int64` | Yes | Settlement ID |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `debtor_id` | `string` | Yes | Payer user ID |
+  | `debtor_name` | `string` | Yes | Payer display name |
+  | `creditor_id` | `string` | Yes | Recipient user ID |
+  | `creditor_name` | `string` | Yes | Recipient display name |
+  | `amount_toman` | `int64` | Yes | Settlement amount in Toman |
+  | `settled_at` | `RFC3339` | Yes | Payment timestamp |
+
+  ---
+
+  ## 3. Poll Events
+
+  ### `poll.created`
+  **Trigger:** `POST /api/v1/groups/:groupID/polls`
+  **Recipient:** All active group members
+
+  ```json
+  {
+    "event": "poll.created",
+    "channel": "group:5",
+    "data": {
+      "poll_id": 18,
+      "group_id": 5,
+      "group_name": "North Trip",
+      "creator_id": "12",
+      "creator_name": "Ali",
+      "question": "Where should we stay?",
+      "options": [
+        "Ramsar",
+        "Masal"
+      ]
+    },
+    "timestamp": "2026-11-26T11:10:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `poll_id` | `int64` | Yes | Poll ID |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `creator_id` | `string` | Yes | Poll creator user ID |
+  | `creator_name` | `string` | Yes | Poll creator display name |
+  | `question` | `string` | Yes | Poll question |
+  | `options` | `string[]` | Yes | Option titles |
+  | `expires_at` | `RFC3339` | No | Optional poll expiration timestamp |
+
+  ---
+
+  ### `poll.closed`
+  **Trigger:** `PATCH /api/v1/groups/:groupID/polls/:pollID/close`
+  **Recipient:** All active group members
+
+  ```json
+  {
+    "event": "poll.closed",
+    "channel": "group:5",
+    "data": {
+      "poll_id": 18,
+      "group_id": 5,
+      "group_name": "North Trip",
+      "question": "Where should we stay?",
+      "total_votes": 4,
+      "results": [
+        {
+          "option_id": 31,
+          "text": "Ramsar",
+          "vote_count": 3,
+          "percentage": 75
+        },
+        {
+          "option_id": 32,
+          "text": "Masal",
+          "vote_count": 1,
+          "percentage": 25
+        }
+      ],
+      "winning_option": [
+        {
+          "option_id": 31,
+          "text": "Ramsar",
+          "vote_count": 3,
+          "percentage": 75
+        }
+      ],
+      "closed_at": "2026-11-26T12:00:00Z"
+    },
+    "timestamp": "2026-11-26T12:00:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `poll_id` | `int64` | Yes | Poll ID |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `question` | `string` | Yes | Poll question |
+  | `total_votes` | `int` | Yes | Total votes cast |
+  | `results` | `PollOptionResult[]` | Yes | Tally for each option (`option_id`, `text`, `vote_count`, `percentage`) |
+  | `winning_option` | `PollOptionResult[]` | Yes | **Note singular JSON key name:** array of top-voted option(s); empty `[]` if zero votes |
+  | `closed_at` | `RFC3339` | Yes | Close timestamp |
+
+  ---
+
+  ## 4. Lucky Draw Events
+
+  ### `draw.created`
+  **Trigger:** `POST /api/v1/groups/:groupID/draws`
+  **Recipient:** All active group members
+
+  ```json
+  {
+    "event": "draw.created",
+    "channel": "group:5",
+    "data": {
+      "draw_id": 9,
+      "group_id": 5,
+      "group_name": "North Trip",
+      "creator_id": "12",
+      "creator_name": "Ali",
+      "title": "Who drives first?",
+      "candidates": [
+        "Ali",
+        "Sara",
+        "Bob"
+      ],
+      "created_at": "2026-11-26T12:10:00Z"
+    },
+    "timestamp": "2026-11-26T12:10:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `draw_id` | `int64` | Yes | Draw ID |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `creator_id` | `string` | Yes | Creator user ID |
+  | `creator_name` | `string` | Yes | Creator display name |
+  | `title` | `string` | Yes | Draw title |
+  | `candidates` | `string[]` | Yes | Resolved candidate names/labels |
+  | `created_at` | `RFC3339` | Yes | Creation timestamp |
+
+  ---
+
+  ### `draw.result`
+  **Trigger:** `POST /api/v1/groups/:groupID/draws/:drawID/run` *(only emitted on first completion)*
+  **Recipient:** All active group members
+
+  ```json
+  {
+    "event": "draw.result",
+    "channel": "group:5",
+    "data": {
+      "draw_id": 9,
+      "group_id": 5,
+      "group_name": "North Trip",
+      "title": "Who drives first?",
+      "winner_id": "19",
+      "winner_name": "Sara",
+      "drawn_at": "2026-11-26T12:12:00Z"
+    },
+    "timestamp": "2026-11-26T12:12:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `draw_id` | `int64` | Yes | Draw ID |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `title` | `string` | Yes | Draw title |
+  | `winner_id` | `string` | Yes | Winner user ID string, or `""` when the candidate is a free-text entry |
+  | `winner_name` | `string` | Yes | Winner display name or text label |
+  | `drawn_at` | `RFC3339` | Yes | Completion timestamp |
+
+  ---
+
+  ## 5. Checklist Events
+
+  ### `checklist.updated`
+  **Trigger:**
+  * `POST /api/v1/groups/:groupID/checklist/items`
+  * `PUT /api/v1/groups/:groupID/checklist/items/:itemID/claim` *(when state changes)*
+  * `DELETE /api/v1/groups/:groupID/checklist/items/:itemID/claim` *(when state changes)*
+  * `DELETE /api/v1/groups/:groupID/checklist/items/:itemID`
+
+  **Recipient:** All active group members
+
+  ```json
+  {
+    "event": "checklist.updated",
+    "channel": "group:5",
+    "data": {
+      "group_id": 5,
+      "group_name": "North Trip",
+      "updated_by_id": "12",
+      "updated_by_name": "Ali",
+      "updated_at": "2026-11-26T12:20:00Z"
+    },
+    "timestamp": "2026-11-26T12:20:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `updated_by_id` | `string` | Yes | Acting user ID |
+  | `updated_by_name` | `string` | Yes | Acting user display name |
+  | `updated_at` | `RFC3339` | Yes | Change timestamp |
+
+  ---
+
+  ## 6. Admin Report Events
+
+  ### `admin_report.answered`
+  **Trigger:** `PUT /api/v1/admin/reports/:id/review` *(when resulting status is `RESOLVED`, `REJECTED`, or `DISMISSED`)*
+  **Recipient:** Original reporter
+
+  ```json
+  {
+    "event": "admin_report.answered",
+    "data": {
+      "report_id": 31,
+      "user_id": "12",
+      "subject": "SPAM",
+      "answer": "Issue reviewed and resolved.",
+      "admin_name": "Sarah Admin",
+      "answered_at": "2026-11-26T12:30:00Z"
+    },
+    "timestamp": "2026-11-26T12:30:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `report_id` | `int64` | Yes | Report ID |
+  | `user_id` | `string` | Yes | Reporter user ID |
+  | `subject` | `string` | Yes | Report reason enum string |
+  | `answer` | `string` | Yes | Admin response text |
+  | `admin_name` | `string` | No | Reviewing admin display name |
+  | `answered_at` | `RFC3339` | Yes | Resolution timestamp |
+
+  ---
+
+  ## 7. Group Membership & Invite Events
+
+  ### `group.member_joined`
+  **Trigger:** `POST /api/v1/invites/direct/:inviteID/respond` *(accept)* or `POST /api/v1/invites/links/:token/join`
+  **Recipient:** All active group members
+
+  ```json
+  {
+    "event": "group.member_joined",
+    "channel": "group:5",
+    "data": {
+      "group_id": 5,
+      "group_name": "North Trip",
+      "user_id": "23",
+      "user_name": "Nima",
+      "joined_at": "2026-11-26T12:35:00Z"
+    },
+    "timestamp": "2026-11-26T12:35:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `user_id` | `string` | Yes | Joining user ID |
+  | `user_name` | `string` | Yes | Joining user display name |
+  | `joined_at` | `RFC3339` | Yes | Join timestamp |
+
+  ---
+
+  ### `group.member_left`
+  **Trigger:** `DELETE /api/v1/groups/:groupID/leave` (`reason: "left"`) or `DELETE /api/v1/groups/:groupID/members/:memberID` (`reason: "kicked"`)
+  **Recipient:** Remaining active group members (and the kicked user directly when `reason == "kicked"`)
+
+  ```json
+  {
+    "event": "group.member_left",
+    "channel": "group:5",
+    "data": {
+      "group_id": 5,
+      "group_name": "North Trip",
+      "user_id": "23",
+      "user_name": "Nima",
+      "reason": "kicked",
+      "left_at": "2026-11-26T12:40:00Z"
+    },
+    "timestamp": "2026-11-26T12:40:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `user_id` | `string` | Yes | Departed/kicked user ID |
+  | `user_name` | `string` | Yes | Departed/kicked user display name |
+  | `reason` | `string` | No | `"left"` or `"kicked"` |
+  | `left_at` | `RFC3339` | Yes | Departure timestamp |
+
+  ---
+
+  ### `group.invite_received`
+  **Trigger:** `POST /api/v1/invites/direct`
+  **Recipient:** Invited user(s)
+
+  ```json
+  {
+    "event": "group.invite_received",
+    "channel": "group:5",
+    "data": {
+      "invite_id": 71,
+      "group_id": 5,
+      "group_name": "North Trip",
+      "sender_id": "12",
+      "sender_name": "Ali",
+      "sender_avatar_id": 7,
+      "invited_at": "2026-11-26T12:45:00Z"
+    },
+    "timestamp": "2026-11-26T12:45:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `invite_id` | `int64` | Yes | Direct invite ID |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `sender_id` | `string` | Yes | Inviter user ID |
+  | `sender_name` | `string` | Yes | Inviter display name |
+  | `sender_avatar_id` | `int64` | No | Omitted if inviter has no avatar (`0`) |
+  | `invited_at` | `RFC3339` | Yes | Invite timestamp |
+
+  ---
+
+  ## 8. Token Price Events
+
+  ### `token.price_updated`
+  **Trigger:** `PUT /api/v1/admin/token-price` *(only emitted when the price value changes)*
+  **Recipient:** All connected sessions (`Broadcast`, including anonymous connections if enabled; **not** persisted in `notifications` table)
+
+  ```json
+  {
+    "event": "token.price_updated",
+    "data": {
+      "new_price_toman": 12500,
+      "old_price_toman": 10000,
+      "updated_at": "2026-11-26T12:50:00Z"
+    },
+    "timestamp": "2026-11-26T12:50:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `new_price_toman` | `int64` | Yes | Updated token price in Toman |
+  | `old_price_toman` | `int64` | Yes | Previous token price in Toman |
+  | `updated_at` | `RFC3339` | Yes | Update timestamp |
+
+  ---
+
+  ## 9. Group Announcement Events
+
+  ### `group.announcement`
+  **Trigger:** `POST /api/v1/groups/:groupID/announcements`
+  **Recipient:** Active group members *(excluding the group owner)*
+
+  ```json
+  {
+    "event": "group.announcement",
+    "channel": "group:5",
+    "data": {
+      "group_id": 5,
+      "group_name": "North Trip",
+      "sender_id": "12",
+      "sender_name": "Group Owner",
+      "title": "Emergency Group Notice",
+      "message": "Please review the updated checklist and expense split by tonight.",
+      "sent_at": "2026-11-26T12:55:00Z"
+    },
+    "timestamp": "2026-11-26T12:55:00Z"
+  }
+  ```
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `group_id` | `int64` | Yes | Group ID |
+  | `group_name` | `string` | Yes | Group title |
+  | `sender_id` | `string` | Yes | Group owner user ID |
+  | `sender_name` | `string` | Yes | `"Group Owner"` |
+  | `title` | `string` | Yes | Announcement title |
+  | `message` | `string` | Yes | Announcement body |
+  | `sent_at` | `RFC3339` | Yes | Dispatch timestamp |
+}

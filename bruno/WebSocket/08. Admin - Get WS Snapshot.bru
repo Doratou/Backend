@@ -1,7 +1,7 @@
 meta {
-  name: 06. Admin - Get WS Snapshot
+  name: 08. Admin - Get WS Snapshot
   type: http
-  seq: 6
+  seq: 8
 }
 
 get {
@@ -32,7 +32,7 @@ docs {
   **Auth:** Required (Admin Access Token — `ADMIN` role)
 
   ## Description
-  Returns a filtered, bounded point-in-time snapshot of the WebSocket hub including summary stats, active channels with subscriber counts, and active connection states (queue depth, subscribed channels, timestamps).
+  Returns a filtered, bounded point-in-time snapshot of the WebSocket hub on the responding instance, including summary `stats`, active `channels` with subscriber counts, and active `connections` with queue depth and timestamps.
 
   ## Request
 
@@ -44,9 +44,9 @@ docs {
   ### Query Parameters
   | Field | Type | Required | Default | Description |
   | --- | --- | --- | --- | --- |
-  | `user_id` | `int64` | No | - | Filter connections belonging to a specific user ID (> 0) |
-  | `channel` | `string` | No | - | Filter channels and connections subscribed to a specific channel name |
-  | `limit` | `int` | No | `100` | Maximum connections to return (capped at `1000`) |
+  | `user_id` | `int64` | No | - | Filter connections belonging to a specific user ID (must be `> 0`) |
+  | `channel` | `string` | No | - | Filter `channels` and `connections` subscribed to a specific generic channel |
+  | `limit` | `int` | No | `100` | Maximum connections to return (must be `> 0`; capped at `1000`) |
 
   ## Response
   **`200 OK`**
@@ -99,6 +99,23 @@ docs {
     }
   }
   ```
+
+  ### Snapshot Field Reference
+  | Field | Type | Description |
+  | --- | --- | --- |
+  | `stats` | `HubStats` | Same summary metrics object returned by `/api/v1/admin/ws/stats` |
+  | `channels[].channel` | `string` | Active generic room/channel name |
+  | `channels[].subscribers` | `int` | Number of active connections subscribed to this channel |
+  | `connections[].conn_id` | `string` | Unique UUID of the WebSocket connection |
+  | `connections[].user_id` | `int64` | Authenticated user ID (`0` if anonymous) |
+  | `connections[].role` | `string` | User role from JWT (`USER` / `ADMIN`, omitted if empty) |
+  | `connections[].remote_addr` | `string` | Client TCP remote address seen by the server |
+  | `connections[].channels` | `string[]` | Sorted list of generic channels subscribed by this connection |
+  | `connections[].send_queue_len` | `int` | Current number of outbound messages waiting in buffer |
+  | `connections[].send_queue_cap` | `int` | Configured buffer capacity (`WS_SEND_BUFFER_SIZE`) |
+  | `connections[].connected_at` | `RFC3339` | UTC timestamp when handshake completed |
+  | `connections[].last_activity_at` | `RFC3339` | UTC timestamp of last read, write, or ping activity |
+  | `truncated` | `bool` | `true` if matching connections exceeded `limit` |
 
   ## Errors
   * `400 Bad Request` — Invalid `user_id` or `limit` query parameter (must be positive integers)

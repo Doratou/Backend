@@ -1,0 +1,60 @@
+meta {
+  name: 05. Optional Room - Subscribe (Infra)
+  type: ws
+  seq: 5
+}
+
+ws {
+  url: {{wsBaseUrl}}/api/v1/ws?token={{token}}
+  body: ws
+  auth: none
+}
+
+params:query {
+  token: {{token}}
+}
+
+body:ws {
+  name: ws.subscribe
+  content: '''
+    {
+      "id": "sub-1",
+      "event": "ws.subscribe",
+      "channel": "{{wsChannel}}"
+    }
+  '''
+}
+
+docs {
+  # Optional Room — Subscribe (Infrastructure Control)
+
+  **Protocol:** `WebSocket` (`ws://` / `wss://`)
+  **Endpoint:** `/api/v1/ws?token=<access_token>`
+  **Auth:** Required (`token` query parameter or `Authorization: Bearer`)
+
+  > **Important:** You do **NOT** need to call `ws.subscribe` to receive personal or group notifications (`group:<id>`). Domain notifications are routed automatically by the backend based on PostgreSQL group membership.
+  > This control event is only for optional generic room/topic subscriptions at the transport layer.
+
+  ## Request Frame
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `string` | No | Optional correlation ID echoed in `ws.subscribed` |
+  | `event` | `string` | Yes | Must be `"ws.subscribe"` |
+  | `channel` | `string` | Yes | Non-empty generic room/channel identifier (e.g. `room:test`) |
+
+  ## Expected Server Response
+  ```json
+  {
+    "id": "sub-1",
+    "event": "ws.subscribed",
+    "channel": "room:test",
+    "data": {
+      "channel": "room:test"
+    },
+    "timestamp": "2026-11-26T10:30:10Z"
+  }
+  ```
+
+  ## Errors
+  * `ws.error` (`code: "SUBSCRIBE_FAILED"`) — Empty or invalid `channel` name
+}
