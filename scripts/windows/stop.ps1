@@ -20,7 +20,7 @@ if (Test-Path $pidFile) {
 }
 
 # Stop worker processes if running
-foreach ($w in @('email', 'sms', 'ws')) {
+foreach ($w in @('email', 'sms')) {
     $wPidFile = Join-Path $RunDir "worker-$w.pid"
     if (Test-Path $wPidFile) {
         $wProcId = [int](Get-Content $wPidFile)

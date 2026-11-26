@@ -19,7 +19,7 @@ else
 fi
 
 # Stop worker processes if running
-for w in email sms ws; do
+for w in email sms; do
   w_pid_file="$RUN_DIR/worker-$w.pid"
   if [ -f "$w_pid_file" ]; then
     w_pid="$(cat "$w_pid_file")"

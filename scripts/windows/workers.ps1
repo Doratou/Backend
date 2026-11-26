@@ -3,10 +3,10 @@
 $RunDir = Get-RunDir
 New-Item -ItemType Directory -Force $RunDir | Out-Null
 
-$workers = @('email', 'sms', 'ws')
+$workers = @('email', 'sms')
 $processes = @()
 
-Write-Host "Building Doratou notification workers (email, sms, ws)..." -ForegroundColor Cyan
+Write-Host "Building Doratou notification workers (email, sms)..." -ForegroundColor Cyan
 foreach ($w in $workers) {
     $exe = Join-Path $RunDir "worker-$w.exe"
     Invoke-Checked 'go' @('build', '-o', $exe, "./cmd/worker/$w")
