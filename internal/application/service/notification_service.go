@@ -235,9 +235,6 @@ func (s *notificationService) GetNotificationByID(ctx context.Context, userID, i
 		return nil, exception.ErrNotificationNotFound
 	}
 
-	lastReadID, _ := s.repo.GetLastReadID(ctx, userID)
-	notif.IsRead = notif.ID <= lastReadID
-
 	return &dto.NotificationResponse{
 		ID:          notif.ID,
 		RecipientID: notif.RecipientID,
