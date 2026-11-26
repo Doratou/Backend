@@ -67,6 +67,7 @@ type WSConst struct {
 	DefaultShutdownTimeout    time.Duration
 	DefaultMaxConnsPerUser    int
 	DefaultSlowConsumerPolicy string
+	DefaultPubSubChannel      string
 }
 
 func NewConstant() *Constant {
@@ -118,6 +119,7 @@ func NewConstant() *Constant {
 			DefaultShutdownTimeout:    5 * time.Second,
 			DefaultMaxConnsPerUser:    0,
 			DefaultSlowConsumerPolicy: "disconnect",
+			DefaultPubSubChannel:      "doratou:ws:events",
 		},
 	}
 }

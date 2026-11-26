@@ -44,6 +44,7 @@ type WSConfig struct {
 	ShutdownTimeout    time.Duration `mapstructure:"WS_SHUTDOWN_TIMEOUT"`
 	MaxConnsPerUser    int           `mapstructure:"WS_MAX_CONNS_PER_USER"`
 	SlowConsumerPolicy string        `mapstructure:"WS_SLOW_CONSUMER_POLICY"`
+	PubSubChannel      string        `mapstructure:"WS_PUBSUB_CHANNEL"`
 }
 
 type NotificationConfig struct {
@@ -56,7 +57,6 @@ type NotificationConfig struct {
 type QueueTTLConfig struct {
 	EmailQueueTTL time.Duration `mapstructure:"EMAIL_QUEUE_TTL"`
 	SMSQueueTTL   time.Duration `mapstructure:"SMS_QUEUE_TTL"`
-	WSQueueTTL    time.Duration `mapstructure:"WS_QUEUE_TTL"`
 	DLQMessageTTL time.Duration `mapstructure:"DLQ_MESSAGE_TTL"`
 }
 
@@ -70,11 +70,6 @@ type WorkerConfig struct {
 	SMSPrefetch    int           `mapstructure:"SMS_WORKER_PREFETCH"`
 	SMSMaxRetries  int           `mapstructure:"SMS_WORKER_MAX_RETRIES"`
 	SMSRetryDelay  time.Duration `mapstructure:"SMS_WORKER_RETRY_DELAY"`
-
-	WSConcurrency int           `mapstructure:"WS_WORKER_CONCURRENCY"`
-	WSPrefetch    int           `mapstructure:"WS_WORKER_PREFETCH"`
-	WSMaxRetries  int           `mapstructure:"WS_WORKER_MAX_RETRIES"`
-	WSRetryDelay  time.Duration `mapstructure:"WS_WORKER_RETRY_DELAY"`
 }
 type OAuthConfig struct {
 	Protcol string `mapstructure:"OAUTH_PROTCOL"`
