@@ -1,0 +1,226 @@
+meta {
+  name: 01. List Expense Shares I Owe
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{settlementGroupId}}/reports/expenses/owed-by-me
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Expense Shares I Owe
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/reports/expenses/owed-by-me`
+  **Auth:** Bearer access token
+
+  ## Description
+
+  Lists one positive share assigned to the caller for each expense paid by another member. The caller is determined from the token. Use `counterparty` for the expense payer. Several expenses between the same two people produce several items with separate titles and amounts.
+
+  The example shows three shares Ali owes on expenses originally paid by Reza. These are recorded expense amounts. Approved payments affect the current settlement plan while the recorded expense rows stay visible. Expense edits and soft deletion are reflected. When Reza leaves, the same rows label his membership with `is_former_member: true`.
+
+  Every report requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group with no departure timestamp. Group owners and system admins need active membership too. All example IDs are illustrative.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `group_status` | `ACTIVE`, `SETTLING`, `CLOSED` | All three states allow reports to be read. |
+  | `currency` | `TOMAN` | All amount fields are expressed in integer toman. |
+
+  Status values are uppercase and case-sensitive. Member flags and permission flags are JSON booleans.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
+
+  ### Path parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Group ID in the range 1 to 9223372036854775807. Bruno variable `settlementGroupId`. |
+
+  ### Query parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Defaults to 1. Minimum 1. |
+  | `limit` | `integer` | No | Defaults to 20. From 1 to 100. |
+
+  Omitted or empty page/limit use their defaults. Explicit zero, negative values, malformed integers, limit above 100 or an overflowing offset return BAD_REQUEST. Rows are ordered by occurred_at descending with nulls last, then expense ID descending and share ID ascending.
+
+  ### Body
+
+  Send this request without a body.
+
+  ### Example request
+
+  `GET /api/v1/groups/10/reports/expenses/owed-by-me?page=1&limit=20`
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "group_id": 10,
+      "group_status": "ACTIVE",
+      "viewer_member_id": 30,
+      "currency": "TOMAN",
+      "items": [
+        {
+          "from_member_id": 30,
+          "to_member_id": 31,
+          "amount_toman": 20000,
+          "share_id": 143,
+          "expense_id": 43,
+          "expense_title": "Shopping",
+          "occurred_at": "2026-11-20T12:00:00Z",
+          "counterparty": {
+            "member_id": 31,
+            "user_id": 131,
+            "name": "Reza",
+            "avatar_url": null,
+            "is_former_member": false
+          }
+        },
+        {
+          "from_member_id": 30,
+          "to_member_id": 31,
+          "amount_toman": 60000,
+          "share_id": 142,
+          "expense_id": 42,
+          "expense_title": "Taxi",
+          "occurred_at": "2026-11-20T11:00:00Z",
+          "counterparty": {
+            "member_id": 31,
+            "user_id": 131,
+            "name": "Reza",
+            "avatar_url": null,
+            "is_former_member": false
+          }
+        },
+        {
+          "from_member_id": 30,
+          "to_member_id": 31,
+          "amount_toman": 120000,
+          "share_id": 141,
+          "expense_id": 41,
+          "expense_title": "Dinner",
+          "occurred_at": "2026-11-20T10:00:00Z",
+          "counterparty": {
+            "member_id": 31,
+            "user_id": 131,
+            "name": "Reza",
+            "avatar_url": null,
+            "is_former_member": false
+          }
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 3
+      }
+    }
+  }
+  ```
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `group_id` | Integer. Group addressed by groupID. |
+  | `viewer_member_id` | Integer. Membership ID derived from the access token. Use to highlight the current member. |
+  | `group_status` | Current group lifecycle enum. |
+  | `currency` | Fixed string TOMAN. Amount fields ending in _toman are integer toman. |
+  | `items[]` | One row per positive share for the selected direction. |
+  | `from_member_id` | Integer. Equals viewer_member_id. |
+  | `to_member_id` | Integer. The member who paid for the expense. |
+  | `amount_toman` | Positive integer. Recorded expense share in toman. |
+  | `share_id` | Integer. ID of the individual expense share. Use as the stable key for distinct rows or parallel edges. |
+  | `expense_id` | Integer. Source expense ID. Use `GET /api/v1/groups/:groupID/expenses/:expenseID` to open expense details. |
+  | `expense_title` | String. Current title of this expense, useful as the reason shown beside the amount. |
+  | `occurred_at` | RFC 3339 expense occurrence timestamp or null. The timestamp can include a UTC offset. |
+  | `counterparty` | The expense payer's member profile. |
+  | `pagination.page` | Effective page number. |
+  | `pagination.limit` | Effective page size. |
+  | `pagination.total` | Number of matching shares before pagination. Parallel shares for the same member count separately. |
+
+  ### Member profile fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `member_id` | Integer. ID of this group membership. Match this ID when connecting nodes or creating a settlement. |
+  | `user_id` | Integer. Account ID for the user profile API. |
+  | `name` | String. Current display name. |
+  | `avatar_url` | Temporary URL or null. Missing or inaccessible avatars and storage signing failures produce null. Render a fallback for null and refetch if the URL expires. |
+  | `is_former_member` | JSON boolean. True for an inactive membership or a membership with a departure timestamp. |
+
+  ### Empty result
+
+  A page past the end returns an empty items array. The matching total remains positive in this example.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "group_id": 10,
+      "viewer_member_id": 30,
+      "group_status": "ACTIVE",
+      "currency": "TOMAN",
+      "items": [],
+      "pagination": {
+        "page": 4,
+        "limit": 1,
+        "total": 3
+      }
+    }
+  }
+  ```
+
+  ## Frontend use
+
+  Use this endpoint for itemized expense shares assigned to the caller. For full expense records, use `GET /api/v1/groups/:groupID/expenses?scope=owed_by_me`. For the amount currently suggested for payment, use Get My Settlement Plan.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID, page, limit, or overflowing pagination offset. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not supply a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, is a refresh token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is inactive. |
+  | 403 | `FINANCIAL_REPORT_FORBIDDEN` | `only active group members can access financial reports` | The caller lacks active membership in the addressed group. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or token-blacklist operation failed. |
+
+  Internal causes stay server-side. The error response contains success=false, code and error.
+
+  ```json
+  {
+    "success": false,
+    "code": "FINANCIAL_REPORT_FORBIDDEN",
+    "error": "only active group members can access financial reports"
+  }
+  ```
+}

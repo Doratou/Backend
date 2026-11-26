@@ -1,0 +1,219 @@
+meta {
+  name: 05. Get My Settlement Plan
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/groups/{{settlementGroupId}}/reports/settlements/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get My Settlement Plan
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/groups/:groupID/reports/settlements/me`
+  **Auth:** Bearer access token
+
+  ## Description
+
+  Returns the signed-in member's portion of the current exact group settlement graph. `outgoing` tells the caller whom to pay. `incoming` tells the caller from whom to receive money. Both arrays use the current proposal and contain member profiles for rendering. With the same `balance_revision` in both responses, each personal transfer matches the group graph.
+
+  For an outgoing row, use `to_member_id` and `amount_toman` to prefill Create Settlement. For a pending receipt, use the existing Settlements list to check approval status. Refresh this report after approval or an expense or membership change.
+
+  Every report requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group with no departure timestamp. Group owners and system admins need active membership too. All example IDs are illustrative.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `group_status` | `ACTIVE`, `SETTLING`, `CLOSED` | All three states allow reports to be read. |
+  | `currency` | `TOMAN` | All amount fields are expressed in integer toman. |
+
+  Status values are uppercase and case-sensitive. Member flags and permission flags are JSON booleans.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
+
+  ### Path parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Group ID in the range 1 to 9223372036854775807. Bruno variable `settlementGroupId`. |
+
+  ### Query parameters
+  This route has no query parameters. It returns the complete incoming and outgoing plan for the caller.
+
+  ### Body
+
+  Send this request without a body.
+
+  ### Example request
+
+  `GET /api/v1/groups/10/reports/settlements/me`
+
+  ## Response
+
+  **`200 OK`**
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "group_id": 10,
+      "group_status": "ACTIVE",
+      "viewer_member_id": 30,
+      "currency": "TOMAN",
+      "balance_revision": "5443d17f5f7794ba30d82b79516f199d9976dc18c0c9ca604f28ef7744bdcb31",
+      "can_register_payments": true,
+      "outgoing": [
+        {
+          "from_member_id": 30,
+          "to_member_id": 32,
+          "amount_toman": 200000,
+          "counterparty": {
+            "member_id": 32,
+            "user_id": 132,
+            "name": "Sara",
+            "avatar_url": null,
+            "is_former_member": false
+          }
+        }
+      ],
+      "incoming": [],
+      "net_amount_toman": -200000,
+      "total_to_pay_toman": 200000,
+      "total_to_receive_toman": 0
+    }
+  }
+  ```
+
+  ### Recipient's view
+
+  With Sara's token, the same transfer appears in incoming. The revision is unchanged because the exact plan is shared.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "group_id": 10,
+      "group_status": "ACTIVE",
+      "viewer_member_id": 32,
+      "currency": "TOMAN",
+      "balance_revision": "5443d17f5f7794ba30d82b79516f199d9976dc18c0c9ca604f28ef7744bdcb31",
+      "can_register_payments": true,
+      "outgoing": [],
+      "incoming": [
+        {
+          "from_member_id": 30,
+          "to_member_id": 32,
+          "amount_toman": 200000,
+          "counterparty": {
+            "member_id": 30,
+            "user_id": 130,
+            "name": "Ali",
+            "avatar_url": null,
+            "is_former_member": false
+          }
+        }
+      ],
+      "net_amount_toman": 200000,
+      "total_to_pay_toman": 0,
+      "total_to_receive_toman": 200000
+    }
+  }
+  ```
+
+  ### Response fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `group_id` | Integer. Group addressed by groupID. |
+  | `viewer_member_id` | Integer. Membership ID derived from the access token. Use to highlight the current member. |
+  | `group_status` | Current group lifecycle enum. |
+  | `currency` | Fixed string TOMAN. Amount fields ending in _toman are integer toman. |
+  | `balance_revision` | Opaque 64-character value derived from active membership IDs and outstanding pairwise obligations. Compare values within the same group. Read the group status separately. |
+  | `can_register_payments` | Boolean. true in ACTIVE and SETTLING, false in CLOSED. Create Settlement still checks the chosen recipient and the caller. |
+  | `outgoing` | Proposed transfers whose sender is viewer_member_id. |
+  | `incoming` | Proposed transfers whose receiver is viewer_member_id. |
+  | `from_member_id` | Integer. Membership ID of the proposed payer. |
+  | `to_member_id` | Integer. Membership ID of the proposed recipient. |
+  | `amount_toman` | Positive integer. Suggested transfer amount in toman. |
+  | `counterparty` | Receiver profile on an outgoing row, sender profile on an incoming row. |
+  | `net_amount_toman` | Signed value, total_to_receive_toman minus total_to_pay_toman. |
+  | `total_to_pay_toman` | Sum of outgoing amounts. |
+  | `total_to_receive_toman` | Sum of incoming amounts. |
+
+  ### Member profile fields
+
+  | Field | Meaning |
+  | --- | --- |
+  | `member_id` | Integer. ID of this group membership. Match this ID when connecting nodes or creating a settlement. |
+  | `user_id` | Integer. Account ID for the user profile API. |
+  | `name` | String. Current display name. |
+  | `avatar_url` | Temporary URL or null. Missing or inaccessible avatars and storage signing failures produce null. Render a fallback for null and refetch if the URL expires. |
+  | `is_former_member` | Always false for current settlement participants. |
+
+  ### Empty result
+
+  Reza gets empty lists and zero totals while Ali's transfer to Sara is still outstanding. The revision matches the group plan.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "group_id": 10,
+      "viewer_member_id": 31,
+      "group_status": "ACTIVE",
+      "currency": "TOMAN",
+      "balance_revision": "5443d17f5f7794ba30d82b79516f199d9976dc18c0c9ca604f28ef7744bdcb31",
+      "can_register_payments": true,
+      "outgoing": [],
+      "incoming": [],
+      "net_amount_toman": 0,
+      "total_to_pay_toman": 0,
+      "total_to_receive_toman": 0
+    }
+  }
+  ```
+
+  ## Frontend use
+
+  Only enable registration for outgoing suggestions when `can_register_payments` is true. The recipient can use `status=PENDING&direction=incoming` on List Settlements to find actual payments awaiting approval. `balance_revision` is a read-only comparison value.
+
+  ## Errors
+
+  | HTTP | code | error | When |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is missing or does not supply a Bearer token. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid, is a refresh token, or has an invalid user ID. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The authenticated account is inactive. |
+  | 403 | `FINANCIAL_REPORT_FORBIDDEN` | `only active group members can access financial reports` | The caller lacks active membership in the addressed group. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller does not exist or has been soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | The group does not exist or has been soft-deleted. |
+  | 422 | `FINANCIAL_AMOUNT_OUT_OF_RANGE` | `financial balance exceeds the supported range` | A balance calculation exceeds the supported signed integer range. |
+  | 503 | `SETTLEMENT_PLAN_TIMEOUT` | `the minimum settlement plan could not be calculated in time` | The exact solver exceeded its two-second optimization budget. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction or token-blacklist operation failed. |
+
+  Internal causes stay server-side. The error response contains success=false, code and error.
+
+  ```json
+  {
+    "success": false,
+    "code": "SETTLEMENT_PLAN_TIMEOUT",
+    "error": "the minimum settlement plan could not be calculated in time"
+  }
+  ```
+}

@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"math/big"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -13,19 +12,21 @@ import (
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
 	"github.com/Doratou/Backend/internal/domain/exception"
+	"github.com/Doratou/Backend/internal/domain/finance"
 	domainDB "github.com/Doratou/Backend/internal/domain/repository/DB"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 )
 
 type settlementService struct {
-	repo  domainDB.SettlementRepository
-	users domainDB.UserRepository
-	trx   database.TrxManager
-	urls  adapter.AttachmentURLResolver
+	repo     domainDB.SettlementRepository
+	balances domainDB.FinancialBalanceRepository
+	users    domainDB.UserRepository
+	trx      database.TrxManager
+	urls     adapter.AttachmentURLResolver
 }
 
-func NewSettlementService(repo domainDB.SettlementRepository, users domainDB.UserRepository, trx database.TrxManager, urls adapter.AttachmentURLResolver) adapter.SettlementService {
-	return &settlementService{repo: repo, users: users, trx: trx, urls: urls}
+func NewSettlementService(repo domainDB.SettlementRepository, balances domainDB.FinancialBalanceRepository, users domainDB.UserRepository, trx database.TrxManager, urls adapter.AttachmentURLResolver) adapter.SettlementService {
+	return &settlementService{repo: repo, balances: balances, users: users, trx: trx, urls: urls}
 }
 
 func (s *settlementService) withGroup(ctx context.Context, userID, groupID int64, write bool, fn func(context.Context, *entity.Group, *entity.GroupMember) error) error {
@@ -40,7 +41,7 @@ func (s *settlementService) withGroup(ctx context.Context, userID, groupID int64
 		if user.Status != enum.UserStatusActive {
 			return exception.ErrUserInactive
 		}
-		group, err := s.repo.FindGroupByID(tx, groupID)
+		group, err := s.repo.FindGroupByID(tx, groupID, write)
 		if err != nil {
 			return err
 		}
@@ -87,22 +88,27 @@ func (s *settlementService) Create(ctx context.Context, userID, groupID int64, r
 		if err := s.validateAttachments(tx, userID, groupID, req.AttachmentIDs); err != nil {
 			return err
 		}
-		debtString, err := s.repo.NetDebt(tx, groupID, member.ID)
+		ledger, err := loadFinancialLedger(tx, s.balances, groupID)
 		if err != nil {
 			return err
 		}
-		debt, ok := new(big.Int).SetString(debtString, 10)
-		if !ok {
-			return exception.ErrInternal
+		positions, err := ledger.Positions()
+		if err != nil {
+			return financialCalculationError(err)
 		}
-		if debt.Sign() < 0 {
-			debt.SetInt64(0)
+		var debt int64
+		for _, position := range positions {
+			if position.MemberID == member.ID {
+				debt = max(0, -position.NetToman)
+				break
+			}
 		}
 		paidAt := time.Now().UTC()
 		if req.PaidAt != nil {
 			paidAt = *req.PaidAt
 		}
-		payment := &entity.Settlement{GroupID: groupID, FromMemberID: member.ID, ToMemberID: req.ToMemberID, AmountToman: req.AmountToman, Status: enum.SettlementStatusPending, Note: req.Note, PaidAt: paidAt}
+		revision := ledger.Revision()
+		payment := &entity.Settlement{GroupID: groupID, FromMemberID: member.ID, ToMemberID: req.ToMemberID, AmountToman: req.AmountToman, Status: enum.SettlementStatusPending, Note: req.Note, PaidAt: paidAt, BalanceRevision: &revision}
 		if err := s.repo.Create(tx, payment); err != nil {
 			return err
 		}
@@ -114,7 +120,7 @@ func (s *settlementService) Create(ctx context.Context, userID, groupID int64, r
 			return err
 		}
 		res = dto.ToSettlementResponse(stored, group, member)
-		if big.NewInt(req.AmountToman).Cmp(debt) > 0 {
+		if req.AmountToman > debt {
 			res.Warnings = append(res.Warnings, dto.SettlementWarning{Code: "PAYMENT_EXCEEDS_CURRENT_DEBT", Message: "payment exceeds your current net debt in this group; registration is allowed"})
 		}
 		return s.resolveURLs(tx, userID, []*entity.Settlement{stored}, []*dto.SettlementResponse{&res})
@@ -180,6 +186,9 @@ func (s *settlementService) Get(ctx context.Context, userID, groupID, id int64) 
 			return exception.ErrSettlementForbidden
 		}
 		res = dto.ToSettlementResponse(payment, group, member)
+		if err := s.addBalanceWarnings(tx, groupID, []*entity.Settlement{payment}, []*dto.SettlementResponse{&res}); err != nil {
+			return err
+		}
 		return s.resolveURLs(tx, userID, []*entity.Settlement{payment}, []*dto.SettlementResponse{&res})
 	})
 	if err != nil {
@@ -212,6 +221,9 @@ func (s *settlementService) List(ctx context.Context, userID, groupID int64, req
 		}
 		for i := range items {
 			ptrs[i] = &items[i]
+		}
+		if err := s.addBalanceWarnings(tx, groupID, payments, ptrs); err != nil {
+			return err
 		}
 		if err := s.resolveURLs(tx, userID, payments, ptrs); err != nil {
 			return err
@@ -265,7 +277,23 @@ func (s *settlementService) Reject(ctx context.Context, userID, groupID, id int6
 func (s *settlementService) respond(ctx context.Context, userID, groupID, id int64, status enum.SettlementStatus) (*dto.SettlementResponse, error) {
 	var res dto.SettlementResponse
 	err := s.withPending(ctx, userID, groupID, id, true, func(tx context.Context, group *entity.Group, member *entity.GroupMember, payment *entity.Settlement) error {
-		if err := s.repo.Respond(tx, groupID, id, status); err != nil {
+		var legs []finance.Transfer
+		var revision string
+		if status == enum.SettlementStatusSuccess {
+			ledger, err := loadFinancialLedger(tx, s.balances, groupID)
+			if err != nil {
+				return err
+			}
+			revision = ledger.Revision()
+			legs, err = ledger.ApplyPayment(finance.Transfer{FromMemberID: payment.FromMemberID, ToMemberID: payment.ToMemberID, AmountToman: payment.AmountToman})
+			if err != nil {
+				return financialCalculationError(err)
+			}
+			if _, err := ledger.Positions(); err != nil {
+				return financialCalculationError(err)
+			}
+		}
+		if err := s.repo.Respond(tx, groupID, id, status, legs); err != nil {
 			return err
 		}
 		stored, err := s.repo.FindByID(tx, groupID, id, false)
@@ -273,6 +301,9 @@ func (s *settlementService) respond(ctx context.Context, userID, groupID, id int
 			return err
 		}
 		res = dto.ToSettlementResponse(stored, group, member)
+		if revision != "" {
+			addBalanceWarning(payment, revision, &res)
+		}
 		return s.resolveURLs(tx, userID, []*entity.Settlement{stored}, []*dto.SettlementResponse{&res})
 	})
 	if err != nil {
@@ -285,6 +316,33 @@ func (s *settlementService) Delete(ctx context.Context, userID, groupID, id int6
 	return s.withPending(ctx, userID, groupID, id, false, func(tx context.Context, _ *entity.Group, _ *entity.GroupMember, _ *entity.Settlement) error {
 		return s.repo.DeletePending(tx, groupID, id)
 	})
+}
+
+func (s *settlementService) addBalanceWarnings(ctx context.Context, groupID int64, payments []*entity.Settlement, responses []*dto.SettlementResponse) error {
+	var revision string
+	for i, payment := range payments {
+		if payment.Status != enum.SettlementStatusPending || payment.BalanceRevision == nil {
+			continue
+		}
+		if revision == "" {
+			ledger, err := loadFinancialLedger(ctx, s.balances, groupID)
+			if err != nil {
+				return err
+			}
+			revision = ledger.Revision()
+		}
+		addBalanceWarning(payment, revision, responses[i])
+	}
+	return nil
+}
+
+func addBalanceWarning(payment *entity.Settlement, revision string, response *dto.SettlementResponse) {
+	if payment.BalanceRevision != nil && *payment.BalanceRevision != revision {
+		response.Warnings = append(response.Warnings, dto.SettlementWarning{
+			Code:    "SETTLEMENT_BALANCE_CHANGED",
+			Message: "the group balance or membership changed after this payment was registered",
+		})
+	}
 }
 
 func (s *settlementService) resolveURLs(ctx context.Context, userID int64, payments []*entity.Settlement, responses []*dto.SettlementResponse) error {

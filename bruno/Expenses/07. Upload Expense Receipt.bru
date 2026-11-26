@@ -22,73 +22,129 @@ body:multipart-form {
 }
 
 docs {
-  # 07. Upload Expense Receipt
+  # Upload Expense Receipt
 
-  **Method:** `POST`
-  **Endpoint:** `/api/v1/attachments/upload`
-  **Auth:** Required (Bearer token)
+  - **Method** `POST`
+  - **Endpoint** `/api/v1/attachments/upload`
+  - **Auth** Bearer access token
 
   ## Description
 
-  Uploads a receipt before creating/updating an expense. Select a file in Body; do not enter a file path belonging to another computer. Bruno sets the multipart boundary automatically. Repeat for additional photos. No response script changes expense variables.
+  Uploads one private file for an active caller and returns the attachment ID. Add `data.id` to `attachment_ids` in Create Expense or an authorized PUT/PATCH of an existing expense. Before linking, access belongs to the uploader. Bruno prompts for a local file when you open the multipart form.
+
+  The server detects MIME from the bytes. It accepts detected `image/*` or `application/pdf`, with a limit of 10 MiB (10,485,760 bytes). If you include `group_id`, the caller must be an active member and the group must be `ACTIVE`. Omit the field entirely for a staged receipt without group context.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `type` | `EXPENSE_RECEIPT` | Receipt category to use with this request. |
+  | `group status when group_id is supplied` | `ACTIVE` | Accepted group lifecycle states. |
 
   ## Request
 
-  | Form field | Type | Required | Description |
+  ### Headers
+  | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | file | file | Yes | Image or PDF, up to 10 MiB (10485760 bytes); actual MIME and size are checked. |
-  | type | string enum | Yes | EXPENSE_RECEIPT for this workflow, uppercase. |
-  | group_id | integer | No | Target group ID; if supplied, must be an active group with active caller membership. The prepared request uses expenseGroupId. |
-  | is_public | boolean | No | Always forced false for EXPENSE_RECEIPT, even if true is submitted. |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
+  | `Content-Type` | `string` | Yes | `multipart/form-data`. Let the HTTP client add the boundary. |
 
-  Do not send expense_id for receipts; it returns 400 BAD_REQUEST. The upload remains unbound and accessible only to its uploader. Copy data.id into expenseAttachmentIds, for example [1201], then Create Expense with attachment_ids or PATCH the existing expense with {"attachment_ids":[1201]}. Binding requires an active group and active creator/owner permissions. A receipt already attached elsewhere cannot be reused.
+  ### Path parameters
+  This endpoint has no path parameters.
 
-  Presigned upload is also supported by the existing Attachments requests: request URL, PUT the file to upload_url, then confirm with the exact object_key from that user response. Receipt object keys are scoped to the uploading user; do not invent or share keys. Presigned uploads also omit expense_id and are private.
+  ### Query parameters
+  This endpoint has no query parameters.
+
+  ### Body
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `file` | `file` | Yes | One non-empty image or PDF, up to 10 MiB. |
+  | `type` | `string` | Yes | Send `EXPENSE_RECEIPT`. |
+  | `group_id` | `integer` | No | Group for optional membership and lifecycle validation. This Bruno request uses `expenseGroupId`. |
+  | `is_public` | `boolean` | No | The server always stores receipts as private. |
+  | `expense_id / settlement_id` | `integer` | Omit | Link the file when saving its expense or payment. Supplying either ID returns `BAD_REQUEST`. |
+
+  Example multipart fields with a PDF selected in the `file` control.
+
+  ```text
+  file      receipt.pdf
+  type      EXPENSE_RECEIPT
+  group_id  10
+  is_public false
+  ```
 
   ## Response
 
-  **201 Created**. Example: PNG uploaded by user 3 for group 10; IDs, filename, MIME, hash, dimensions, object_key and timestamps vary. Null optional upload metadata is omitted, so expense_id is absent until linked. uploaded_by_user_id is a USER ID; it is not the member_id used for splitting. URL signatures and hashes below are illustrative.
+  **`201 Created`**
 
   ```json
   {
     "success": true,
     "data": {
       "id": 1201,
-      "uploaded_by_user_id": 3,
+      "uploaded_by_user_id": 130,
       "group_id": 10,
       "type": "EXPENSE_RECEIPT",
-      "original_filename": "receipt.png",
-      "object_key": "attachments/expense_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.png",
-      "mime_type": "image/png",
-      "file_size_bytes": 68,
-      "file_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "width": 1,
-      "height": 1,
+      "original_filename": "receipt.pdf",
+      "object_key": "attachments/expense_receipt/130/2026/11/example_receipt.pdf",
+      "mime_type": "application/pdf",
+      "file_size_bytes": 28413,
+      "file_hash": "14eaf9d8d862296aae97f8fd2963967b0c0f02553bc515ea28fa337ab78e7fb8",
       "is_public": false,
-      "access_url": "https://storage.example.com/doratou-storage/attachments/expense_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.png?X-Amz-Signature=example",
-      "uploaded_at": "2026-11-16T10:00:00Z",
-      "created_at": "2026-11-16T10:00:00Z",
-      "updated_at": "2026-11-16T10:00:00Z"
+      "access_url": "https://storage.example.com/signed/receipt.pdf",
+      "uploaded_at": "2026-11-20T09:15:00Z",
+      "created_at": "2026-11-20T09:15:00Z",
+      "updated_at": "2026-11-20T09:15:00Z"
     }
   }
   ```
 
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `integer` | Receipt ID to place in `attachment_ids`. |
+  | `uploaded_by_user_id` | `integer` | Authenticated uploader's user ID. |
+  | `group_id` | `integer (optional)` | Returned when supplied. |
+  | `type` | `string` | Receipt type. |
+  | `original_filename` | `string` | Original filename from the uploading client. |
+  | `object_key` | `string` | Storage identifier. Use the attachment ID for API operations. |
+  | `mime_type` | `string` | MIME type detected from the content. |
+  | `file_size_bytes` | `integer` | Number of bytes received. |
+  | `file_hash` | `string` | SHA-256 hex digest of the uploaded bytes. |
+  | `width / height` | `integer (optional)` | Image dimensions when the server can decode them. Omitted for PDFs. |
+  | `is_public` | `boolean` | Always false for receipts. |
+  | `access_url` | `string` | Temporary download URL. Can be an empty string if signing fails after upload. |
+  | `uploaded_at / created_at / updated_at` | `RFC 3339 timestamp` | Upload, record creation and last change. |
+
+  An unlinked receipt response omits `expense_id`. The example URL is illustrative.
+
   ## Errors
 
-  | HTTP | code | error | When |
+  | HTTP | code | error | When it happens |
   | --- | --- | --- | --- |
-  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Missing file, invalid form, or expense_id supplied for EXPENSE_RECEIPT. |
-  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | Unsupported receipt format. |
-  | 400 | `GROUP_INVALID_STATUS` | `status must be ACTIVE, SETTLING or CLOSED` | The supplied group is `SETTLING` or `CLOSED`; uploading a new expense receipt requires an `ACTIVE` group. |
-  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Bearer token. |
-  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid token. |
-  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Expired token. |
-  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Revoked token. |
-  | 403 | `USER_INACTIVE` | `user account is deactivated` | Uploader account inactive. |
-  | 403 | `GROUP_FORBIDDEN` | `you do not have permission to access this group` | Uploader is not an active member of the supplied group. |
-  | 404 | `GROUP_NOT_FOUND` | `group not found` | Supplied group does not exist. |
-  | 404 | `USER_NOT_FOUND` | `user not found` | Uploader no longer exists. |
-  | 413 | `FILE_TOO_LARGE` | `file size exceeds maximum allowed limit` | Receipt exceeds 10 MiB. |
-  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or unexpected internal failure. |
-  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Storage upload failed. |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid multipart data, missing or unreadable file, zero bytes, invalid form value or supplied expense_id/settlement_id. |
+  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | Unrecognized type or detected bytes are outside the supported image/PDF types. |
+  | 400 | `GROUP_INVALID_STATUS` | `status must be ACTIVE, SETTLING or CLOSED` | The supplied group is outside the allowed upload states for this receipt. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Authorization header or invalid Bearer header format. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid access token, including use of a refresh token in its place. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. Refresh it or sign in again. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Caller account is inactive. |
+  | 403 | `GROUP_FORBIDDEN` | `you do not have permission to access this group` | The uploader lacks active membership in the supplied group. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Caller account is missing or soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group is missing or soft-deleted. |
+  | 413 | `FILE_TOO_LARGE` | `file size exceeds maximum allowed limit` | File exceeds 10 MiB. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, transaction or token verification dependency failed. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Writing the file to storage failed. |
+
+  ### `413 FILE_TOO_LARGE` example
+
+  ```json
+  {
+    "success": false,
+    "code": "FILE_TOO_LARGE",
+    "error": "file size exceeds maximum allowed limit"
+  }
+  ```
 }

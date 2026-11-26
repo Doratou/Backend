@@ -1,0 +1,58 @@
+meta {
+  name: Financial Reports
+  seq: 17
+}
+
+docs {
+  # Financial Reports
+
+  Apply `go run ./cmd/migrate up` before starting this version. The migration `20261126000000_record_settlement_balance_effects.sql` stores new settlement effects and captures the available data for reconstructing previous approved payments.
+
+  ## Routes
+
+  All routes use GET and start with `/api/v1/groups/:groupID/reports`.
+
+  | Route | Use |
+  | --- | --- |
+  | `/expenses/owed-by-me` | List Expense Shares I Owe |
+  | `/expenses/owed-to-me` | List Expense Shares Owed to Me |
+  | `/expenses/graph` | Get Raw Expense Graph |
+  | `/settlements/graph` | Get Minimum Settlement Graph |
+  | `/settlements/me` | Get My Settlement Plan |
+
+  ## Access and group lifecycle
+
+  Every report requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group with no departure timestamp. Group owners and system admins need active membership too. All example IDs are illustrative. Set `settlementGroupId` manually in the selected Bruno environment. Login and Refresh handle the token as usual.
+
+  | Group status | View reports | Register a settlement |
+  | --- | --- | --- |
+  | `ACTIVE` | Yes | Available under the settlement rules. |
+  | `SETTLING` | Yes | Available under the settlement rules. |
+  | `CLOSED` | Yes | Disabled. |
+
+  Amounts are integer toman. Use membership IDs for graph arrows and settlement recipients. An account's user ID is used for profile endpoints.
+
+  ## Expense shares and current settlement
+
+  The two expense lists and raw graph use the currently saved non-deleted expense versions. Each positive share owed to another member is a separate row or edge. Use share_id as the key and expense_title for the reason displayed to the user. The raw graph includes former memberships with is_former_member=true. Payment approval leaves those expense shares visible. Edits and deletions update the reports.
+
+  For the current settlement plan, only active memberships contribute open obligations. Approved payments post their balance effects. Pending, rejected and canceled payments leave the plan unchanged. After a member departs, obligations and adjustments involving that membership are excluded from the active plan. Confirmed adjustments between remaining active memberships continue to apply. Rejoining restores eligibility for recorded open positions under that membership. A pending receipt to a departing recipient is canceled. An active recipient can still answer a receipt registered by a departing sender.
+
+  The group graph returns the exact minimum number of proposed transfers. The personal endpoint filters that same plan to the viewer's incoming and outgoing transfers. Compare their `balance_revision` values before rendering them together. The revision tracks active memberships and outstanding pairwise obligations. Read `group_status` and `can_register_payments` separately. Keep the revision as read-only state. The optimizer uses a two-second calculation budget and can return 503 SETTLEMENT_PLAN_TIMEOUT.
+
+  ## Frontend flow
+
+  1. Use the two expense lists for original shares. Render counterparty information and the title for each row. Use page and limit to paginate.
+  2. Render the raw graph by member ID. Use share_id to distinguish parallel arrows. Show the former-member label using is_former_member.
+  3. Render suggested payments from the settlement graph or the personal plan. Pass an outgoing row's to_member_id and amount_toman to Create Settlement. Disable registration when can_register_payments is false.
+  4. Refresh Get Settlement before approving a pending receipt. Display SETTLEMENT_BALANCE_CHANGED when present in warnings. Refresh the plan after confirmation, membership changes, expense edits or expense deletion.
+
+  ## Manual Bruno test
+
+  1. In an active group, Reza creates three expenses with shares of 120,000, 60,000 and 20,000 toman for Ali. Sara creates a 200,000 toman share for Reza. Use the same group ID across all requests.
+  2. As Ali, List Expense Shares I Owe shows three distinct expense titles and a total of three rows. As Reza, List Expense Shares Owed to Me shows the same three shares. The raw graph has four arrows, three from Ali to Reza.
+  3. The settlement graph proposes one 200,000 toman transfer from Ali to Sara. With Ali's token, the personal plan has one outgoing row. With Sara's token it has one incoming row at the same revision.
+  4. Register the transfer and check that the pending receipt leaves the plan unchanged. Confirm as Sara. The settlement graph has no edges and the raw graph still has four.
+  5. Have Reza leave. His node stays in the raw graph with is_former_member=true, and the group remains settled. In a fresh copy of the group, have Reza leave before the payment and check that his open chain drops out of the settlement graph.
+  6. Check pagination, a user outside the group, and a closed group. Each request includes success, empty-result and error examples.
+}

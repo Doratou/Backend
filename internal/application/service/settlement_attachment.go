@@ -81,7 +81,7 @@ func (s *attachmentService) validateSettlementReceiptAccess(ctx context.Context,
 	if attachment.GroupID == nil || *attachment.GroupID != groupID {
 		return exception.ErrAttachmentForbidden
 	}
-	if _, err = s.settlementRepo.FindGroupByID(ctx, groupID); err != nil {
+	if _, err = s.settlementRepo.FindGroupByID(ctx, groupID, false); err != nil {
 		return err
 	}
 	member, err := s.settlementRepo.FindMemberByUserID(ctx, groupID, userID)

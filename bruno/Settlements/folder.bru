@@ -7,7 +7,7 @@ docs {
   # Settlements
 
 
-  All routes require Bearer authentication, an ACTIVE account and ACTIVE membership with left_at=null. Membership IDs belong to this group; user IDs are not interchangeable with them. An owner or site ADMIN has no special payment permissions.
+  Payment routes require a Bearer access token, an active account and active membership with no departure timestamp. Use group membership IDs as sender and recipient identifiers. The recipient-picker request uses the group member route and also allows site admins. For receipt upload, supplying `group_id` requires active membership and a writable group.
 
   Group status enum: `ACTIVE`, `SETTLING`, `CLOSED`. Both ACTIVE and SETTLING allow settlement writes; CLOSED allows reads only. Expenses, polls and draws remain frozen whenever the group is not ACTIVE.
 
@@ -15,7 +15,7 @@ docs {
 
   Payments cannot be edited. Only the active sender may soft-delete PENDING. Only the active recipient may confirm/reject PENDING. Confirmation records a successful external payment; this endpoint does not perform a bank transfer. Rejection/cancellation never count as successful payments. Owner/admin cannot override either party.
 
-  A sender who leaves loses access; their existing PENDING payment remains answerable by its active recipient. If the recipient leaves/is removed before responding, incoming PENDING payments become `CANCELED` and record `canceled_at` in the same transaction. Rejoining does not revive them. Former-member financial relationships are outside the active-member balance calculation; history remains stored. `is_external` is true when either party currently has inactive membership/left_at. Membership status values remain ACTIVE/INACTIVE.
+  A sender who leaves loses access; their existing PENDING payment remains answerable by its active recipient. If the recipient leaves/is removed before responding, incoming PENDING payments become `CANCELED` and record `canceled_at` in the same transaction. Rejoining does not revive them. Raw expense reports retain former-member relationships. The current balance excludes pairwise obligations involving an inactive membership. Adjustments posted between memberships that are still active remain in the balance. `is_external` is true when either party currently has inactive membership/left_at. Membership status values remain ACTIVE/INACTIVE.
 
   IDs are manual environment variables. No response script sets or overwrites settlement IDs. Set settlementGroupId, settlementToMemberId (from Get Group Members), settlementId, and settlementAttachmentIds yourself. Auth login/refresh keeps its existing token behavior.
 
@@ -30,6 +30,10 @@ docs {
   6. Try a sender leaving after Create: B can still confirm. Try recipient leaving/removal: payment becomes `CANCELED` with `canceled_at` set and stays canceled if B rejoins.
   7. Move group ACTIVE -> SETTLING: settlement writes still work, expense/poll/draw writes stop. Resolve all pending payments, then move SETTLING -> CLOSED: all settlement writes stop. Reopening is not supported by this workflow.
 
+  ## List filters
+
+  Use `status=PENDING&direction=incoming` to find payments to approve, and `status=PENDING&direction=outgoing` to track payments you sent. Use `status=SUCCESS` for confirmed history, optionally with `direction=incoming` or `direction=outgoing`. The request documentation shows all accepted enum values and how pagination interacts with visibility.
+
   ## Receipt privacy
 
   SETTLEMENT_RECEIPT is always private. Metadata, streaming download, signed URL batches, ZIP downloads and group attachment lists enforce the same visibility. Linking happens only through Create Settlement; do not send settlement_id or expense_id when uploading/confirming a receipt. Once linked, direct deletion is blocked with 409 SETTLEMENT_RECEIPT_LOCKED, including for its uploader/owner. Delete a pending payment first to detach its files.
@@ -42,5 +46,5 @@ docs {
 
   ## Scope
 
-  This feature records external payments and decisions. It does not send money, charge wallets, schedule notifications or expose debt graph/report endpoints. Current balances are calculated only for the creation warning. Final SUCCESS records remain the source for future balance/report calculations.
+  This feature records external payments and decisions. A SUCCESS payment records its effect on the balance at confirmation. Use the Financial Reports folder for raw shares, the raw graph, and the exact minimum settlement graph and personal plan. A PENDING payment registered against an earlier balance can include `SETTLEMENT_BALANCE_CHANGED` in its warnings. Refresh payment details before confirmation. Confirmation applies an actual payment to the current ledger and remains available to the active receiver.
 }

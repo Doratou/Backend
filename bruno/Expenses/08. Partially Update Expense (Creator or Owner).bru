@@ -25,31 +25,70 @@ body:json {
 }
 
 docs {
-  # 08. Partially Update Expense (Creator or Owner)
+  # Partially Update Expense (Creator or Owner)
 
-  **Method:** `PATCH`
-  **Endpoint:** `/api/v1/groups/:groupID/expenses/:expenseID`
-  **Auth:** Required (Bearer token)
+  - **Method** `PATCH`
+  - **Endpoint** `/api/v1/groups/:groupID/expenses/:expenseID`
+  - **Auth** Bearer access token
 
   ## Description
 
-  Changes only the fields present in the JSON body. Active original creator or current group owner only; SETTLING and CLOSED groups are frozen. Former members have no access, including a former creator. Payer, creator, group and expense_type are immutable. All expense/share/receipt changes are atomic. Concurrent saves serialize; the last applied values win. This endpoint has no optimistic version check.
+  Updates only the supplied fields. The server recomputes and validates the whole allocation, then stores it with any receipt changes in one transaction. An amount-only edit reuses the stored split values. An EXACT edit must supply revised shares if the existing values no longer add up.
+
+  An active original creator or the current group owner can make this request while the group is `ACTIVE`. Ownership changes do not change the recorded payer. Example IDs are illustrative. Use IDs from your own group.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `expense_type` | `NORMAL`, `PREMIUM` | Existing classification. Creation sets NORMAL. |
+  | `split_type` | `EQUAL`, `EXACT`, `PERCENTAGE`, `WEIGHTED` | Case-sensitive allocation mode. |
+  | `group status` | `ACTIVE`, `SETTLING`, `CLOSED` | Only ACTIVE permits expense changes. |
 
   ## Request
 
-  | Field | Type | Behavior |
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
+  | `Content-Type` | `string` | Yes | `application/json`. Keep the body within 1 MiB. |
+
+  ### Path parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive signed 64-bit group ID. Bruno variable `expenseGroupId`. |
+  | `expenseID` | `integer` | Yes | Positive expense ID in the addressed group. Bruno variable `expenseId`. |
+
+  ### Query parameters
+  This endpoint has no query parameters.
+
+  ### Body
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `title` | `string` | No | Replaces the title. Same trimming and 1–200 character rules as create. |
+  | `description` | `string \| null` | No | A string replaces it. null clears it. |
+  | `total_amount_toman` | `integer` | No | Positive whole-toman amount. Existing shares are recalculated unless supplied. |
+  | `split_type` | `string` | No | Use a case-sensitive mode. An actual mode change requires shares in the same request. |
+  | `occurred_at` | `RFC 3339 timestamp` | No | Replace the expense's occurrence date. |
+  | `shares` | `array` | No | A non-empty array replaces all shares. Each entry uses a unique positive member_id and the value rules below. |
+  | `attachment_ids` | `integer[]` | No | The supplied list replaces the set. [] detaches all receipts. An unlinked receipt must belong to the caller. |
+
+  Supply at least one recognized field. Omitted fields preserve their values. `description` is the sole field that accepts JSON null. To add one receipt while retaining others, send the existing IDs plus the new ID.
+
+  ### Split modes
+
+  | split_type | Value for each share | Total rule |
   | --- | --- | --- |
-  | title | string | Trimmed, non-empty, maximum 200 Unicode characters. |
-  | description | string or null | Replace; null clears. |
-  | total_amount_toman | positive integer | Integer TOMAN. Recalculates existing EQUAL/PERCENTAGE/WEIGHTED shares; EXACT values must sum to the new amount. |
-  | split_type | string enum | EQUAL, EXACT, PERCENTAGE, WEIGHTED; uppercase and case-sensitive. Changing the method requires shares in the same request. |
-  | occurred_at | RFC3339 timestamp | Replace expense date. |
-  | shares | array | Replaces the ENTIRE set, not a delta. Unique group member IDs; current or former members accepted. Non-empty. |
-  | attachment_ids | integer array | Complete desired receipt set; [] unlinks all. New receipts must be the editor own unclaimed EXPENSE_RECEIPT uploads, in this group or unscoped. Existing expense receipts may be retained regardless of uploader. |
+  | `EQUAL` | Omit `value`, send null, or send the integer 1. | All shares have equal weight. |
+  | `EXACT` | Non-negative integer toman. | Values must sum to `total_amount_toman`. |
+  | `PERCENTAGE` | A JSON number from 0 through 100, with increments of 0.01. | Values must sum to exactly 100. |
+  | `WEIGHTED` | Positive integer weight. | Share is proportional to weight divided by the sum of weights. |
 
-  Omitted fields remain unchanged. Only description accepts null. An empty body or a body with no recognized editable fields returns 400 BAD_REQUEST. Unknown fields cannot change payer/creator; otherwise the project JSON binder ignores them. shares[].value follows Create Expense: EQUAL absent/null/1, EXACT non-negative integer amounts summing to total, PERCENTAGE numbers with at most two decimal places summing to 100, WEIGHTED positive integers. Number strings and exponent notation for share values are invalid.
+  Send numeric split values as ordinary JSON numbers. The number parser rejects quoted values and exponent notation for `value`. The server floors each proportional share, then assigns remaining toman to the largest fractional remainders, breaking ties by ascending `member_id`. The resulting amounts sum to the expense total.
 
-  ### Update text only
+  ### Request examples
+
+  #### Edit text
 
   ```json
   {
@@ -57,19 +96,7 @@ docs {
   }
   ```
 
-  ### Add or replace receipts
-
-  Upload first with 07. Upload Expense Receipt. This list must contain every receipt to keep; omitting an existing ID detaches it without physically deleting the file.
-
-  ```json
-  {
-    "attachment_ids": [
-      1201
-    ]
-  }
-  ```
-
-  ### Clear description and remove all receipts
+  #### Clear description and detach all receipts
 
   ```json
   {
@@ -78,24 +105,20 @@ docs {
   }
   ```
 
-  ### Change financial allocation
+  #### Change both the mode and the shares
 
   ```json
   {
-    "total_amount_toman": 100,
     "split_type": "PERCENTAGE",
+    "total_amount_toman": 200,
     "shares": [
       {
         "member_id": 30,
-        "value": 50
+        "value": 25
       },
       {
         "member_id": 31,
-        "value": 25
-      },
-      {
-        "member_id": 32,
-        "value": 25
+        "value": 75
       }
     ]
   }
@@ -103,7 +126,7 @@ docs {
 
   ## Response
 
-  **200 OK**. Same structure as Get Expense. This example assumes receipt 1201 was already attached before the description-only PATCH. Existing shares and files stay intact; updated_at is the expense update time. Access URLs expire (15 minutes by default); refetch when needed.
+  **`200 OK`**
 
   ```json
   {
@@ -118,9 +141,9 @@ docs {
       "total_amount_toman": 100,
       "expense_type": "NORMAL",
       "split_type": "EQUAL",
-      "occurred_at": "2026-11-16T10:00:00Z",
-      "created_at": "2026-11-16T10:01:00Z",
-      "updated_at": "2026-11-16T11:00:00Z",
+      "occurred_at": "2026-11-20T10:00:00Z",
+      "created_at": "2026-11-20T10:00:00Z",
+      "updated_at": "2026-11-20T10:05:00Z",
       "is_frozen": false,
       "can_edit": true,
       "can_delete": true,
@@ -142,46 +165,78 @@ docs {
         }
       ],
       "my_share_amount_toman": 34,
-      "attachment_ids": [
-        1201
-      ],
-      "attachments": [
-        {
-          "id": 1201,
-          "original_filename": "receipt.png",
-          "mime_type": "image/png",
-          "file_size_bytes": 68,
-          "access_url": "https://storage.example.com/doratou-storage/attachments/expense_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.png?X-Amz-Signature=example"
-        }
-      ]
+      "attachment_ids": [],
+      "attachments": []
     }
   }
   ```
 
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `integer` | Expense ID, used in expenseID. |
+  | `group_id` | `integer` | Parent group. |
+  | `created_by_member_id` | `integer` | Original creator's group membership ID. |
+  | `paid_by_member_id` | `integer` | Original payer's group membership ID. Equal to created_by_member_id. |
+  | `title` | `string` | Stored display title. |
+  | `description` | `string \| null` | Optional details. Null when absent or cleared. |
+  | `total_amount_toman` | `integer` | Total expense in toman. |
+  | `expense_type` | `string` | Current expense classification. |
+  | `split_type` | `string` | Allocation mode. |
+  | `occurred_at` | `RFC 3339 timestamp \| null` | When the expense occurred. Older rows can have null. |
+  | `created_at` | `RFC 3339 timestamp` | When the expense was registered. |
+  | `updated_at` | `RFC 3339 timestamp` | Last update to the expense record. |
+  | `is_frozen` | `boolean` | True in SETTLING and CLOSED. |
+  | `can_edit` | `boolean` | True for the creator or current owner while ACTIVE. |
+  | `can_delete` | `boolean` | True for the creator or current owner while ACTIVE. |
+  | `shares` | `array` | Saved shares, in ascending member_id order. Legacy expenses can return an empty array. |
+  | `shares[].member_id` | `integer` | Current or former group membership ID. |
+  | `shares[].value` | `number` | Configured split input. A percentage in PERCENTAGE, weight in WEIGHTED, toman in EXACT or 1 in EQUAL. |
+  | `shares[].share_amount_toman` | `integer` | Final allocated whole-toman amount. |
+  | `my_share_amount_toman` | `integer` | The caller's saved share, or 0 when none. Includes the payer's own share when allocated. |
+  | `attachment_ids` | `integer[]` | IDs of attached receipts ordered by ID. |
+  | `attachments` | `array` | Receipt details, ordered by ID. Empty when none. |
+  | `attachments[].id` | `integer` | Attachment ID. |
+  | `attachments[].original_filename` | `string \| null` | Original display filename. |
+  | `attachments[].mime_type` | `string \| null` | Stored MIME type. |
+  | `attachments[].file_size_bytes` | `integer \| null` | Stored length in bytes. |
+  | `attachments[].access_url` | `string \| null` | Signed download URL when available. Refresh the API response for a new URL after expiration. |
+
   ## Errors
 
-  | HTTP | code | error | When |
+  | HTTP | code | error | When it happens |
   | --- | --- | --- | --- |
-  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, pagination, JSON field, positive total amount, required field, title, or timestamp. |
-  | 400 | `EXPENSE_INVALID_SPLIT` | `provide valid split values for the selected split type` | Unknown split type, invalid value, missing non-EQUAL value, percentage precision above two decimal places, or non-positive weight. |
-  | 400 | `EXPENSE_SPLIT_TOTAL_MISMATCH` | `exact shares must sum to total_amount_toman and percentages must sum to 100` | EXACT values do not sum to the expense total or PERCENTAGE values do not sum to exactly 100. |
-  | 400 | `EXPENSE_DUPLICATE_MEMBERS` | `shares must not contain duplicate member IDs` | A member_id appears more than once. |
-  | 400 | `EXPENSE_DUPLICATE_ATTACHMENTS` | `attachment_ids must not contain duplicate IDs` | Repeated receipt IDs. |
-  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | An attachment is not an EXPENSE_RECEIPT. |
-  | 403 | `ATTACHMENT_FORBIDDEN` | `you do not have permission to access or modify this attachment` | Receipt belongs to another expense/group, or an unbound receipt was uploaded by another user. |
-  | 404 | `ATTACHMENT_NOT_FOUND` | `attachment not found` | Receipt ID does not exist or was deleted. |
-  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is absent or does not contain a Bearer token. |
-  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Access token is invalid or malformed. |
-  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |
+  | 400 | `EXPENSE_INVALID_SPLIT` | `provide valid split values for the selected split type` | A share value violates the selected mode, a PATCH supplies no shares with a changed split type, or a PATCH supplies an invalid split type or an empty shares array. |
+  | 400 | `EXPENSE_SPLIT_TOTAL_MISMATCH` | `exact shares must sum to total_amount_toman and percentages must sum to 100` | EXACT amounts do not sum to total_amount_toman or percentages do not sum to 100. |
+  | 400 | `EXPENSE_DUPLICATE_MEMBERS` | `shares must not contain duplicate member IDs` | At least one member_id was supplied more than once. |
+  | 400 | `EXPENSE_DUPLICATE_ATTACHMENTS` | `attachment_ids must not contain duplicate IDs` | The attachment_ids array repeats a receipt ID. |
+  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | A supplied file is not an EXPENSE_RECEIPT attachment. |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid ID, malformed JSON, invalid field type, invalid title/date/amount, or a body that exceeds the 1 MiB JSON limit. An empty patch or null outside description is invalid. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Authorization header or invalid Bearer header format. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid access token, including use of a refresh token in its place. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. Refresh it or sign in again. |
   | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
-  | 403 | `USER_INACTIVE` | `user account is deactivated` | Authenticated account is not ACTIVE. |
-  | 403 | `EXPENSE_FORBIDDEN` | `only active group members can access expenses` | Requester is not an ACTIVE member, or left_at is not null. This also applies to a former expense creator. |
-  | 403 | `EXPENSE_EDITOR_REQUIRED` | `only the expense creator or current group owner can edit or delete this expense` | An active requester is neither this expense creator nor current group owner. |
-  | 404 | `USER_NOT_FOUND` | `user not found` | Authenticated account no longer exists. |
-  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group does not exist or is soft-deleted. |
-  | 404 | `EXPENSE_NOT_FOUND` | `expense not found` | Expense does not exist, is soft-deleted, or belongs to another group. |
-  | 404 | `EXPENSE_PARTICIPANT_NOT_FOUND` | `a selected participant does not belong to this group's current or former members` | An ID is unknown or belongs to another group. |
-  | 409 | `EXPENSE_GROUP_INACTIVE` | `expenses cannot be changed while the group is inactive` | Group is SETTLING or CLOSED; expense creation, updates and deletion are frozen. |
-  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or authentication infrastructure failed; causes remain private. |
-  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt or avatar URL generation failed. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Caller account is inactive. |
+  | 403 | `EXPENSE_FORBIDDEN` | `only active group members can access expenses` | The caller lacks active membership in the group. |
+  | 403 | `EXPENSE_EDITOR_REQUIRED` | `only the expense creator or current group owner can edit or delete this expense` | The caller is neither the original creator nor the current group owner. |
+  | 403 | `ATTACHMENT_FORBIDDEN` | `you do not have permission to access or modify this attachment` | Receipt belongs to another expense or group, or the unlinked receipt was uploaded by another user. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Caller account is missing or soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group is missing or soft-deleted. |
+  | 404 | `EXPENSE_NOT_FOUND` | `expense not found` | The expense is missing, soft-deleted or belongs to a different group. |
+  | 404 | `EXPENSE_PARTICIPANT_NOT_FOUND` | `a selected participant does not belong to this group's current or former members` | A selected membership does not belong to this group. |
+  | 404 | `ATTACHMENT_NOT_FOUND` | `attachment not found` | A supplied receipt is missing or soft-deleted. |
+  | 409 | `EXPENSE_GROUP_INACTIVE` | `expenses cannot be changed while the group is inactive` | The group is SETTLING or CLOSED. Expense writes are frozen. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, transaction or token verification dependency failed. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Required attachment URL signing failed. |
+
+  ### `400 EXPENSE_INVALID_SPLIT` example
+
+  ```json
+  {
+    "success": false,
+    "code": "EXPENSE_INVALID_SPLIT",
+    "error": "provide valid split values for the selected split type"
+  }
+  ```
 }
