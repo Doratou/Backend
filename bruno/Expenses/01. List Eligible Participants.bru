@@ -15,31 +15,51 @@ auth:bearer {
 }
 
 docs {
-  # 01. List Eligible Participants
+  # List Eligible Participants
 
-  **Method:** `GET`
-  **Endpoint:** `/api/v1/groups/:groupID/expenses/participants`
-  **Auth:** Required
+  - **Method** `GET`
+  - **Endpoint** `/api/v1/groups/:groupID/expenses/participants`
+  - **Auth** Bearer access token
 
   ## Description
 
-  Returns EVERY current or former membership of this group, paginated by member_id ascending. Use items[].member_id in shares; user_id is only for profile lookup. A group invitation alone is not membership. A person who never belonged to this group is never eligible. Former members are selectable for shares but cannot themselves access the expense endpoints.
+  Lists current and former group memberships available for expense shares. Copy `member_id` into `shares[].member_id`. The same user can have different membership IDs in different groups. Inactive memberships and records with a departure date stay selectable. The endpoint includes profiles and available avatar URLs.
 
-  All routes require a valid access token, ACTIVE account and ACTIVE membership with left_at=null. A user who left or was removed cannot read, create, edit or delete expenses, even their own. ACTIVE and INACTIVE are the membership status values currently returned by this project; left and removed members remain stored as INACTIVE, normally with left_at set.
+  An active account and active membership with no departure timestamp are required. A site admin also needs active membership. Example IDs are illustrative. Use IDs from your own group. Reads are available in `ACTIVE`, `SETTLING` and `CLOSED`.
 
-  SETTLING and CLOSED groups allow expense reads only. is_frozen=true and can_edit/can_delete=false in that state. On an active group, only the expense creator or current group owner can edit/delete. Site ADMIN alone does not override membership or editing permissions.
+  ## Enum values
 
-  Amounts are integer TOMAN. expense_type is a separate legacy enum (NORMAL, PREMIUM); new records are NORMAL. split_type is the allocation enum (EQUAL, EXACT, PERCENTAGE, WEIGHTED). No wallet charge or premium purchase is performed here.
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `status` | `ACTIVE`, `INACTIVE` | Membership status. Eligibility here includes both. |
+  | `group status` | `ACTIVE`, `SETTLING`, `CLOSED` | All three allow reads. |
 
   ## Request
 
-  Path groupID is a positive BIGINT group ID. expenseID, when present, is a positive expense ID in that same group. Use the manual expenseGroupId and expenseId environment variables.
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
 
-  List endpoints accept page (default 1) and limit (default 20, max 100), both positive integers.
+  ### Path parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive signed 64-bit group ID. Bruno variable `expenseGroupId`. |
+
+  ### Query parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Defaults to 1. Minimum 1. |
+  | `limit` | `integer` | No | Defaults to 20. Range 1 to 100. |
+
+  Omitted or empty page and limit use their defaults. Explicit zero, negatives, non-integers, limits above 100 and overflowing offsets return `BAD_REQUEST`. Sorted by member_id ascending.
+
+  ### Body
+  Send this request without a body.
 
   ## Response
 
-  **200 OK**
+  **`200 OK`**
 
   ```json
   {
@@ -48,59 +68,90 @@ docs {
       "items": [
         {
           "member_id": 30,
-          "user_id": 3,
-          "name": "Alice Owner",
+          "user_id": 130,
+          "name": "Ali",
           "avatar_attachment_id": null,
+          "avatar_url": null,
           "status": "ACTIVE",
-          "joined_at": "2026-11-01T10:00:00Z",
-          "left_at": null,
-          "avatar_url": null
+          "joined_at": "2026-11-17T08:00:00Z",
+          "left_at": null
         },
         {
           "member_id": 31,
-          "user_id": 4,
-          "name": "Bob Member",
-          "avatar_attachment_id": null,
-          "status": "ACTIVE",
-          "joined_at": "2026-11-01T10:00:00Z",
-          "left_at": null,
-          "avatar_url": null
-        },
-        {
-          "member_id": 32,
-          "user_id": 5,
-          "name": "Former Member",
-          "avatar_attachment_id": null,
+          "user_id": 131,
+          "name": "Reza",
+          "avatar_attachment_id": 501,
+          "avatar_url": null,
           "status": "INACTIVE",
-          "joined_at": "2026-11-01T10:00:00Z",
-          "left_at": "2026-11-10T12:00:00Z",
-          "avatar_url": null
+          "joined_at": "2026-11-17T08:30:00Z",
+          "left_at": "2026-11-20T09:00:00Z"
         }
       ],
       "pagination": {
         "page": 1,
         "limit": 20,
-        "total": 3
+        "total": 2
       }
     }
   }
   ```
 
-  avatar_url is a ready-to-use image URL when an accessible avatar exists; otherwise null. avatar_attachment_id is retained for compatibility. Private URLs expire (15 minutes by default); refetch the list when needed. A private avatar that the caller cannot access is not disclosed.
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `items` | `array` | Memberships on the requested page. |
+  | `items[].member_id` | `integer` | ID to submit in a share. |
+  | `items[].user_id` | `integer` | Global user ID for user profile operations. |
+  | `items[].name` | `string` | Display name, or an empty string when unavailable. |
+  | `items[].avatar_attachment_id` | `integer \| null` | Avatar record ID when present. |
+  | `items[].avatar_url` | `string \| null` | Signed avatar URL if accessible. |
+  | `items[].status` | `string` | ACTIVE or INACTIVE. |
+  | `items[].joined_at` | `RFC 3339 timestamp` | Membership join date. |
+  | `items[].left_at` | `RFC 3339 timestamp \| null` | Recorded departure time. |
+  | `pagination.page` | `integer` | Effective page number. |
+  | `pagination.limit` | `integer` | Effective page size. |
+  | `pagination.total` | `integer` | Count before slicing, after any filters and access rules. An out-of-range page still returns this count. |
+
+  ### Empty page
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [],
+      "pagination": {
+        "page": 2,
+        "limit": 20,
+        "total": 2
+      }
+    }
+  }
+  ```
 
   ## Errors
 
-  | HTTP | code | error | When |
+  | HTTP | code | error | When it happens |
   | --- | --- | --- | --- |
-  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid path ID, pagination, JSON field, positive total amount, required field, title, or timestamp. |
-  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization is absent or does not contain a Bearer token. |
-  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Access token is invalid or malformed. |
-  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID or pagination. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Authorization header or invalid Bearer header format. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid access token, including use of a refresh token in its place. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. Refresh it or sign in again. |
   | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
-  | 403 | `USER_INACTIVE` | `user account is deactivated` | Authenticated account is not ACTIVE. |
-  | 403 | `EXPENSE_FORBIDDEN` | `only active group members can access expenses` | Requester is not an ACTIVE member, or left_at is not null. This also applies to a former expense creator. |
-  | 404 | `USER_NOT_FOUND` | `user not found` | Authenticated account no longer exists. |
-  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group does not exist or is soft-deleted. |
-  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database or authentication infrastructure failed; causes remain private. |
-  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt or avatar URL generation failed. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Caller account is inactive. |
+  | 403 | `EXPENSE_FORBIDDEN` | `only active group members can access expenses` | The caller lacks active membership in the group. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Caller account is missing or soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group is missing or soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, transaction or token verification dependency failed. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Required attachment URL signing failed. |
+
+  ### `403 EXPENSE_FORBIDDEN` example
+
+  ```json
+  {
+    "success": false,
+    "code": "EXPENSE_FORBIDDEN",
+    "error": "only active group members can access expenses"
+  }
+  ```
 }

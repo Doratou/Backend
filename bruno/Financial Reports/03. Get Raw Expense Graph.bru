@@ -53,9 +53,15 @@ docs {
   | `groupID` | `integer` | Yes | Group ID in the range 1 to 9223372036854775807. Bruno variable `settlementGroupId`. |
 
   ### Query parameters
-  This route has no query parameters. It returns the complete graph or plan.
+  This route has no query parameters. It returns the complete raw graph.
 
-  No request body is required.
+  ### Body
+
+  Send this request without a body.
+
+  ### Example request
+
+  `GET /api/v1/groups/10/reports/expenses/graph`
 
   ## Response
 
@@ -144,9 +150,9 @@ docs {
   | `currency` | Fixed string TOMAN. Amount fields ending in _toman are integer toman. |
   | `nodes` | Profiles for the memberships referenced by returned edges. |
   | `edges` | Separate expense-share arrows. The group graph is returned in full. |
-  | `from_member_id` | Integer. Group membership ID of the sender (expense participant or proposed payer). |
-  | `to_member_id` | Integer. Group membership ID of the receiver (expense payer or proposed recipient). |
-  | `amount_toman` | Positive integer. Amount of one recorded share or proposed transfer. |
+  | `from_member_id` | Integer. Membership ID of the participant assigned the expense share. |
+  | `to_member_id` | Integer. Membership ID of the original expense payer. |
+  | `amount_toman` | Positive integer. Recorded expense share in toman. |
   | `share_id` | Integer. ID of the individual expense share. Use as the stable key for distinct rows or parallel edges. |
   | `expense_id` | Integer. Source expense ID. Use `GET /api/v1/groups/:groupID/expenses/:expenseID` to open expense details. |
   | `expense_title` | String. Current title of this expense, useful as the reason shown beside the amount. |
@@ -159,7 +165,7 @@ docs {
   | `member_id` | Integer. ID of this group membership. Match this ID when connecting nodes or creating a settlement. |
   | `user_id` | Integer. Account ID for the user profile API. |
   | `name` | String. Current display name. |
-  | `avatar_url` | Temporary URL or null. Render a fallback for null and refetch if the URL expires. |
+  | `avatar_url` | Temporary URL or null. Missing or inaccessible avatars and storage signing failures produce null. Render a fallback for null and refetch if the URL expires. |
   | `is_former_member` | JSON boolean. True for an inactive membership or a membership with a departure timestamp. |
 
   ### Empty result
@@ -179,6 +185,10 @@ docs {
     }
   }
   ```
+
+  ## Frontend use
+
+  Use `nodes[].member_id` to match both endpoints of each arrow, even when the same user has memberships in several groups. An active viewer with no positive expense relationship may be absent from `nodes`.
 
   ## Errors
 

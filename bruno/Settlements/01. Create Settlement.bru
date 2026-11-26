@@ -28,76 +28,67 @@ body:json {
 }
 
 docs {
-  # 01. Create Settlement
+  # Create Settlement
 
-  **Method:** `POST`
-  **Endpoint:** `/api/v1/groups/:groupID/settlements`
-  **Auth:** Required
+  - **Method** `POST`
+  - **Endpoint** `/api/v1/groups/:groupID/settlements`
+  - **Auth** Bearer access token
 
   ## Description
 
+  Records a payment that already happened outside the app. The caller becomes the sender. Pick a different member of this group with an active account and active membership. The new record starts as `PENDING`. Only a recipient confirmation affects the current settlement balance.
 
-  Register your own external payment to another active member of this group. Any active recipient is accepted; the future simplified debt graph can provide the frontend default, but the API does not require that receiver. Partial payments, overpayments and payments when no debt exists are permitted.
+  An active account and active membership with no departure timestamp are required. A site admin also needs active membership. Example IDs are illustrative. Use IDs from your own group. Payments can be changed in `ACTIVE` and `SETTLING`. A `CLOSED` group is read-only.
 
-  If amount exceeds your current positive net debt among active group members, registration still succeeds with `warnings[0].code=PAYMENT_EXCEEDS_CURRENT_DEBT` and message `payment exceeds your current net debt in this group; registration is allowed`. This is an advisory based on current expenses and SUCCESS payments; pending/rejected/canceled payments do not reduce debt. It is not a receiver-specific debt check or a balance report API.
+  ## Enum values
 
-  All persistence and receipt linking are atomic. Repeating a successful POST creates another payment; no idempotency key is implemented. Disable duplicate form submission in the frontend. A successful Create is 201.
-
-
-
-  All routes require Bearer authentication, an ACTIVE account and ACTIVE membership with left_at=null. Membership IDs belong to this group; user IDs are not interchangeable with them. An owner or site ADMIN has no special payment permissions.
-
-  Group status enum: `ACTIVE`, `SETTLING`, `CLOSED`. Both ACTIVE and SETTLING allow settlement writes; CLOSED allows reads only. Expenses, polls and draws remain frozen whenever the group is not ACTIVE.
-
-  Payment status enum (uppercase, case-sensitive): `PENDING`, `SUCCESS`, `REJECT`, `CANCELED`. PENDING and CANCELED are visible only to their active sender/recipient. SUCCESS and REJECT, including receipts, are visible to every active group member. Filtered list counts follow the same visibility rules.
-
-  Payments cannot be edited. Only the active sender may soft-delete PENDING. Only the active recipient may confirm/reject PENDING. Confirmation records a successful external payment; this endpoint does not perform a bank transfer. Rejection/cancellation never count as successful payments. Owner/admin cannot override either party.
-
-  A sender who leaves loses access; their existing PENDING payment remains answerable by its active recipient. If the recipient leaves/is removed before responding, incoming PENDING payments become `CANCELED` and record `canceled_at` in the same transaction. Rejoining does not revive them. Former-member financial relationships are outside the active-member balance calculation; history remains stored. `is_external` is true when either party currently has inactive membership/left_at. Membership status values remain ACTIVE/INACTIVE.
-
-  IDs are manual environment variables. No response script sets or overwrites settlement IDs. Set settlementGroupId, settlementToMemberId (from Get Group Members), settlementId, and settlementAttachmentIds yourself. Auth login/refresh keeps its existing token behavior.
-
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `status` | `PENDING`, `SUCCESS`, `REJECT`, `CANCELED` | Uppercase, case-sensitive payment status. |
+  | `group status` | `ACTIVE`, `SETTLING`, `CLOSED` | ACTIVE and SETTLING allow payment writes. CLOSED permits reads. |
 
   ## Request
 
-
-  | Field | Type | Required | Rules |
+  ### Headers
+  | Field | Type | Required | Description |
   | --- | --- | --- | --- |
-  | to_member_id | integer | Yes | Another ACTIVE membership in this group, with ACTIVE account. |
-  | amount_toman | integer | Yes | 1..9223372036854775807 TOMAN; no fractional amount. |
-  | note | string or null | No | At most 2000 Unicode characters; no NUL. |
-  | paid_at | RFC3339 string or null | No | External payment date. Omitted/null defaults to server time. |
-  | attachment_ids | integer array or null | No | At most 100 unique positive IDs of your unbound SETTLEMENT_RECEIPT uploads. Omitted/null/[] means no receipt. |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
+  | `Content-Type` | `string` | Yes | `application/json`. Keep the body within 1 MiB. |
 
-  Do not send from_member_id, user_id, status or group_id in JSON; the authenticated user/path determine them. The existing JSON binder ignores unrelated fields.
+  ### Path parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive signed 64-bit group ID. Bruno variable `settlementGroupId`. |
 
-  Upload optional receipts first using 07. Upload Settlement Receipt (the shared attachment API). Upload success alone does not register a payment. Copy uploaded IDs to settlementAttachmentIds, e.g. [1201]. Each receipt must be yours, unbound, and have no group or this same group. A receipt already linked to a payment/expense cannot be reused.
+  ### Query parameters
+  This endpoint has no query parameters.
 
-  Warning example (in data.warnings; HTTP remains 201):
+  ### Body
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `to_member_id` | `integer` | Yes | Positive group membership ID from List Active Recipients or the personal settlement plan. |
+  | `amount_toman` | `integer` | Yes | Positive whole-toman amount within signed 64-bit range. |
+  | `note` | `string \| null` | No | Optional note, up to 2,000 characters. |
+  | `paid_at` | `RFC 3339 timestamp \| null` | No | Date the payment happened. Omit or send null to use the current server time. |
+  | `attachment_ids` | `integer[] \| null` | No | Up to 100 unique positive IDs. Each must be an unlinked SETTLEMENT_RECEIPT uploaded by the caller and compatible with the group. |
+
+  Upload any receipt first. In the save request use its `data.id`. Each accepted POST registers a new record.
 
   ```json
-  [{"code":"PAYMENT_EXCEEDS_CURRENT_DEBT","message":"payment exceeds your current net debt in this group; registration is allowed"}]
+  {
+    "to_member_id": 32,
+    "amount_toman": 200000,
+    "note": "Bank transfer",
+    "paid_at": "2026-11-20T14:00:00Z",
+    "attachment_ids": [
+      1301
+    ]
+  }
   ```
-
 
   ## Response
 
-
-  | Response field | Meaning |
-  | --- | --- |
-  | from_member_id / to_member_id | Group membership IDs. Sender is always derived from the access token. |
-  | from_member / to_member | Current display name, member_id, user_id and nullable avatar_url. |
-  | amount_toman | Positive signed BIGINT integer in TOMAN. |
-  | paid_at | User-supplied RFC3339 external payment date, or server time when omitted/null. |
-  | confirmed_at / rejected_at / canceled_at | Server decision time; other outcome timestamps stay null. |
-  | created_at / updated_at | Registration time / last state change time. |
-  | is_frozen | True only when the group is CLOSED. |
-  | is_external | Either party has left/is no longer active; retained history. |
-  | can_confirm / can_reject / can_delete | Permissions calculated for the authenticated caller. UI hints; backend always enforces authorization. |
-  | attachment_ids | IDs of attached SETTLEMENT_RECEIPT files; [] when none. |
-  | attachments | Receipt metadata: id, original_filename, mime_type, file_size_bytes, nullable access_url. |
-  | warnings | May include PAYMENT_EXCEEDS_CURRENT_DEBT when registering more than your current net debt. |
-
+  **`201 Created`**
 
   ```json
   {
@@ -106,75 +97,136 @@ docs {
       "id": 701,
       "group_id": 10,
       "from_member_id": 30,
-      "to_member_id": 31,
+      "to_member_id": 32,
       "from_member": {
         "member_id": 30,
-        "user_id": 3,
+        "user_id": 130,
         "name": "Ali",
         "avatar_url": null
       },
       "to_member": {
-        "member_id": 31,
-        "user_id": 4,
-        "name": "Reza",
+        "member_id": 32,
+        "user_id": 132,
+        "name": "Sara",
         "avatar_url": null
       },
-      "amount_toman": 100000,
+      "amount_toman": 200000,
       "status": "PENDING",
       "note": "Bank transfer",
-      "paid_at": "2026-11-18T10:00:00Z",
+      "paid_at": "2026-11-20T14:00:00Z",
       "confirmed_at": null,
       "rejected_at": null,
       "canceled_at": null,
-      "created_at": "2026-11-18T10:00:00Z",
-      "updated_at": "2026-11-18T10:00:00Z",
+      "created_at": "2026-11-20T14:00:00Z",
+      "updated_at": "2026-11-20T14:00:00Z",
       "is_frozen": false,
       "is_external": false,
       "can_confirm": false,
       "can_reject": false,
       "can_delete": true,
-      "attachment_ids": [],
-      "attachments": [],
+      "attachment_ids": [
+        1301
+      ],
+      "attachments": [
+        {
+          "id": 1301,
+          "original_filename": "receipt.pdf",
+          "mime_type": "application/pdf",
+          "file_size_bytes": 28413,
+          "access_url": "https://storage.example.com/signed/receipt.pdf"
+        }
+      ],
       "warnings": []
     }
   }
   ```
 
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `integer` | Payment ID used in settlementID. |
+  | `group_id` | `integer` | Parent group. |
+  | `from_member_id` | `integer` | Sender's group membership ID. |
+  | `to_member_id` | `integer` | Recipient's group membership ID. |
+  | `from_member / to_member` | `object` | Member profiles for displaying both parties. |
+  | `amount_toman` | `integer` | Registered whole-toman amount. |
+  | `status` | `string` | Current payment status. |
+  | `note` | `string \| null` | Optional note provided during registration. |
+  | `paid_at` | `RFC 3339 timestamp` | When the sender says the transfer occurred. |
+  | `confirmed_at` | `RFC 3339 timestamp \| null` | Server time of confirmation. |
+  | `rejected_at` | `RFC 3339 timestamp \| null` | Server time of rejection. |
+  | `canceled_at` | `RFC 3339 timestamp \| null` | Server time of cancellation after the recipient departed. |
+  | `created_at` | `RFC 3339 timestamp` | When the payment was recorded. |
+  | `updated_at` | `RFC 3339 timestamp` | Most recent payment record update. |
+  | `is_frozen` | `boolean` | True when the group is CLOSED. |
+  | `is_external` | `boolean` | True if either party has inactive membership or a departure timestamp. |
+  | `can_confirm / can_reject` | `boolean` | True for the recipient on a writable PENDING payment. |
+  | `can_delete` | `boolean` | True for the sender on a writable PENDING payment. |
+  | `attachment_ids` | `integer[]` | Private receipt IDs. Empty when none. |
+  | `attachments` | `array` | Receipt metadata. Empty when none. |
+  | `attachments[].id` | `integer` | Attachment ID. |
+  | `attachments[].original_filename` | `string \| null` | Original display filename. |
+  | `attachments[].mime_type` | `string \| null` | Stored MIME type. |
+  | `attachments[].file_size_bytes` | `integer \| null` | Stored length in bytes. |
+  | `attachments[].access_url` | `string \| null` | Signed download URL when available. Refresh the API response for a new URL after expiration. |
+  | `warnings` | `array` | Endpoint-specific advisory messages. Empty when none. |
+  | `warnings[].code` | `string` | Stable warning code. |
+  | `warnings[].message` | `string` | Displayable explanation. |
+
+  ### Fields of `from_member` and `to_member`
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `member_id` | `integer` | Membership ID in this group. |
+  | `user_id` | `integer` | Global user ID. |
+  | `name` | `string` | Display name, or an empty string when unavailable. |
+  | `avatar_url` | `string \| null` | Signed avatar URL when available. |
+
+  Copy `data.id` into `settlementId` for Get, Confirm, Reject or Delete.
+
+  ### Overpayment warning
+
+  If the amount exceeds the sender's current net debt in this group, the record is still created and the following item appears in `warnings`. Net debt is calculated across the group's active memberships.
+
+  ```json
+  {
+    "code": "PAYMENT_EXCEEDS_CURRENT_DEBT",
+    "message": "payment exceeds your current net debt in this group; registration is allowed"
+  }
+  ```
+
   ## Errors
 
-  | HTTP | code | error | When |
+  | HTTP | code | error | When it happens |
   | --- | --- | --- | --- |
-  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid IDs, amount, query, timestamp or JSON; note over 2000 characters. |
-  | 400 | `SETTLEMENT_SELF_PAYMENT` | `you cannot register a payment to yourself` | Sender and recipient are the same membership. |
-  | 400 | `SETTLEMENT_DUPLICATE_ATTACHMENTS` | `attachment_ids must not contain duplicate IDs` | Repeated receipt ID on Create. |
-  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | A supplied attachment is not SETTLEMENT_RECEIPT. |
-  | 401 | `MISSING_TOKEN` | `authorization token is missing` | No Bearer token. |
-  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid token. |
-  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Expired access token; refresh or log in again. |
-  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Revoked access token. |
-  | 403 | `USER_INACTIVE` | `user account is deactivated` | Caller account inactive. |
-  | 403 | `SETTLEMENT_FORBIDDEN` | `you do not have permission to access this settlement` | Caller not an active group member, or non-party reading a PENDING/CANCELED payment. |
-  | 403 | `SETTLEMENT_RECIPIENT_REQUIRED` | `only the recipient can confirm or reject this payment` | Confirm/Reject called by anyone other than the recipient. No owner/admin override. |
-  | 403 | `SETTLEMENT_CREATOR_REQUIRED` | `only the creator can delete this pending payment` | Delete called by anyone other than its sender. |
-  | 403 | `ATTACHMENT_FORBIDDEN` | `you do not have permission to access or modify this attachment` | Receipt belongs to another uploader, already linked or associated with another group. |
-  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group absent or deleted. |
-  | 404 | `USER_NOT_FOUND` | `user not found` | Caller no longer exists. |
-  | 404 | `SETTLEMENT_NOT_FOUND` | `settlement not found` | Payment absent, soft-deleted, or in another group. |
-  | 404 | `SETTLEMENT_RECIPIENT_NOT_FOUND` | `recipient must be an active member with an active account in this group` | Recipient membership/account missing, inactive or outside the group. |
-  | 404 | `ATTACHMENT_NOT_FOUND` | `attachment not found` | Supplied receipt ID missing/deleted. |
-  | 409 | `SETTLEMENT_NOT_PENDING` | `only pending payments can be confirmed, rejected or deleted` | Already SUCCESS/REJECT/CANCELED. Repeating DELETE after soft deletion returns 404. |
-  | 409 | `SETTLEMENT_GROUP_CLOSED` | `payments cannot be changed after the group is closed` | Group CLOSED; create/confirm/reject/delete forbidden. |
-  | 422 | `FINANCIAL_AMOUNT_OUT_OF_RANGE` | `financial balance exceeds the supported range` | A balance calculation exceeds the signed BIGINT range. |
-  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Unexpected database/internal failure. |
-  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Receipt/avatar URL resolution unavailable. |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid group ID, malformed/oversize JSON, invalid amount/date/recipient ID, note longer than 2,000 characters, or invalid attachment ID or array length. |
+  | 400 | `SETTLEMENT_SELF_PAYMENT` | `you cannot register a payment to yourself` | The recipient is the caller's own membership. |
+  | 400 | `SETTLEMENT_DUPLICATE_ATTACHMENTS` | `attachment_ids must not contain duplicate IDs` | The receipt ID list contains duplicates. |
+  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | An attachment is not a SETTLEMENT_RECEIPT. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Authorization header or invalid Bearer header format. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid access token, including use of a refresh token in its place. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. Refresh it or sign in again. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Caller account is inactive. |
+  | 403 | `SETTLEMENT_FORBIDDEN` | `you do not have permission to access this settlement` | The caller lacks active membership in the group. |
+  | 403 | `ATTACHMENT_FORBIDDEN` | `you do not have permission to access or modify this attachment` | Receipt was uploaded by another user, is already linked or is associated with a different group. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Caller account is missing or soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group is missing or soft-deleted. |
+  | 404 | `SETTLEMENT_RECIPIENT_NOT_FOUND` | `recipient must be an active member with an active account in this group` | Recipient membership is missing, outside the group or inactive, or the recipient account is missing or inactive. |
+  | 404 | `ATTACHMENT_NOT_FOUND` | `attachment not found` | A specified receipt is missing or soft-deleted. |
+  | 409 | `SETTLEMENT_GROUP_CLOSED` | `payments cannot be changed after the group is closed` | Payment writes are blocked in CLOSED groups. |
+  | 422 | `FINANCIAL_AMOUNT_OUT_OF_RANGE` | `financial balance exceeds the supported range` | The current ledger balance is outside the supported signed 64-bit range. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, transaction or token verification dependency failed. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Required attachment URL signing failed. |
 
-  The table includes shared errors across this folder; individual operations return only applicable cases. Error envelope:
+  ### `404 SETTLEMENT_RECIPIENT_NOT_FOUND` example
 
   ```json
   {
     "success": false,
-    "code": "SETTLEMENT_NOT_PENDING",
-    "error": "only pending payments can be confirmed, rejected or deleted"
+    "code": "SETTLEMENT_RECIPIENT_NOT_FOUND",
+    "error": "recipient must be an active member with an active account in this group"
   }
   ```
 }

@@ -25,13 +25,17 @@ docs {
 
   ## Manual setup
 
-  Set expenseGroupId, expenseId, expenseTotalAmountToman, expenseSplitType expenseShares and expenseAttachmentIds yourself in Local and save. No response sets these identifiers. The folder clears only corresponding runtime values so manually saved values win. Login/Refresh still automatically populate token.
+  Set expenseGroupId, expenseId, expenseTotalAmountToman, expenseSplitType, expenseShares and expenseAttachmentIds yourself in Local and save. No response sets these identifiers. The folder clears only corresponding runtime values so manually saved values win. Login/Refresh still automatically populate token.
 
   Start with List Eligible Participants. Copy member_id values, not user_id. For EQUAL, set expenseShares to [{"member_id":30},{"member_id":31}]. Use actual IDs from your group; documentation examples use illustrative group 10 and memberships 30/31/32.
 
   For EXACT, set value to each member's non-negative integer amount, summing to total_amount_toman. For PERCENTAGE, values must sum to 100 with at most two decimal places. For WEIGHTED, use positive integer weights such as 2,1,1. EQUAL permits absent/null value or 1.
 
-  All number values are JSON numbers, not strings; split values do not accept exponent notation. total_amount_toman and integer values fit signed BIGINT. Amounts are TOMAN. Percentages are stored exactly as hundredths of a percent and returned as numeric percentages. Allocations use exact integer arithmetic with deterministic largest-remainder rounding and ascending member ID to break ties. All final share amounts sum exactly to the expense amount, even for very small totals.
+  Send numbers as JSON numeric values and use ordinary decimal notation for split values. total_amount_toman and integer values fit signed BIGINT. Amounts are TOMAN. Percentages are stored exactly as hundredths of a percent and returned as numeric percentages. Allocations use exact integer arithmetic with deterministic largest-remainder rounding and ascending member ID to break ties. All final share amounts sum exactly to the expense amount, even for very small totals.
+
+  ## List filters
+
+  Use `scope=all` for all current expenses, `scope=created_by_me` for expenses created by the caller and `scope=owed_by_me` for positive recorded shares assigned to the caller on another member's expense. The caller's recorded own share is part of `my_share_amount_toman` on each expense. For suggested payments after netting confirmed settlements, use the Financial Reports folder.
 
   ## Permission and lifecycle
 
@@ -60,5 +64,4 @@ docs {
   ## Suggested manual checks
 
   Use two active members, one outsider and one former member. Create each split type, include/exclude the payer, use a former member in shares, verify exact totals and rounding, then edit as creator and group owner. Confirm a third member cannot edit/delete and a former creator cannot access the expense after leaving. Check `SETTLING` and `CLOSED` groups, duplicate members, foreign IDs, empty shares, invalid percentages/weights, amount mismatches, bad dates, wrong-group expense IDs and repeated deletion.
-
 }

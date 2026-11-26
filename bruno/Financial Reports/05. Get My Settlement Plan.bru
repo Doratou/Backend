@@ -51,9 +51,15 @@ docs {
   | `groupID` | `integer` | Yes | Group ID in the range 1 to 9223372036854775807. Bruno variable `settlementGroupId`. |
 
   ### Query parameters
-  This route has no query parameters. It returns the complete graph or plan.
+  This route has no query parameters. It returns the complete incoming and outgoing plan for the caller.
 
-  No request body is required.
+  ### Body
+
+  Send this request without a body.
+
+  ### Example request
+
+  `GET /api/v1/groups/10/reports/settlements/me`
 
   ## Response
 
@@ -135,13 +141,13 @@ docs {
   | `viewer_member_id` | Integer. Membership ID derived from the access token. Use to highlight the current member. |
   | `group_status` | Current group lifecycle enum. |
   | `currency` | Fixed string TOMAN. Amount fields ending in _toman are integer toman. |
-  | `balance_revision` | Opaque 64-character value derived from active memberships and open positions. Compare values only within the same group. |
+  | `balance_revision` | Opaque 64-character value derived from active membership IDs and outstanding pairwise obligations. Compare values within the same group. Read the group status separately. |
   | `can_register_payments` | Boolean. true in ACTIVE and SETTLING, false in CLOSED. Create Settlement still checks the chosen recipient and the caller. |
   | `outgoing` | Proposed transfers whose sender is viewer_member_id. |
   | `incoming` | Proposed transfers whose receiver is viewer_member_id. |
-  | `from_member_id` | Integer. Group membership ID of the sender (expense participant or proposed payer). |
-  | `to_member_id` | Integer. Group membership ID of the receiver (expense payer or proposed recipient). |
-  | `amount_toman` | Positive integer. Amount of one recorded share or proposed transfer. |
+  | `from_member_id` | Integer. Membership ID of the proposed payer. |
+  | `to_member_id` | Integer. Membership ID of the proposed recipient. |
+  | `amount_toman` | Positive integer. Suggested transfer amount in toman. |
   | `counterparty` | Receiver profile on an outgoing row, sender profile on an incoming row. |
   | `net_amount_toman` | Signed value, total_to_receive_toman minus total_to_pay_toman. |
   | `total_to_pay_toman` | Sum of outgoing amounts. |
@@ -154,7 +160,7 @@ docs {
   | `member_id` | Integer. ID of this group membership. Match this ID when connecting nodes or creating a settlement. |
   | `user_id` | Integer. Account ID for the user profile API. |
   | `name` | String. Current display name. |
-  | `avatar_url` | Temporary URL or null. Render a fallback for null and refetch if the URL expires. |
+  | `avatar_url` | Temporary URL or null. Missing or inaccessible avatars and storage signing failures produce null. Render a fallback for null and refetch if the URL expires. |
   | `is_former_member` | Always false for current settlement participants. |
 
   ### Empty result
@@ -179,6 +185,10 @@ docs {
     }
   }
   ```
+
+  ## Frontend use
+
+  Only enable registration for outgoing suggestions when `can_register_payments` is true. The recipient can use `status=PENDING&direction=incoming` on List Settlements to find actual payments awaiting approval. `balance_revision` is a read-only comparison value.
 
   ## Errors
 

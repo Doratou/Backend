@@ -25,7 +25,7 @@ docs {
 
   Returns all active memberships and the exact minimum-transfer plan for the current net amounts. The inputs are open expense shares and the effects of approved `SUCCESS` payments. Pending, rejected and canceled payments leave the plan unchanged.
 
-  Each edge is a payment suggestion from debtor to creditor. A node's sign indicates whether the member should pay or receive. The plan can route money directly from Ali to Sara even when the raw graph has expense shares through Reza. Members with zero net amounts still appear as nodes. When a member leaves, their node and open relationships drop out. The effects already posted for confirmed payments remain accounted for.
+  Each edge is a payment suggestion from debtor to creditor. A node's sign indicates whether the member should pay or receive. The plan can route money directly from Ali to Sara even when the raw graph has expense shares through Reza. Members with zero net amounts still appear as nodes. When a member leaves, their node and open relationships drop out. Previously confirmed adjustments between still-active memberships remain accounted for.
 
   Every report requires a valid Bearer access token, an ACTIVE account and ACTIVE membership in the specified group with no departure timestamp. Group owners and system admins need active membership too. All example IDs are illustrative.
 
@@ -51,9 +51,15 @@ docs {
   | `groupID` | `integer` | Yes | Group ID in the range 1 to 9223372036854775807. Bruno variable `settlementGroupId`. |
 
   ### Query parameters
-  This route has no query parameters. It returns the complete graph or plan.
+  This route has no query parameters. It returns the complete minimum-transfer graph.
 
-  No request body is required.
+  ### Body
+
+  Send this request without a body.
+
+  ### Example request
+
+  `GET /api/v1/groups/10/reports/settlements/graph`
 
   ## Response
 
@@ -114,14 +120,14 @@ docs {
   | `viewer_member_id` | Integer. Membership ID derived from the access token. Use to highlight the current member. |
   | `group_status` | Current group lifecycle enum. |
   | `currency` | Fixed string TOMAN. Amount fields ending in _toman are integer toman. |
-  | `balance_revision` | Opaque 64-character value derived from active memberships and open positions. Compare values only within the same group. |
+  | `balance_revision` | Opaque 64-character value derived from active membership IDs and outstanding pairwise obligations. Compare values within the same group. Read the group status separately. |
   | `can_register_payments` | Boolean. true in ACTIVE and SETTLING, false in CLOSED. Create Settlement still checks the chosen recipient and the caller. |
   | `nodes` | All active memberships in increasing member_id order, including zero balances. |
   | `nodes[].net_amount_toman` | Signed integer. Negative is payable, positive is receivable, zero is balanced. |
   | `edges` | Complete set of suggested payments. Empty when nothing remains to transfer. |
-  | `from_member_id` | Integer. Group membership ID of the sender (expense participant or proposed payer). |
-  | `to_member_id` | Integer. Group membership ID of the receiver (expense payer or proposed recipient). |
-  | `amount_toman` | Positive integer. Amount of one recorded share or proposed transfer. |
+  | `from_member_id` | Integer. Membership ID of the proposed payer. |
+  | `to_member_id` | Integer. Membership ID of the proposed recipient. |
+  | `amount_toman` | Positive integer. Suggested transfer amount in toman. |
 
   ### Member profile fields
 
@@ -130,7 +136,7 @@ docs {
   | `member_id` | Integer. ID of this group membership. Match this ID when connecting nodes or creating a settlement. |
   | `user_id` | Integer. Account ID for the user profile API. |
   | `name` | String. Current display name. |
-  | `avatar_url` | Temporary URL or null. Render a fallback for null and refetch if the URL expires. |
+  | `avatar_url` | Temporary URL or null. Missing or inaccessible avatars and storage signing failures produce null. Render a fallback for null and refetch if the URL expires. |
   | `is_former_member` | Always false for current settlement participants. |
 
   ### Empty result
@@ -169,6 +175,10 @@ docs {
     }
   }
   ```
+
+  ## Frontend use
+
+  For an outgoing suggestion, use the edge's `to_member_id` and `amount_toman` to prefill Create Settlement. Keep the edge as a suggestion until a payment is actually made and confirmed. A solver timeout returns `503 SETTLEMENT_PLAN_TIMEOUT` with the standard error envelope.
 
   ## Errors
 

@@ -24,37 +24,127 @@ body:multipart-form {
 docs {
   # Upload Settlement Receipt
 
-  POST /api/v1/attachments/upload is the existing shared upload endpoint, not a new settlement route. Bearer token required. Select a file in Body; Bruno supplies the multipart boundary.
+  - **Method** `POST`
+  - **Endpoint** `/api/v1/attachments/upload`
+  - **Auth** Bearer access token
 
-  Form: file (required image or PDF, at most 10 MiB), type=SETTLEMENT_RECEIPT, optional group_id (ACTIVE or SETTLING group with active caller membership), is_public=false (always enforced even if true submitted). Do not send settlement_id or expense_id: binding is only through Create Settlement. Uploader account must be ACTIVE.
+  ## Description
 
-  Success: 201 with the shared AttachmentResponse (id, uploaded_by_user_id, optional group_id, type, original_filename, object_key, mime_type, file_size_bytes, file_hash, optional dimensions, is_public=false, access_url and timestamps). settlement_id is omitted until bound. The upload itself is visible only to its uploader. Copy data.id to settlementAttachmentIds, for example [1201]; variables are manual.
+  Uploads one private file for an active caller and returns the attachment ID. Add `data.id` to `attachment_ids` in Create Settlement. Only the uploader can bind an unlinked file, and a linked payment receipt is locked for direct edits or deletion. Before linking, access belongs to the uploader. Bruno prompts for a local file when you open the multipart form.
 
-  Example response (hash/signature illustrative):
+  The server detects MIME from the bytes. It accepts detected `image/*` or `application/pdf`, with a limit of 10 MiB (10,485,760 bytes). If you include `group_id`, the caller must be an active member and the group must be `ACTIVE` or `SETTLING`. Omit the field entirely for a staged receipt without group context.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `type` | `SETTLEMENT_RECEIPT` | Receipt category to use with this request. |
+  | `group status when group_id is supplied` | `ACTIVE`, `SETTLING` | Accepted group lifecycle states. |
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
+  | `Content-Type` | `string` | Yes | `multipart/form-data`. Let the HTTP client add the boundary. |
+
+  ### Path parameters
+  This endpoint has no path parameters.
+
+  ### Query parameters
+  This endpoint has no query parameters.
+
+  ### Body
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `file` | `file` | Yes | One non-empty image or PDF, up to 10 MiB. |
+  | `type` | `string` | Yes | Send `SETTLEMENT_RECEIPT`. |
+  | `group_id` | `integer` | No | Group for optional membership and lifecycle validation. This Bruno request uses `settlementGroupId`. |
+  | `is_public` | `boolean` | No | The server always stores receipts as private. |
+  | `expense_id / settlement_id` | `integer` | Omit | Link the file when saving its expense or payment. Supplying either ID returns `BAD_REQUEST`. |
+
+  Example multipart fields with a PDF selected in the `file` control.
+
+  ```text
+  file      receipt.pdf
+  type      SETTLEMENT_RECEIPT
+  group_id  10
+  is_public false
+  ```
+
+  ## Response
+
+  **`201 Created`**
 
   ```json
   {
     "success": true,
     "data": {
-      "id": 1201,
-      "uploaded_by_user_id": 3,
+      "id": 1301,
+      "uploaded_by_user_id": 130,
       "group_id": 10,
       "type": "SETTLEMENT_RECEIPT",
       "original_filename": "receipt.pdf",
-      "object_key": "attachments/settlement_receipt/3/2026/11/00000000-0000-4000-8000-000000000001_receipt.pdf",
+      "object_key": "attachments/settlement_receipt/130/2026/11/example_receipt.pdf",
       "mime_type": "application/pdf",
-      "file_size_bytes": 1000,
-      "file_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "file_size_bytes": 28413,
+      "file_hash": "14eaf9d8d862296aae97f8fd2963967b0c0f02553bc515ea28fa337ab78e7fb8",
       "is_public": false,
-      "access_url": "https://storage.example.com/receipt?X-Amz-Signature=example",
-      "uploaded_at": "2026-11-18T10:00:00Z",
-      "created_at": "2026-11-18T10:00:00Z",
-      "updated_at": "2026-11-18T10:00:00Z"
+      "access_url": "https://storage.example.com/signed/receipt.pdf",
+      "uploaded_at": "2026-11-20T09:15:00Z",
+      "created_at": "2026-11-20T09:15:00Z",
+      "updated_at": "2026-11-20T09:15:00Z"
     }
   }
   ```
 
-  Existing presigned upload/confirm routes also support this type. Confirm validates actual MIME/size and creates a fresh immutable storage object; use the returned attachment ID, not the original upload object key, for settlement linking. A stale PUT URL cannot modify the confirmed receipt. URLs must not be shared beyond their allowed viewers.
+  ### Response fields
 
-  Errors: 400 BAD_REQUEST (missing file, invalid form or direct link IDs), 400 INVALID_FILE_TYPE, 400 GROUP_INVALID_STATUS (supplied group CLOSED), 401 token errors, 403 USER_INACTIVE, 403 GROUP_FORBIDDEN, 404 GROUP_NOT_FOUND, 413 FILE_TOO_LARGE, 500 INTERNAL_SERVER_ERROR, 503 STORAGE_UNAVAILABLE. See shared attachment docs for the standard code/error envelope.
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `integer` | Receipt ID to place in `attachment_ids`. |
+  | `uploaded_by_user_id` | `integer` | Authenticated uploader's user ID. |
+  | `group_id` | `integer (optional)` | Returned when supplied. |
+  | `type` | `string` | Receipt type. |
+  | `original_filename` | `string` | Original filename from the uploading client. |
+  | `object_key` | `string` | Storage identifier. Use the attachment ID for API operations. |
+  | `mime_type` | `string` | MIME type detected from the content. |
+  | `file_size_bytes` | `integer` | Number of bytes received. |
+  | `file_hash` | `string` | SHA-256 hex digest of the uploaded bytes. |
+  | `width / height` | `integer (optional)` | Image dimensions when the server can decode them. Omitted for PDFs. |
+  | `is_public` | `boolean` | Always false for receipts. |
+  | `access_url` | `string` | Temporary download URL. Can be an empty string if signing fails after upload. |
+  | `uploaded_at / created_at / updated_at` | `RFC 3339 timestamp` | Upload, record creation and last change. |
+
+  An unlinked receipt response omits `settlement_id`. The example URL is illustrative.
+
+  ## Errors
+
+  | HTTP | code | error | When it happens |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid multipart data, missing or unreadable file, zero bytes, invalid form value or supplied expense_id/settlement_id. |
+  | 400 | `INVALID_FILE_TYPE` | `file type or format is not supported` | Unrecognized type or detected bytes are outside the supported image/PDF types. |
+  | 400 | `GROUP_INVALID_STATUS` | `status must be ACTIVE, SETTLING or CLOSED` | The supplied group is outside the allowed upload states for this receipt. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Authorization header or invalid Bearer header format. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid access token, including use of a refresh token in its place. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. Refresh it or sign in again. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | Caller account is inactive. |
+  | 403 | `GROUP_FORBIDDEN` | `you do not have permission to access this group` | The uploader lacks active membership in the supplied group. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | Caller account is missing or soft-deleted. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group is missing or soft-deleted. |
+  | 413 | `FILE_TOO_LARGE` | `file size exceeds maximum allowed limit` | File exceeds 10 MiB. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, transaction or token verification dependency failed. |
+  | 503 | `STORAGE_UNAVAILABLE` | `storage service is temporarily unavailable` | Writing the file to storage failed. |
+
+  ### `413 FILE_TOO_LARGE` example
+
+  ```json
+  {
+    "success": false,
+    "code": "FILE_TOO_LARGE",
+    "error": "file size exceeds maximum allowed limit"
+  }
+  ```
 }

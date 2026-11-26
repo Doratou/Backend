@@ -17,23 +17,106 @@ auth:bearer {
 docs {
   # List Active Recipients
 
-  GET /api/v1/groups/:groupID/members reuses the existing group-members endpoint. This is a convenience request for settlement testing, not a new backend route. Set settlementGroupId manually.
+  - **Method** `GET`
+  - **Endpoint** `/api/v1/groups/:groupID/members`
+  - **Auth** Bearer access token
 
-  Response data is an array of active memberships with member_id, user_id, name, role (OWNER or MEMBER), joined_at. Use member_id for to_member_id; do not use user_id. The list may contain your own membership: exclude yourself in the frontend. Payment creation also requires the recipient account to be ACTIVE, even if an inactive account still has an ACTIVE membership in this existing list.
+  ## Description
 
-  Example (IDs and dates illustrative):
+  Lists the group's active membership rows using the existing group endpoint. Each row provides the `member_id` to use when choosing a payment recipient. Remove the caller's own membership from the picker. When a payment is saved, Create Settlement also verifies that the selected member has an active account and has not left the group.
+
+  The group member list allows an active member or a site admin to read it, including users with admin access outside the group. Payment operations themselves require active membership. Read access is available in `ACTIVE`, `SETTLING` and `CLOSED`. Example IDs are illustrative. Use IDs from your own group.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `role` | `OWNER`, `MEMBER` | Role within the addressed group. |
+  | `group status` | `ACTIVE`, `SETTLING`, `CLOSED` | All three allow group member reads. |
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). |
+
+  ### Path parameters
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Positive signed 64-bit group ID. Bruno variable `settlementGroupId`. |
+
+  ### Query parameters
+  No pagination or filtering parameters. Entries are ordered by joined_at ascending.
+
+  ### Body
+  Send this request without a body.
+
+  ## Response
+
+  **`200 OK`**
 
   ```json
   {
     "success": true,
     "data": [
-      {"member_id":30,"user_id":3,"name":"Ali","role":"OWNER","joined_at":"2026-11-18T09:00:00Z"},
-      {"member_id":31,"user_id":4,"name":"Reza","role":"MEMBER","joined_at":"2026-11-18T09:00:00Z"}
+      {
+        "member_id": 30,
+        "user_id": 130,
+        "name": "Ali",
+        "role": "OWNER",
+        "joined_at": "2026-11-17T08:00:00Z"
+      },
+      {
+        "member_id": 32,
+        "user_id": 132,
+        "name": "Sara",
+        "role": "MEMBER",
+        "joined_at": "2026-11-17T09:00:00Z"
+      }
     ]
   }
   ```
 
-  Copy the other user's member_id into settlementToMemberId yourself. No script changes the environment. The existing group endpoint permits group members or site admins; settlement endpoints additionally require active membership and provide no admin override.
+  ### Fields of each `data` item
 
-  Errors follow the existing group endpoint: 400 BAD_REQUEST for an unparsable group ID, 401 token errors, 403 GROUP_FORBIDDEN, 404 GROUP_NOT_FOUND, 500 INTERNAL_SERVER_ERROR. See Group / Get Group Members for full details.
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `member_id` | `integer` | Membership ID for to_member_id. |
+  | `user_id` | `integer` | Global user ID. |
+  | `name` | `string` | Display name, or an empty string if unavailable. |
+  | `role` | `string` | OWNER or MEMBER. |
+  | `joined_at` | `RFC 3339 timestamp` | Membership join time. |
+
+  ### No member rows
+
+  ```json
+  {
+    "success": true,
+    "data": []
+  }
+  ```
+
+  ## Errors
+
+  | HTTP | code | error | When it happens |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | The group ID cannot be parsed as a signed 64-bit integer. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Missing Authorization header or invalid Bearer header format. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | Invalid access token, including use of a refresh token in its place. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | Access token expired. Refresh it or sign in again. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | Access token is blacklisted. |
+  | 403 | `GROUP_FORBIDDEN` | `you do not have permission to access this group` | Caller lacks active membership and is not a site admin. |
+  | 404 | `GROUP_NOT_FOUND` | `group not found` | Group is missing or soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | Database, transaction or token verification dependency failed. |
+
+  ### `403 GROUP_FORBIDDEN` example
+
+  ```json
+  {
+    "success": false,
+    "code": "GROUP_FORBIDDEN",
+    "error": "you do not have permission to access this group"
+  }
+  ```
 }
