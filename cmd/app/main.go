@@ -9,8 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -18,7 +16,6 @@ import (
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/service"
 	"github.com/Doratou/Backend/internal/application/service/decorator"
-	domain_ws "github.com/Doratou/Backend/internal/domain/websocket"
 	"github.com/Doratou/Backend/internal/infrastructure/ai"
 	brokerInfra "github.com/Doratou/Backend/internal/infrastructure/broker/rabbitmq"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
@@ -312,28 +309,29 @@ func main() {
 		redisTrxManager,
 	)
 
-	wsEnabled := cfg.Constant.WS.DefaultEnabled
-	if cfg.Environment.WS.Enabled != nil {
-		wsEnabled = *cfg.Environment.WS.Enabled
-	}
-	var (
-		wsCfg     wsInfra.Config
-		wsRelay   *wsInfra.RedisRelay
-		wsPub     domain_ws.Publisher
-		wsHub     *wsInfra.InMemoryHub
-		wsHandler *handler.WSHandler
-	)
-	if wsEnabled {
-		wsCfg = buildWSConfig(cfg.Environment.WS, cfg.Constant.WS)
-		wsRelay = wsInfra.NewRedisRelay(redisCache.GetClient(), wsCfg.PubSubChannel)
-		wsPub = wsRelay
+	var wsRuntime *wsInfra.Runtime
+	if wsCfg := cfg.ResolveWS(); wsCfg.Enabled {
+		wsRuntime = wsInfra.NewRuntime(wsInfra.Config{
+			RequireAuth:        wsCfg.AuthRequired,
+			InsecureSkipVerify: wsCfg.InsecureSkipVerify,
+			OriginPatterns:     wsCfg.OriginPatterns,
+			ReadLimit:          wsCfg.ReadLimitBytes,
+			SendBufferSize:     wsCfg.SendBufferSize,
+			WriteTimeout:       wsCfg.WriteTimeout,
+			PingInterval:       wsCfg.PingInterval,
+			PongTimeout:        wsCfg.PongTimeout,
+			ShutdownTimeout:    wsCfg.ShutdownTimeout,
+			MaxConnsPerUser:    wsCfg.MaxConnsPerUser,
+			SlowConsumerPolicy: wsInfra.SlowConsumerPolicy(wsCfg.SlowConsumerPolicy),
+			PubSubChannel:      wsCfg.PubSubChannel,
+		}, redisCache.GetClient(), jwtMaker, tokenRepo)
 	}
 
 	notificationService := service.NewNotificationService(
 		notificationRepo,
 		groupRepo,
 		dbTrxManager,
-		wsPub,
+		wsRuntime.Publisher(),
 		service.NotificationServiceConfig{
 			RealtimeTTL: cfg.Environment.Notification.RealtimeTTL,
 			StandardTTL: cfg.Environment.Notification.StandardTTL,
@@ -393,14 +391,9 @@ func main() {
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	tokenPriceHandler := handler.NewTokenPriceHandler(tokenPriceService)
-
-	// 8.1 WebSocket Infrastructure (Hub, JWT Authenticator, HTTP Upgrade Server)
-	if wsEnabled {
-		wsHub = wsInfra.NewInMemoryHub(wsCfg)
-		wsAuth := wsInfra.NewJWTAuthenticator(jwtMaker, tokenRepo)
-		wsServer := wsInfra.NewServer(wsHub, wsCfg, wsInfra.WithAuthenticator(wsAuth))
-		wsHandler = handler.NewWSHandler(wsServer, wsServer)
-		log.Printf("WebSocket infrastructure initialized (route: /api/v1/ws, auth_required: %v, pubsub_channel: %s)", wsCfg.RequireAuth, wsCfg.PubSubChannel)
+	var wsHandler *handler.WSHandler
+	if wsRuntime != nil {
+		wsHandler = handler.NewWSHandler(wsRuntime.HTTPHandler(), wsRuntime.Monitor())
 	}
 
 	engine := router.New(router.Dependencies{
@@ -432,16 +425,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	var wsRelayWG sync.WaitGroup
-	if wsEnabled && wsRelay != nil && wsHub != nil {
-		wsRelayWG.Add(1)
-		go func() {
-			defer wsRelayWG.Done()
-			if err := wsRelay.Run(ctx, wsHub); err != nil && !errors.Is(err, context.Canceled) {
-				log.Printf("[WS REDIS RELAY ERROR] stopped with error: %v", err)
-			}
-		}()
-	}
+	wsRuntime.Start(ctx)
 
 	server := &http.Server{
 		Addr:              net.JoinHostPort(cfg.Environment.HttpServer.Domain, cfg.Environment.HttpServer.Port),
@@ -458,95 +442,11 @@ func main() {
 
 	<-ctx.Done()
 	log.Print("Shutdown signal received, shutting down gracefully...")
-	wsRelayWG.Wait()
-	if wsHub != nil {
-		wsShutdownCtx, cancelWSShutdown := context.WithTimeout(context.Background(), wsCfg.ShutdownTimeout)
-		if err := wsHub.Close(wsShutdownCtx); err != nil {
-			log.Printf("error during WebSocket hub shutdown: %v", err)
-		}
-		cancelWSShutdown()
-	}
+	wsRuntime.Shutdown()
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("error during HTTP server shutdown: %v", err)
 	}
 	log.Print("Server stopped")
-}
-
-func buildWSConfig(envCfg bootstrap.WSConfig, constCfg bootstrap.WSConst) wsInfra.Config {
-	cfg := wsInfra.DefaultConfig()
-	cfg.RequireAuth = constCfg.DefaultAuthRequired
-	if envCfg.AuthRequired != nil {
-		cfg.RequireAuth = *envCfg.AuthRequired
-	}
-	cfg.InsecureSkipVerify = envCfg.InsecureSkipVerify
-
-	if envCfg.OriginPatterns != "" {
-		for _, part := range strings.Split(envCfg.OriginPatterns, ",") {
-			if p := strings.TrimSpace(part); p != "" {
-				cfg.OriginPatterns = append(cfg.OriginPatterns, p)
-			}
-		}
-	}
-
-	if envCfg.ReadLimitBytes > 0 {
-		cfg.ReadLimit = envCfg.ReadLimitBytes
-	} else if constCfg.DefaultReadLimitBytes > 0 {
-		cfg.ReadLimit = constCfg.DefaultReadLimitBytes
-	}
-
-	if envCfg.SendBufferSize > 0 {
-		cfg.SendBufferSize = envCfg.SendBufferSize
-	} else if constCfg.DefaultSendBufferSize > 0 {
-		cfg.SendBufferSize = constCfg.DefaultSendBufferSize
-	}
-
-	if envCfg.WriteTimeout > 0 {
-		cfg.WriteTimeout = envCfg.WriteTimeout
-	} else if constCfg.DefaultWriteTimeout > 0 {
-		cfg.WriteTimeout = constCfg.DefaultWriteTimeout
-	}
-
-	if envCfg.PingInterval > 0 {
-		cfg.PingInterval = envCfg.PingInterval
-	} else if constCfg.DefaultPingInterval > 0 {
-		cfg.PingInterval = constCfg.DefaultPingInterval
-	}
-
-	if envCfg.PongTimeout > 0 {
-		cfg.PongTimeout = envCfg.PongTimeout
-	} else if constCfg.DefaultPongTimeout > 0 {
-		cfg.PongTimeout = constCfg.DefaultPongTimeout
-	}
-
-	if envCfg.ShutdownTimeout > 0 {
-		cfg.ShutdownTimeout = envCfg.ShutdownTimeout
-	} else if constCfg.DefaultShutdownTimeout > 0 {
-		cfg.ShutdownTimeout = constCfg.DefaultShutdownTimeout
-	}
-
-	if envCfg.MaxConnsPerUser > 0 {
-		cfg.MaxConnsPerUser = envCfg.MaxConnsPerUser
-	} else if constCfg.DefaultMaxConnsPerUser > 0 {
-		cfg.MaxConnsPerUser = constCfg.DefaultMaxConnsPerUser
-	}
-
-	policy := strings.TrimSpace(envCfg.SlowConsumerPolicy)
-	if policy == "" {
-		policy = constCfg.DefaultSlowConsumerPolicy
-	}
-	if policy == string(wsInfra.SlowConsumerDrop) {
-		cfg.SlowConsumerPolicy = wsInfra.SlowConsumerDrop
-	} else {
-		cfg.SlowConsumerPolicy = wsInfra.SlowConsumerDisconnect
-	}
-
-	if ch := strings.TrimSpace(envCfg.PubSubChannel); ch != "" {
-		cfg.PubSubChannel = ch
-	} else if constCfg.DefaultPubSubChannel != "" {
-		cfg.PubSubChannel = constCfg.DefaultPubSubChannel
-	}
-
-	return cfg
 }
