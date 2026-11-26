@@ -1,0 +1,93 @@
+meta {
+  name: 07. Admin - Get WS Stats
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/ws/stats
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - Get WebSocket Stats
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/admin/ws/stats`
+  **Auth:** Required (Admin Access Token — `ADMIN` role)
+
+  ## Description
+  Returns lightweight, lock-free operational counters and health summary for the current backend instance's WebSocket hub.
+
+  > **Multi-instance note:** Behind a Load Balancer, `instance_id` identifies which backend pod served the request.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Admin Bearer access token (`Bearer <token>`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "instance_id": "api-pod-1-a1b2c3d4",
+      "status": "running",
+      "started_at": "2026-11-26T10:00:00Z",
+      "uptime_seconds": 1825,
+      "active_connections": 42,
+      "anonymous_connections": 0,
+      "unique_users": 35,
+      "active_channels": 12,
+      "total_accepted": 128,
+      "total_closed": 86,
+      "total_rejected_limit": 1,
+      "total_rejected_auth": 4,
+      "messages_enqueued": 1024,
+      "messages_sent": 1020,
+      "messages_dropped": 0,
+      "messages_received": 310,
+      "inbound_errors": 2,
+      "heartbeat_failures": 3
+    }
+  }
+  ```
+
+  ### Response Field Reference
+  | Field | Type | Description |
+  | --- | --- | --- |
+  | `instance_id` | `string` | Hostname + short instance ID of the responding pod |
+  | `status` | `string` | `"running"` or `"closed"` |
+  | `started_at` | `RFC3339` | UTC startup time of the hub |
+  | `uptime_seconds` | `int64` | Seconds elapsed since `started_at` |
+  | `active_connections` | `int` | Currently open WebSocket connections on this instance |
+  | `anonymous_connections` | `int` | Open unauthenticated connections (`user_id == 0`) |
+  | `unique_users` | `int` | Distinct authenticated users currently connected on this instance |
+  | `active_channels` | `int` | Generic channels/rooms with at least 1 subscriber |
+  | `total_accepted` | `uint64` | Cumulative connections registered since startup |
+  | `total_closed` | `uint64` | Cumulative connections unregistered since startup |
+  | `total_rejected_limit` | `uint64` | Handshakes rejected due to `WS_MAX_CONNS_PER_USER` |
+  | `total_rejected_auth` | `uint64` | Handshakes rejected due to authentication failure |
+  | `messages_enqueued` | `uint64` | Outbound envelopes placed into client send buffers |
+  | `messages_sent` | `uint64` | Outbound envelopes successfully written to sockets |
+  | `messages_dropped` | `uint64` | Envelopes dropped because client send buffer was full |
+  | `messages_received` | `uint64` | Valid JSON envelopes read from clients |
+  | `inbound_errors` | `uint64` | Malformed frames, invalid envelopes, or inbound handler errors |
+  | `heartbeat_failures` | `uint64` | Connections closed after `Conn.Ping` timeout or error |
+
+  ## Errors
+  * `401 Unauthorized` — Missing, expired, invalid, or revoked token
+  * `403 Forbidden` — Insufficient permissions (requires `ADMIN` role)
+}

@@ -1,0 +1,47 @@
+meta {
+  name: 04. Connect (Bearer Header)
+  type: ws
+  seq: 4
+}
+
+ws {
+  url: {{wsBaseUrl}}/api/v1/ws
+  body: ws
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:ws {
+  name: ws.ping
+  content: '''
+    {
+      "id": "ping-1",
+      "event": "ws.ping"
+    }
+  '''
+}
+
+docs {
+  # Connect WebSocket (Bearer Header)
+
+  **Protocol:** `WebSocket` (`ws://` / `wss://`)
+  **Endpoint:** `/api/v1/ws`
+  **Auth:** Header `Authorization: Bearer {{token}}` (Access Token)
+
+  ## Description
+  Non-browser handshake flow (mobile apps, CLI clients, Bruno, Postman) passing the JWT access token in the standard `Authorization` header.
+
+  Upon connection, the server emits `ws.connected` and streams all real-time notifications for the authenticated user automatically.
+
+  ## Prerequisite
+  Run `Auth -> 05. Login (Identifier + Password)` first so `{{token}}` is populated.
+
+  ## Errors (HTTP JSON before upgrade)
+  * `401 MISSING_TOKEN` — Missing or malformed `Authorization: Bearer` header
+  * `401 TOKEN_EXPIRED` — Access token expired
+  * `401 TOKEN_INVALID` — Invalid signature or wrong token type
+  * `401 TOKEN_REVOKED` — Token has been revoked
+}

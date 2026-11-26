@@ -29,7 +29,7 @@ docs {
   
   ## Description
   
-  Updates the singleton platform token price in Toman. When the price actually changes, broadcasts a `token.price_updated` event via RabbitMQ to notify all active WebSocket sessions.
+  Updates the singleton platform token price in Toman. When the price actually changes, broadcasts a `token.price_updated` event via Redis Pub/Sub to notify all active WebSocket sessions. See `WebSocket -> 02. Event Catalog & Payloads` for the exact WebSocket payload contract.
   
   ## Request
   
