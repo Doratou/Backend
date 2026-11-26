@@ -216,15 +216,20 @@ func (c *Consumer) handleFailure(ctx context.Context, queue string, d domain_bro
 		retryCount := d.RetryCount()
 		if retryCount < policy.MaxRetries {
 			delay := c.calculateBackoffDelay(policy, retryCount)
-			log.Printf("[RABBITMQ NOTICE] retrying message %s (attempt %d/%d) in %v...",
-				msg.ID, retryCount+1, policy.MaxRetries, delay)
+			urgency := d.Urgency()
+			newPriority := domain_broker.CalculatePriority(urgency, retryCount+1, policy.MaxRetries)
+			log.Printf("[RABBITMQ NOTICE] retrying message %s (attempt %d/%d, urgency %d -> priority %d) in %v...",
+				msg.ID, retryCount+1, policy.MaxRetries, urgency, newPriority, delay)
 
 			retryExchange := policy.RetryExchange
 			if retryExchange == "" {
 				retryExchange = domain_broker.NotificationRetryExchange
 			}
 
-			retryErr := c.publisher.PublishToRetry(ctx, retryExchange, routingKey, msg, retryCount, delay)
+			retryErr := c.publisher.PublishToRetry(ctx, retryExchange, routingKey, msg, retryCount, delay,
+				domain_broker.WithPriority(newPriority),
+				domain_broker.WithUrgency(urgency),
+			)
 			if retryErr == nil {
 				// Safely acknowledge original delivery since it is now buffered in retry queue
 				_ = d.Ack(false)
