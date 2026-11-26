@@ -111,7 +111,7 @@ func New(deps Dependencies) *gin.Engine {
 		RegisterTokenPriceRoutes(v1, deps.TokenPriceHandler, authMiddleware)
 	}
 	if deps.WSHandler != nil {
-		RegisterWSRoutes(v1, deps.WSHandler)
+		RegisterWSRoutes(v1, deps.WSHandler, authMiddleware)
 	}
 
 	return engine

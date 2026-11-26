@@ -390,7 +390,7 @@ func main() {
 		wsHub = wsInfra.NewInMemoryHub(wsCfg)
 		wsAuth := wsInfra.NewJWTAuthenticator(jwtMaker, tokenRepo)
 		wsServer := wsInfra.NewServer(wsHub, wsCfg, wsInfra.WithAuthenticator(wsAuth))
-		wsHandler = handler.NewWSHandler(wsServer)
+		wsHandler = handler.NewWSHandler(wsServer, wsServer)
 		log.Printf("WebSocket infrastructure initialized (route: /api/v1/ws, auth_required: %v)", wsCfg.RequireAuth)
 	}
 
