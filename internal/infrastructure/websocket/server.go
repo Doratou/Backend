@@ -63,11 +63,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		id, err := s.auth.Authenticate(r.Context(), r)
 		if err != nil {
 			if s.cfg.RequireAuth {
+				s.hub.recordAuthRejected()
 				writeAuthError(w, err)
 				return
 			}
 			// Optional auth mode: only allow anonymous fallback when no token was provided.
 			if !errors.Is(err, exception.ErrMissingToken) {
+				s.hub.recordAuthRejected()
 				writeAuthError(w, err)
 				return
 			}
@@ -92,7 +94,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	conn.SetReadLimit(s.cfg.ReadLimit)
 
-	client := newWSClient(r.Context(), conn, s.hub, identity, s.cfg, s.inboundHandler)
+	client := newWSClient(r.Context(), conn, s.hub, identity, r.RemoteAddr, s.cfg, s.inboundHandler)
 	if err := s.hub.Register(client); err != nil {
 		code := websocket.StatusInternalError
 		if errors.Is(err, domain_ws.ErrTooManyConnections) {
@@ -122,6 +124,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client.run()
+}
+
+// Stats returns the current operational metrics of the underlying WebSocket hub.
+func (s *Server) Stats() domain_ws.HubStats {
+	if s.hub == nil {
+		return domain_ws.HubStats{Status: "unavailable"}
+	}
+	return s.hub.Stats()
+}
+
+// Snapshot returns a filtered, bounded point-in-time snapshot of active channels and connections.
+func (s *Server) Snapshot(filter domain_ws.SnapshotFilter) domain_ws.HubSnapshot {
+	if s.hub == nil {
+		return domain_ws.HubSnapshot{Stats: domain_ws.HubStats{Status: "unavailable"}}
+	}
+	return s.hub.Snapshot(filter)
 }
 
 func writeAuthError(w http.ResponseWriter, err error) {

@@ -3,24 +3,47 @@ package websocket
 import (
 	"context"
 	"errors"
+	"os"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	domain_ws "github.com/Doratou/Backend/internal/domain/websocket"
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
+)
+
+const (
+	defaultSnapshotLimit = 100
+	maxSnapshotLimit     = 1000
 )
 
 // InMemoryHub is a thread-safe, in-memory WebSocket connection registry and message router.
 type InMemoryHub struct {
-	cfg Config
+	cfg        Config
+	instanceID string
+	startedAt  time.Time
 
 	mu           sync.RWMutex
 	closed       bool
 	conns        map[string]domain_ws.Client
 	users        map[int64]map[string]domain_ws.Client
+	anonConns    int
 	channels     map[string]map[string]domain_ws.Client
 	connChannels map[string]map[string]struct{}
+
+	totalAccepted      atomic.Uint64
+	totalClosed        atomic.Uint64
+	totalRejectedLimit atomic.Uint64
+	totalRejectedAuth  atomic.Uint64
+	messagesEnqueued   atomic.Uint64
+	messagesSent       atomic.Uint64
+	messagesDropped    atomic.Uint64
+	messagesReceived   atomic.Uint64
+	inboundErrors      atomic.Uint64
+	heartbeatFailures  atomic.Uint64
 
 	activeWG sync.WaitGroup
 }
@@ -28,8 +51,14 @@ type InMemoryHub struct {
 // NewInMemoryHub creates a new InMemoryHub configured with cfg.
 func NewInMemoryHub(cfg Config) *InMemoryHub {
 	cfg = cfg.withDefaults()
+	host, err := os.Hostname()
+	if err != nil || strings.TrimSpace(host) == "" {
+		host = "ws-node"
+	}
 	return &InMemoryHub{
 		cfg:          cfg,
+		instanceID:   host + "-" + uuid.NewString()[:8],
+		startedAt:    time.Now().UTC(),
 		conns:        make(map[string]domain_ws.Client),
 		users:        make(map[int64]map[string]domain_ws.Client),
 		channels:     make(map[string]map[string]domain_ws.Client),
@@ -53,6 +82,7 @@ func (h *InMemoryHub) Register(client domain_ws.Client) error {
 	userID := client.UserID()
 	if userID > 0 && h.cfg.MaxConnsPerUser > 0 {
 		if len(h.users[userID]) >= h.cfg.MaxConnsPerUser {
+			h.totalRejectedLimit.Add(1)
 			return domain_ws.ErrTooManyConnections
 		}
 	}
@@ -66,7 +96,10 @@ func (h *InMemoryHub) Register(client domain_ws.Client) error {
 			h.users[userID] = make(map[string]domain_ws.Client)
 		}
 		h.users[userID][connID] = client
+	} else {
+		h.anonConns++
 	}
+	h.totalAccepted.Add(1)
 
 	return nil
 }
@@ -82,6 +115,7 @@ func (h *InMemoryHub) Unregister(connID string) {
 	}
 
 	delete(h.conns, connID)
+	h.totalClosed.Add(1)
 
 	if userID := client.UserID(); userID > 0 {
 		if userConns, ok := h.users[userID]; ok {
@@ -90,6 +124,8 @@ func (h *InMemoryHub) Unregister(connID string) {
 				delete(h.users, userID)
 			}
 		}
+	} else if h.anonConns > 0 {
+		h.anonConns--
 	}
 
 	if subs, ok := h.connChannels[connID]; ok {
@@ -300,16 +336,136 @@ func (h *InMemoryHub) Broadcast(ctx context.Context, env domain_ws.Envelope) err
 	return dispatchToClients(ctx, targets, env)
 }
 
-// Stats returns a point-in-time snapshot of hub connection, user, and channel counts.
+// Stats returns a point-in-time snapshot of hub connection, user, channel, and cumulative counters.
 func (h *InMemoryHub) Stats() domain_ws.HubStats {
+	h.mu.RLock()
+	stats := h.buildStatsLocked()
+	h.mu.RUnlock()
+	return stats
+}
+
+// Snapshot returns a filtered, bounded point-in-time view of hub metrics, active channels, and connections.
+func (h *InMemoryHub) Snapshot(filter domain_ws.SnapshotFilter) domain_ws.HubSnapshot {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = defaultSnapshotLimit
+	} else if limit > maxSnapshotLimit {
+		limit = maxSnapshotLimit
+	}
+	channelFilter := strings.TrimSpace(filter.Channel)
+
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	return domain_ws.HubStats{
-		ActiveConnections: len(h.conns),
-		UniqueUsers:       len(h.users),
-		ActiveChannels:    len(h.channels),
+	stats := h.buildStatsLocked()
+
+	channels := make([]domain_ws.ChannelSnapshot, 0, len(h.channels))
+	for ch, members := range h.channels {
+		if channelFilter != "" && ch != channelFilter {
+			continue
+		}
+		channels = append(channels, domain_ws.ChannelSnapshot{
+			Channel:     ch,
+			Subscribers: len(members),
+		})
 	}
+	sort.Slice(channels, func(i, j int) bool {
+		return channels[i].Channel < channels[j].Channel
+	})
+
+	// Choose the narrowest index when filters are provided.
+	var candidates map[string]domain_ws.Client
+	switch {
+	case channelFilter != "":
+		candidates = h.channels[channelFilter]
+	case filter.UserID > 0:
+		candidates = h.users[filter.UserID]
+	default:
+		candidates = h.conns
+	}
+
+	conns := make([]domain_ws.ConnectionSnapshot, 0, min(len(candidates), limit))
+	for connID, client := range candidates {
+		if filter.UserID > 0 && client.UserID() != filter.UserID {
+			continue
+		}
+		conns = append(conns, h.buildConnSnapshotLocked(connID, client))
+	}
+
+	sort.Slice(conns, func(i, j int) bool {
+		if !conns[i].ConnectedAt.Equal(conns[j].ConnectedAt) {
+			return conns[i].ConnectedAt.Before(conns[j].ConnectedAt)
+		}
+		return conns[i].ConnID < conns[j].ConnID
+	})
+
+	truncated := false
+	if len(conns) > limit {
+		conns = conns[:limit]
+		truncated = true
+	}
+
+	return domain_ws.HubSnapshot{
+		Stats:       stats,
+		Channels:    channels,
+		Connections: conns,
+		Truncated:   truncated,
+	}
+}
+
+func (h *InMemoryHub) buildStatsLocked() domain_ws.HubStats {
+	status := "running"
+	if h.closed {
+		status = "closed"
+	}
+	return domain_ws.HubStats{
+		InstanceID:           h.instanceID,
+		Status:               status,
+		StartedAt:            h.startedAt,
+		UptimeSeconds:        int64(time.Since(h.startedAt).Seconds()),
+		ActiveConnections:    len(h.conns),
+		AnonymousConnections: h.anonConns,
+		UniqueUsers:          len(h.users),
+		ActiveChannels:       len(h.channels),
+		TotalAccepted:        h.totalAccepted.Load(),
+		TotalClosed:          h.totalClosed.Load(),
+		TotalRejectedLimit:   h.totalRejectedLimit.Load(),
+		TotalRejectedAuth:    h.totalRejectedAuth.Load(),
+		MessagesEnqueued:     h.messagesEnqueued.Load(),
+		MessagesSent:         h.messagesSent.Load(),
+		MessagesDropped:      h.messagesDropped.Load(),
+		MessagesReceived:     h.messagesReceived.Load(),
+		InboundErrors:        h.inboundErrors.Load(),
+		HeartbeatFailures:    h.heartbeatFailures.Load(),
+	}
+}
+
+func (h *InMemoryHub) buildConnSnapshotLocked(connID string, client domain_ws.Client) domain_ws.ConnectionSnapshot {
+	subs := h.connChannels[connID]
+	channels := make([]string, 0, len(subs))
+	for ch := range subs {
+		channels = append(channels, ch)
+	}
+	sort.Strings(channels)
+
+	if wc, ok := client.(*wsClient); ok {
+		return wc.snapshot(channels)
+	}
+
+	var role string
+	if id := client.Identity(); id != nil {
+		role = id.Role
+	}
+	return domain_ws.ConnectionSnapshot{
+		ConnID:   client.ID(),
+		UserID:   client.UserID(),
+		Role:     role,
+		Channels: channels,
+	}
+}
+
+func (h *InMemoryHub) recordAuthRejected() {
+	h.totalRejectedAuth.Add(1)
 }
 
 // Close marks the hub closed, closes all active connections with StatusGoingAway,

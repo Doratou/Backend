@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // Identity carries the authenticated subject resolved during the WebSocket handshake.
@@ -41,11 +42,66 @@ func (f InboundHandlerFunc) HandleMessage(ctx context.Context, client Client, en
 	return f(ctx, client, env)
 }
 
-// HubStats exposes a point-in-time snapshot of active WebSocket resources.
+// HubStats exposes a point-in-time snapshot of active WebSocket resources and cumulative counters.
 type HubStats struct {
-	ActiveConnections int `json:"active_connections"`
-	UniqueUsers       int `json:"unique_users"`
-	ActiveChannels    int `json:"active_channels"`
+	InstanceID           string    `json:"instance_id"`
+	Status               string    `json:"status"`
+	StartedAt            time.Time `json:"started_at"`
+	UptimeSeconds        int64     `json:"uptime_seconds"`
+	ActiveConnections    int       `json:"active_connections"`
+	AnonymousConnections int       `json:"anonymous_connections"`
+	UniqueUsers          int       `json:"unique_users"`
+	ActiveChannels       int       `json:"active_channels"`
+	TotalAccepted        uint64    `json:"total_accepted"`
+	TotalClosed          uint64    `json:"total_closed"`
+	TotalRejectedLimit   uint64    `json:"total_rejected_limit"`
+	TotalRejectedAuth    uint64    `json:"total_rejected_auth"`
+	MessagesEnqueued     uint64    `json:"messages_enqueued"`
+	MessagesSent         uint64    `json:"messages_sent"`
+	MessagesDropped      uint64    `json:"messages_dropped"`
+	MessagesReceived     uint64    `json:"messages_received"`
+	InboundErrors        uint64    `json:"inbound_errors"`
+	HeartbeatFailures    uint64    `json:"heartbeat_failures"`
+}
+
+// SnapshotFilter constrains the connections included in a HubSnapshot.
+type SnapshotFilter struct {
+	UserID  int64
+	Channel string
+	Limit   int
+}
+
+// ConnectionSnapshot describes the live state of a single WebSocket connection.
+type ConnectionSnapshot struct {
+	ConnID         string    `json:"conn_id"`
+	UserID         int64     `json:"user_id"`
+	Role           string    `json:"role,omitempty"`
+	RemoteAddr     string    `json:"remote_addr,omitempty"`
+	Channels       []string  `json:"channels"`
+	SendQueueLen   int       `json:"send_queue_len"`
+	SendQueueCap   int       `json:"send_queue_cap"`
+	ConnectedAt    time.Time `json:"connected_at"`
+	LastActivityAt time.Time `json:"last_activity_at"`
+}
+
+// ChannelSnapshot describes an active channel and its subscriber count.
+type ChannelSnapshot struct {
+	Channel     string `json:"channel"`
+	Subscribers int    `json:"subscribers"`
+}
+
+// HubSnapshot captures a point-in-time view of hub metrics, channels, and connections for monitoring.
+type HubSnapshot struct {
+	Stats       HubStats             `json:"stats"`
+	Channels    []ChannelSnapshot    `json:"channels"`
+	Connections []ConnectionSnapshot `json:"connections"`
+	Truncated   bool                 `json:"truncated"`
+}
+
+// Monitor exposes read-only WebSocket operational metrics and snapshots.
+type Monitor interface {
+	Stats() HubStats
+	Snapshot(filter SnapshotFilter) HubSnapshot
 }
 
 // Hub defines the transport-agnostic registry and message router for WebSocket connections.
@@ -60,5 +116,6 @@ type Hub interface {
 	SendToChannel(ctx context.Context, channel string, env Envelope) error
 	Broadcast(ctx context.Context, env Envelope) error
 	Stats() HubStats
+	Snapshot(filter SnapshotFilter) HubSnapshot
 	Close(ctx context.Context) error
 }

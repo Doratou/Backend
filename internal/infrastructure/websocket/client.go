@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	domain_ws "github.com/Doratou/Backend/internal/domain/websocket"
@@ -18,6 +19,10 @@ import (
 type wsClient struct {
 	id             string
 	identity       *domain_ws.Identity
+	remoteAddr     string
+	connectedAt    time.Time
+	lastActivityNs atomic.Int64
+
 	conn           *websocket.Conn
 	hub            *InMemoryHub
 	cfg            Config
@@ -38,16 +43,20 @@ func newWSClient(
 	conn *websocket.Conn,
 	hub *InMemoryHub,
 	identity *domain_ws.Identity,
+	remoteAddr string,
 	cfg Config,
 	inboundHandler domain_ws.InboundHandler,
 ) *wsClient {
 	if identity == nil {
 		identity = &domain_ws.Identity{}
 	}
+	now := time.Now().UTC()
 	ctx, cancel := context.WithCancel(parentCtx)
-	return &wsClient{
+	c := &wsClient{
 		id:             uuid.NewString(),
 		identity:       identity,
+		remoteAddr:     remoteAddr,
+		connectedAt:    now,
 		conn:           conn,
 		hub:            hub,
 		cfg:            cfg,
@@ -55,6 +64,33 @@ func newWSClient(
 		sendCh:         make(chan domain_ws.Envelope, cfg.SendBufferSize),
 		ctx:            ctx,
 		cancel:         cancel,
+	}
+	c.lastActivityNs.Store(now.UnixNano())
+	return c
+}
+
+func (c *wsClient) touchActivity() {
+	c.lastActivityNs.Store(time.Now().UTC().UnixNano())
+}
+
+func (c *wsClient) snapshot(channels []string) domain_ws.ConnectionSnapshot {
+	if channels == nil {
+		channels = []string{}
+	}
+	var role string
+	if c.identity != nil {
+		role = c.identity.Role
+	}
+	return domain_ws.ConnectionSnapshot{
+		ConnID:         c.id,
+		UserID:         c.UserID(),
+		Role:           role,
+		RemoteAddr:     c.remoteAddr,
+		Channels:       channels,
+		SendQueueLen:   len(c.sendCh),
+		SendQueueCap:   cap(c.sendCh),
+		ConnectedAt:    c.connectedAt,
+		LastActivityAt: time.Unix(0, c.lastActivityNs.Load()).UTC(),
 	}
 }
 
@@ -90,11 +126,17 @@ func (c *wsClient) Send(env domain_ws.Envelope) error {
 	select {
 	case c.sendCh <- env:
 		c.sendMu.RUnlock()
+		if c.hub != nil {
+			c.hub.messagesEnqueued.Add(1)
+		}
 		return nil
 	default:
 		c.sendMu.RUnlock()
 	}
 
+	if c.hub != nil {
+		c.hub.messagesDropped.Add(1)
+	}
 	if c.cfg.SlowConsumerPolicy == SlowConsumerDisconnect {
 		go func() {
 			_ = c.Close(int(websocket.StatusPolicyViolation), "slow consumer: send buffer full")
@@ -170,15 +212,25 @@ func (c *wsClient) readPump(ctx context.Context) {
 		if msgType != websocket.MessageText && msgType != websocket.MessageBinary {
 			continue
 		}
+		c.touchActivity()
 
 		var env domain_ws.Envelope
 		if err := json.Unmarshal(payload, &env); err != nil {
+			if c.hub != nil {
+				c.hub.inboundErrors.Add(1)
+			}
 			c.sendError("", "INVALID_ENVELOPE", "message must be a valid JSON envelope")
 			continue
 		}
 		if err := env.Validate(); err != nil {
+			if c.hub != nil {
+				c.hub.inboundErrors.Add(1)
+			}
 			c.sendError(env.ID, "INVALID_ENVELOPE", err.Error())
 			continue
+		}
+		if c.hub != nil {
+			c.hub.messagesReceived.Add(1)
 		}
 
 		if c.cfg.EnableControlEvents && c.handleControlEvent(ctx, env) {
@@ -187,6 +239,9 @@ func (c *wsClient) readPump(ctx context.Context) {
 
 		if c.inboundHandler != nil {
 			if err := c.inboundHandler.HandleMessage(ctx, c, env); err != nil {
+				if c.hub != nil {
+					c.hub.inboundErrors.Add(1)
+				}
 				c.sendError(env.ID, "INBOUND_HANDLER_ERROR", err.Error())
 			}
 		}
@@ -272,6 +327,10 @@ func (c *wsClient) writePump(ctx context.Context) {
 				_ = c.Close(0, "")
 				return
 			}
+			c.touchActivity()
+			if c.hub != nil {
+				c.hub.messagesSent.Add(1)
+			}
 		}
 	}
 }
@@ -294,11 +353,15 @@ func (c *wsClient) heartbeatLoop(ctx context.Context) {
 			cancel()
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
+					if c.hub != nil {
+						c.hub.heartbeatFailures.Add(1)
+					}
 					log.Printf("[WS CLIENT] heartbeat ping failed conn=%s user=%d err=%v", c.id, c.UserID(), err)
 				}
 				_ = c.Close(0, "")
 				return
 			}
+			c.touchActivity()
 		}
 	}
 }
