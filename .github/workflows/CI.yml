@@ -157,8 +157,8 @@ jobs:
             dockerfile: Dockerfile.worker-email
           - worker: sms
             dockerfile: Dockerfile.worker-sms
-          - worker: ws
-            dockerfile: Dockerfile.worker-ws
+          # - worker: ws
+          #   dockerfile: Dockerfile.worker-ws
 
     permissions:
       contents: read
