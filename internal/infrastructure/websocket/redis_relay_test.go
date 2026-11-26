@@ -198,3 +198,25 @@ func TestRedisRelay_NilClientGuard(t *testing.T) {
 	// Ensure HTTP handler check doesn't fail compile/import sanity
 	_ = http.StatusOK
 }
+
+func TestRuntime_NilSafeAndLifecycle(t *testing.T) {
+	var nilRT *Runtime
+	if nilRT.Publisher() != nil || nilRT.HTTPHandler() != nil || nilRT.Monitor() != nil {
+		t.Fatal("expected nil Runtime accessors to return nil")
+	}
+	nilRT.Start(context.Background())
+	nilRT.Shutdown()
+
+	rt := NewRuntime(DefaultConfig(), nil, nil, nil)
+	if rt.Publisher() != nil {
+		t.Fatal("expected nil publisher when redisClient is nil")
+	}
+	if rt.HTTPHandler() == nil || rt.Monitor() == nil {
+		t.Fatal("expected non-nil server and monitor")
+	}
+	rt.Start(context.Background())
+	rt.Shutdown()
+	if stats := rt.Monitor().Stats(); stats.Status != "closed" {
+		t.Fatalf("expected hub status closed after Shutdown, got %q", stats.Status)
+	}
+}
