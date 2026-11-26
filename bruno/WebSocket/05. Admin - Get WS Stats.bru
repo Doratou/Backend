@@ -1,0 +1,71 @@
+meta {
+  name: 05. Admin - Get WS Stats
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/ws/stats
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - Get WebSocket Stats
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/admin/ws/stats`
+  **Auth:** Required (Admin Access Token — `ADMIN` role)
+
+  ## Description
+  Returns real-time operational counters and health summary for the current backend instance's WebSocket hub.
+
+  > **Multi-instance note:** Behind a Load Balancer, `instance_id` identifies which backend pod served the request.
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Admin Bearer access token (`Bearer <token>`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "instance_id": "api-pod-1-a1b2c3d4",
+      "status": "running",
+      "started_at": "2026-11-26T10:00:00Z",
+      "uptime_seconds": 1825,
+      "active_connections": 42,
+      "anonymous_connections": 0,
+      "unique_users": 35,
+      "active_channels": 12,
+      "total_accepted": 128,
+      "total_closed": 86,
+      "total_rejected_limit": 1,
+      "total_rejected_auth": 4,
+      "messages_enqueued": 1024,
+      "messages_sent": 1020,
+      "messages_dropped": 0,
+      "messages_received": 310,
+      "inbound_errors": 2,
+      "heartbeat_failures": 3
+    }
+  }
+  ```
+
+  ## Errors
+  * `401 Unauthorized` — Missing, expired, invalid, or revoked token
+  * `403 Forbidden` — Insufficient permissions (requires `ADMIN` role)
+}
