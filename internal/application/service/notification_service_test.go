@@ -5,14 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
 	"github.com/Doratou/Backend/internal/application/service"
-	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
 	"github.com/Doratou/Backend/internal/domain/broker/payload"
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
 	domain_repo "github.com/Doratou/Backend/internal/domain/repository/DB"
+	domain_ws "github.com/Doratou/Backend/internal/domain/websocket"
 	"gorm.io/gorm"
 )
 
@@ -222,31 +221,12 @@ func (m *mockGroupRepo) CloneWithMembers(ctx context.Context, sourceGroupID int6
 	return nil
 }
 
-type publishedRecord struct {
-	payload payload.WSPayload
-	opts    domain_broker.PublishOptions
-}
-
 type mockPublisher struct {
-	published []payload.WSPayload
-	records   []publishedRecord
+	published []domain_ws.RelayMessage
 }
 
-func (m *mockPublisher) Publish(ctx context.Context, exchange, routingKey string, msg domain_broker.Message, opts ...domain_broker.PublishOption) error {
-	return nil
-}
-
-func (m *mockPublisher) PublishJSON(ctx context.Context, exchange, routingKey string, p any, opts ...domain_broker.PublishOption) error {
-	var pubOpts domain_broker.PublishOptions
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&pubOpts)
-		}
-	}
-	if wsPayload, ok := p.(payload.WSPayload); ok {
-		m.published = append(m.published, wsPayload)
-		m.records = append(m.records, publishedRecord{payload: wsPayload, opts: pubOpts})
-	}
+func (m *mockPublisher) Publish(_ context.Context, msg domain_ws.RelayMessage) error {
+	m.published = append(m.published, msg)
 	return nil
 }
 
@@ -382,34 +362,29 @@ func TestNotificationService_CreateGroupAnnouncement_ExcludesOwner_AndPublishesT
 		t.Fatalf("expected member 200 to have 1 notification, got %d", len(memberList.Items))
 	}
 
-	// Verify RabbitMQ publish was triggered with TargetGroups and Realtime delivery
+	// Verify Pub/Sub publish was triggered with resolved member TargetIDs and group channel metadata
 	if len(pub.published) != 1 {
-		t.Fatalf("expected 1 event published to RMQ, got %d", len(pub.published))
+		t.Fatalf("expected 1 event published to Pub/Sub, got %d", len(pub.published))
 	}
 	event := pub.published[0]
-	if event.Event != payload.WSEventGroupAnnouncement {
+	if event.Event != string(payload.WSEventGroupAnnouncement) {
 		t.Fatalf("expected event %s, got %s", payload.WSEventGroupAnnouncement, event.Event)
 	}
-	if event.TargetType != payload.TargetGroups {
-		t.Fatalf("expected target type %s, got %s", payload.TargetGroups, event.TargetType)
+	if event.TargetType != domain_ws.RelayTargetUsers {
+		t.Fatalf("expected target type %s, got %s", domain_ws.RelayTargetUsers, event.TargetType)
 	}
-	if len(event.TargetIDs) != 1 || event.TargetIDs[0] != 1 {
-		t.Fatalf("expected target IDs [1], got %v", event.TargetIDs)
+	if len(event.TargetIDs) != 2 || event.TargetIDs[0] != 200 || event.TargetIDs[1] != 300 {
+		t.Fatalf("expected target IDs [200 300], got %v", event.TargetIDs)
+	}
+	if event.Channel != "group:1" {
+		t.Fatalf("expected channel group:1, got %q", event.Channel)
 	}
 	if event.SenderID != 100 {
 		t.Fatalf("expected sender ID 100, got %d", event.SenderID)
 	}
-
-	rec := pub.records[0]
-	if rec.opts.Urgency != domain_broker.UrgencyRealtime {
-		t.Fatalf("expected announcement urgency Realtime (%d), got %d", domain_broker.UrgencyRealtime, rec.opts.Urgency)
-	}
-	if rec.opts.TTL != time.Minute {
-		t.Fatalf("expected announcement TTL 1m, got %v", rec.opts.TTL)
-	}
 }
 
-func TestNotificationService_DispatchToUser_PublishesToRMQ(t *testing.T) {
+func TestNotificationService_DispatchToUser_PublishesToPubSub(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockNotificationRepo()
 	groupRepo := &mockGroupRepo{
@@ -429,7 +404,7 @@ func TestNotificationService_DispatchToUser_PublishesToRMQ(t *testing.T) {
 		t.Fatalf("expected 1 event published, got %d", len(pub.published))
 	}
 	ev := pub.published[0]
-	if ev.TargetType != payload.TargetUsers {
+	if ev.TargetType != domain_ws.RelayTargetUsers {
 		t.Fatalf("expected target type users, got %s", ev.TargetType)
 	}
 	if len(ev.TargetIDs) != 1 || ev.TargetIDs[0] != 10 {
@@ -438,17 +413,12 @@ func TestNotificationService_DispatchToUser_PublishesToRMQ(t *testing.T) {
 	if ev.SenderID != 42 {
 		t.Fatalf("expected sender ID 42, got %d", ev.SenderID)
 	}
-
-	rec := pub.records[0]
-	if rec.opts.Urgency != domain_broker.UrgencyRealtime {
-		t.Fatalf("expected friend_request urgency Realtime, got %d", rec.opts.Urgency)
-	}
-	if rec.opts.TTL != time.Minute {
-		t.Fatalf("expected friend_request TTL 1m, got %v", rec.opts.TTL)
+	if ev.Event != string(payload.WSEventFriendRequestReceived) {
+		t.Fatalf("expected event %s, got %s", payload.WSEventFriendRequestReceived, ev.Event)
 	}
 }
 
-func TestNotificationService_EventUrgencyAndTTL_Defaults(t *testing.T) {
+func TestNotificationService_Broadcast_PublishesToPubSub(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockNotificationRepo()
 	groupRepo := &mockGroupRepo{
@@ -458,75 +428,14 @@ func TestNotificationService_EventUrgencyAndTTL_Defaults(t *testing.T) {
 	pub := &mockPublisher{}
 	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
 
-	// 1. UrgencyRealtime event (e.g. SettlementPaid)
-	if err := srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventSettlementPaid, nil); err != nil {
+	if err := srv.Broadcast(ctx, nil, payload.WSEventTokenPriceUpdated, map[string]int64{"new_price_toman": 50000}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// 2. UrgencyStandard event (e.g. PollCreated)
-	if err := srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventPollCreated, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if len(pub.published) != 1 {
+		t.Fatalf("expected 1 broadcast message, got %d", len(pub.published))
 	}
-	// 3. UrgencyNormal event (e.g. TokenPriceUpdated)
-	if err := srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventTokenPriceUpdated, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(pub.records) != 3 {
-		t.Fatalf("expected 3 published records, got %d", len(pub.records))
-	}
-
-	// Verify SettlementPaid -> Realtime & 1m
-	if pub.records[0].opts.Urgency != domain_broker.UrgencyRealtime {
-		t.Errorf("SettlementPaid: expected UrgencyRealtime (%d), got %d", domain_broker.UrgencyRealtime, pub.records[0].opts.Urgency)
-	}
-	if pub.records[0].opts.TTL != time.Minute {
-		t.Errorf("SettlementPaid: expected TTL 1m, got %v", pub.records[0].opts.TTL)
-	}
-
-	// Verify PollCreated -> Standard & 5m
-	if pub.records[1].opts.Urgency != domain_broker.UrgencyStandard {
-		t.Errorf("PollCreated: expected UrgencyStandard (%d), got %d", domain_broker.UrgencyStandard, pub.records[1].opts.Urgency)
-	}
-	if pub.records[1].opts.TTL != 5*time.Minute {
-		t.Errorf("PollCreated: expected TTL 5m, got %v", pub.records[1].opts.TTL)
-	}
-
-	// Verify TokenPriceUpdated -> Normal & 15m
-	if pub.records[2].opts.Urgency != domain_broker.UrgencyNormal {
-		t.Errorf("TokenPriceUpdated: expected UrgencyNormal (%d), got %d", domain_broker.UrgencyNormal, pub.records[2].opts.Urgency)
-	}
-	if pub.records[2].opts.TTL != 15*time.Minute {
-		t.Errorf("TokenPriceUpdated: expected TTL 15m, got %v", pub.records[2].opts.TTL)
-	}
-}
-
-func TestNotificationService_CallerOverride(t *testing.T) {
-	ctx := context.Background()
-	repo := newMockNotificationRepo()
-	groupRepo := &mockGroupRepo{
-		groups:  make(map[int64]*entity.Group),
-		members: make(map[int64][]entity.GroupMember),
-	}
-	pub := &mockPublisher{}
-	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
-
-	// Override TokenPriceUpdated (default Normal/15m) to Realtime with custom 30s TTL
-	err := srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventTokenPriceUpdated, nil,
-		adapter.WithDispatchUrgency(domain_broker.UrgencyRealtime),
-		adapter.WithDispatchTTL(30*time.Second),
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(pub.records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(pub.records))
-	}
-	if pub.records[0].opts.Urgency != domain_broker.UrgencyRealtime {
-		t.Errorf("override: expected UrgencyRealtime, got %d", pub.records[0].opts.Urgency)
-	}
-	if pub.records[0].opts.TTL != 30*time.Second {
-		t.Errorf("override: expected TTL 30s, got %v", pub.records[0].opts.TTL)
+	if pub.published[0].TargetType != domain_ws.RelayTargetBroadcast {
+		t.Fatalf("expected broadcast target type, got %s", pub.published[0].TargetType)
 	}
 }
 
@@ -569,16 +478,19 @@ func TestNotificationService_DispatchToGroup_AutoResolvesMembersAndPublishesOnce
 		}
 	}
 
-	// Verify RabbitMQ received ONLY ONE message (TargetGroups), not duplicate TargetUsers + TargetGroups
-	if len(pub.records) != 1 {
-		t.Fatalf("expected exactly 1 RabbitMQ publish, got %d", len(pub.records))
+	// Verify Pub/Sub received ONLY ONE message with resolved member user IDs and group:5 channel metadata
+	if len(pub.published) != 1 {
+		t.Fatalf("expected exactly 1 Pub/Sub publish, got %d", len(pub.published))
 	}
-	ev := pub.records[0].payload
-	if ev.TargetType != payload.TargetGroups {
-		t.Fatalf("expected target type %s, got %s", payload.TargetGroups, ev.TargetType)
+	ev := pub.published[0]
+	if ev.TargetType != domain_ws.RelayTargetUsers {
+		t.Fatalf("expected target type %s, got %s", domain_ws.RelayTargetUsers, ev.TargetType)
 	}
-	if len(ev.TargetIDs) != 1 || ev.TargetIDs[0] != 5 {
-		t.Fatalf("expected target group ID [5], got %v", ev.TargetIDs)
+	if len(ev.TargetIDs) != 3 || ev.TargetIDs[0] != 100 || ev.TargetIDs[1] != 200 || ev.TargetIDs[2] != 300 {
+		t.Fatalf("expected resolved member target IDs [100 200 300], got %v", ev.TargetIDs)
+	}
+	if ev.Channel != "group:5" {
+		t.Fatalf("expected channel group:5, got %q", ev.Channel)
 	}
 	if ev.SenderID != 100 {
 		t.Fatalf("expected sender ID 100, got %d", ev.SenderID)

@@ -29,6 +29,7 @@ import (
 	"github.com/Doratou/Backend/internal/infrastructure/seed"
 	"github.com/Doratou/Backend/internal/infrastructure/storage"
 	weatherInfra "github.com/Doratou/Backend/internal/infrastructure/weather"
+	wsInfra "github.com/Doratou/Backend/internal/infrastructure/websocket"
 	"github.com/Doratou/Backend/internal/presentation/v1/handler"
 	"github.com/Doratou/Backend/internal/presentation/v1/router"
 	"github.com/Doratou/Backend/pkg/captcha"
@@ -126,7 +127,7 @@ func main() {
 		setupCtx, cancelSetup := context.WithTimeout(context.Background(), 10*time.Second)
 		topology := brokerInfra.NewTopology(rmqConnMgr)
 		qTTL := cfg.Environment.QueueTTL
-		if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.WSQueueTTL, qTTL.DLQMessageTTL); err != nil {
+		if err := topology.SetupDoratouTopology(setupCtx, qTTL.EmailQueueTTL, qTTL.SMSQueueTTL, qTTL.DLQMessageTTL); err != nil {
 			log.Printf("[RABBITMQ WARNING] failed to declare doratou topology: %v", err)
 		} else {
 			log.Print("RabbitMQ Doratou notification topology initialized")
@@ -308,11 +309,29 @@ func main() {
 		redisTrxManager,
 	)
 
+	var wsRuntime *wsInfra.Runtime
+	if wsCfg := cfg.ResolveWS(); wsCfg.Enabled {
+		wsRuntime = wsInfra.NewRuntime(wsInfra.Config{
+			RequireAuth:        wsCfg.AuthRequired,
+			InsecureSkipVerify: wsCfg.InsecureSkipVerify,
+			OriginPatterns:     wsCfg.OriginPatterns,
+			ReadLimit:          wsCfg.ReadLimitBytes,
+			SendBufferSize:     wsCfg.SendBufferSize,
+			WriteTimeout:       wsCfg.WriteTimeout,
+			PingInterval:       wsCfg.PingInterval,
+			PongTimeout:        wsCfg.PongTimeout,
+			ShutdownTimeout:    wsCfg.ShutdownTimeout,
+			MaxConnsPerUser:    wsCfg.MaxConnsPerUser,
+			SlowConsumerPolicy: wsInfra.SlowConsumerPolicy(wsCfg.SlowConsumerPolicy),
+			PubSubChannel:      wsCfg.PubSubChannel,
+		}, redisCache.GetClient(), jwtMaker, tokenRepo)
+	}
+
 	notificationService := service.NewNotificationService(
 		notificationRepo,
 		groupRepo,
 		dbTrxManager,
-		rmqPublisher,
+		wsRuntime.Publisher(),
 		service.NotificationServiceConfig{
 			RealtimeTTL: cfg.Environment.Notification.RealtimeTTL,
 			StandardTTL: cfg.Environment.Notification.StandardTTL,
@@ -372,6 +391,11 @@ func main() {
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	tokenPriceHandler := handler.NewTokenPriceHandler(tokenPriceService)
+	var wsHandler *handler.WSHandler
+	if wsRuntime != nil {
+		wsHandler = handler.NewWSHandler(wsRuntime.HTTPHandler(), wsRuntime.Monitor())
+	}
+
 	engine := router.New(router.Dependencies{
 		AuthHandler:         authHandler,
 		UserHandler:         userHandler,
@@ -380,6 +404,7 @@ func main() {
 		AdminReportHandler:  adminReportHandler,
 		NotificationHandler: notificationHandler,
 		TokenPriceHandler:   tokenPriceHandler,
+		WSHandler:           wsHandler,
 		GroupHandler:        groupHandler,
 		InviteHandler:       inviteHandler,
 		FriendshipHandler:   friendshipHandler,
@@ -400,6 +425,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	wsRuntime.Start(ctx)
+
 	server := &http.Server{
 		Addr:              net.JoinHostPort(cfg.Environment.HttpServer.Domain, cfg.Environment.HttpServer.Port),
 		Handler:           engine,
@@ -415,6 +442,7 @@ func main() {
 
 	<-ctx.Done()
 	log.Print("Shutdown signal received, shutting down gracefully...")
+	wsRuntime.Shutdown()
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
 	if err := server.Shutdown(shutdownCtx); err != nil {

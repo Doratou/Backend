@@ -28,6 +28,23 @@ type Environment struct {
 	Workers      WorkerConfig       `mapstructure:",squash"`
 	QueueTTL     QueueTTLConfig     `mapstructure:",squash"`
 	Notification NotificationConfig `mapstructure:",squash"`
+	WS           WSConfig           `mapstructure:",squash"`
+}
+
+type WSConfig struct {
+	Enabled            *bool         `mapstructure:"WS_ENABLED"`
+	AuthRequired       *bool         `mapstructure:"WS_AUTH_REQUIRED"`
+	InsecureSkipVerify bool          `mapstructure:"WS_INSECURE_SKIP_VERIFY"`
+	OriginPatterns     string        `mapstructure:"WS_ORIGIN_PATTERNS"`
+	ReadLimitBytes     int64         `mapstructure:"WS_READ_LIMIT_BYTES"`
+	SendBufferSize     int           `mapstructure:"WS_SEND_BUFFER_SIZE"`
+	WriteTimeout       time.Duration `mapstructure:"WS_WRITE_TIMEOUT"`
+	PingInterval       time.Duration `mapstructure:"WS_PING_INTERVAL"`
+	PongTimeout        time.Duration `mapstructure:"WS_PONG_TIMEOUT"`
+	ShutdownTimeout    time.Duration `mapstructure:"WS_SHUTDOWN_TIMEOUT"`
+	MaxConnsPerUser    int           `mapstructure:"WS_MAX_CONNS_PER_USER"`
+	SlowConsumerPolicy string        `mapstructure:"WS_SLOW_CONSUMER_POLICY"`
+	PubSubChannel      string        `mapstructure:"WS_PUBSUB_CHANNEL"`
 }
 
 type NotificationConfig struct {
@@ -40,7 +57,6 @@ type NotificationConfig struct {
 type QueueTTLConfig struct {
 	EmailQueueTTL time.Duration `mapstructure:"EMAIL_QUEUE_TTL"`
 	SMSQueueTTL   time.Duration `mapstructure:"SMS_QUEUE_TTL"`
-	WSQueueTTL    time.Duration `mapstructure:"WS_QUEUE_TTL"`
 	DLQMessageTTL time.Duration `mapstructure:"DLQ_MESSAGE_TTL"`
 }
 
@@ -54,11 +70,6 @@ type WorkerConfig struct {
 	SMSPrefetch    int           `mapstructure:"SMS_WORKER_PREFETCH"`
 	SMSMaxRetries  int           `mapstructure:"SMS_WORKER_MAX_RETRIES"`
 	SMSRetryDelay  time.Duration `mapstructure:"SMS_WORKER_RETRY_DELAY"`
-
-	WSConcurrency int           `mapstructure:"WS_WORKER_CONCURRENCY"`
-	WSPrefetch    int           `mapstructure:"WS_WORKER_PREFETCH"`
-	WSMaxRetries  int           `mapstructure:"WS_WORKER_MAX_RETRIES"`
-	WSRetryDelay  time.Duration `mapstructure:"WS_WORKER_RETRY_DELAY"`
 }
 type OAuthConfig struct {
 	Protcol string `mapstructure:"OAUTH_PROTCOL"`

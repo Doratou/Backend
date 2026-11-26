@@ -1,0 +1,52 @@
+meta {
+  name: 03. Connect (Query Token - Subscribe)
+  type: ws
+  seq: 3
+}
+
+ws {
+  url: {{wsBaseUrl}}/api/v1/ws?token={{token}}
+  body: ws
+  auth: none
+}
+
+params:query {
+  token: {{token}}
+}
+
+body:ws {
+  name: ws.subscribe
+  content: '''
+    {
+      "id": "sub-1",
+      "event": "ws.subscribe",
+      "channel": "{{wsChannel}}"
+    }
+  '''
+}
+
+docs {
+  # Connect WebSocket (Query Token — Browser Style) & Subscribe
+
+  **Protocol:** `WebSocket` (`ws://` / `wss://`)
+  **Endpoint:** `/api/v1/ws?token=<access_token>`
+  **Auth:** Query Parameter `token` (Access Token)
+
+  ## Description
+  Demonstrates the browser-compatible handshake flow where the JWT access token is passed via `?token={{token}}` (because browser `new WebSocket(url)` cannot attach custom `Authorization` headers).
+
+  The pre-configured message subscribes this connection to `{{wsChannel}}` (default `room:test`).
+
+  ## Expected Server Response
+  ```json
+  {
+    "id": "sub-1",
+    "event": "ws.subscribed",
+    "channel": "room:test",
+    "data": {
+      "channel": "room:test"
+    },
+    "timestamp": "2026-11-26T10:30:10Z"
+  }
+  ```
+}

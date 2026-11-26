@@ -1,0 +1,107 @@
+meta {
+  name: 06. Admin - Get WS Snapshot
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/ws/snapshot?limit=100
+  body: none
+  auth: bearer
+}
+
+params:query {
+  limit: 100
+  ~user_id: 7
+  ~channel: room:test
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Admin - Get WebSocket Snapshot
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/admin/ws/snapshot`
+  **Auth:** Required (Admin Access Token — `ADMIN` role)
+
+  ## Description
+  Returns a filtered, bounded point-in-time snapshot of the WebSocket hub including summary stats, active channels with subscriber counts, and active connection states (queue depth, subscribed channels, timestamps).
+
+  ## Request
+
+  ### Headers
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Admin Bearer access token (`Bearer <token>`) |
+
+  ### Query Parameters
+  | Field | Type | Required | Default | Description |
+  | --- | --- | --- | --- | --- |
+  | `user_id` | `int64` | No | - | Filter connections belonging to a specific user ID (> 0) |
+  | `channel` | `string` | No | - | Filter channels and connections subscribed to a specific channel name |
+  | `limit` | `int` | No | `100` | Maximum connections to return (capped at `1000`) |
+
+  ## Response
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "stats": {
+        "instance_id": "api-pod-1-a1b2c3d4",
+        "status": "running",
+        "started_at": "2026-11-26T10:00:00Z",
+        "uptime_seconds": 1840,
+        "active_connections": 1,
+        "anonymous_connections": 0,
+        "unique_users": 1,
+        "active_channels": 1,
+        "total_accepted": 5,
+        "total_closed": 4,
+        "total_rejected_limit": 0,
+        "total_rejected_auth": 0,
+        "messages_enqueued": 12,
+        "messages_sent": 12,
+        "messages_dropped": 0,
+        "messages_received": 3,
+        "inbound_errors": 0,
+        "heartbeat_failures": 0
+      },
+      "channels": [
+        {
+          "channel": "room:test",
+          "subscribers": 1
+        }
+      ],
+      "connections": [
+        {
+          "conn_id": "d2f1c8e4-9b7a-4b2c-8e1a-1234567890ab",
+          "user_id": 7,
+          "role": "USER",
+          "remote_addr": "127.0.0.1:54321",
+          "channels": [
+            "room:test"
+          ],
+          "send_queue_len": 0,
+          "send_queue_cap": 64,
+          "connected_at": "2026-11-26T10:29:50Z",
+          "last_activity_at": "2026-11-26T10:30:10Z"
+        }
+      ],
+      "truncated": false
+    }
+  }
+  ```
+
+  ## Errors
+  * `400 Bad Request` — Invalid `user_id` or `limit` query parameter (must be positive integers)
+  * `401 Unauthorized` — Missing, expired, invalid, or revoked token
+  * `403 Forbidden` — Insufficient permissions (requires `ADMIN` role)
+}
