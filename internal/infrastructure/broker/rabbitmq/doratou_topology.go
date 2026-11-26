@@ -57,7 +57,9 @@ func (t *Topology) SetupDoratouTopology(ctx context.Context, emailTTL, smsTTL, w
 
 	for _, ch := range channels {
 		// A. Declare Main Queue & Bind to NotificationExchange
-		mainArgs := make(amqp.Table)
+		mainArgs := amqp.Table{
+			"x-max-priority": int64(domain_broker.MaxQueuePriority),
+		}
 		if ch.ttl > 0 {
 			mainArgs["x-message-ttl"] = int64(ch.ttl.Milliseconds())
 		}
@@ -72,6 +74,7 @@ func (t *Topology) SetupDoratouTopology(ctx context.Context, emailTTL, smsTTL, w
 		retryArgs := amqp.Table{
 			"x-dead-letter-exchange":    domain_broker.NotificationExchange,
 			"x-dead-letter-routing-key": ch.routingKey,
+			"x-max-priority":            int64(domain_broker.MaxQueuePriority),
 		}
 		if _, err := t.DeclareQueue(ctx, ch.retryQueue, domain_broker.QueueTypeClassic, true, false, retryArgs); err != nil {
 			return fmt.Errorf("setup retry queue %s: %w", ch.retryQueue, err)
