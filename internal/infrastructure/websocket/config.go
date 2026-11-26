@@ -34,6 +34,7 @@ type Config struct {
 	RequireAuth         bool
 	EnableControlEvents bool
 	SendConnectedEvent  bool
+	PubSubChannel       string
 }
 
 // DefaultConfig returns production-safe defaults for WebSocket infrastructure.
@@ -51,6 +52,7 @@ func DefaultConfig() Config {
 		RequireAuth:         true,
 		EnableControlEvents: true,
 		SendConnectedEvent:  true,
+		PubSubChannel:       "doratou:ws:events",
 	}
 }
 
@@ -77,6 +79,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.SlowConsumerPolicy != SlowConsumerDrop && c.SlowConsumerPolicy != SlowConsumerDisconnect {
 		c.SlowConsumerPolicy = def.SlowConsumerPolicy
+	}
+	if c.PubSubChannel == "" {
+		c.PubSubChannel = def.PubSubChannel
 	}
 	return c
 }
