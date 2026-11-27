@@ -1,0 +1,221 @@
+meta {
+  name: 02. Purchase Tokens
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/wallet/purchases
+  body: json
+  auth: bearer
+}
+
+headers {
+  Idempotency-Key: wallet-bruno-purchase-1
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "package_id": "TOKEN_50",
+    "expected_amount_toman": 220000
+  }
+}
+
+docs {
+  # Purchase Tokens
+
+  - **Method** `POST`
+  - **Endpoint** `/api/v1/wallet/purchases`
+  - **Auth** Bearer access token
+
+  ## Description
+
+  Creates a simulated purchase for the active account identified by the access token. The server calculates the price from the current base rate and immediately records a final outcome. `SUCCEEDED` adds the tokens once. `FAILED` records a purchase attempt with a zero change to the balance. Both appear in history.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `type` | `PURCHASE` | Transaction type returned by this endpoint. |
+  | `status` | `SUCCEEDED`, `FAILED` | Final recorded outcome. |
+  | `currency` | `TOMAN` | All monetary values are whole toman. |
+  | `package_id` | `TOKEN_10`, `TOKEN_25`, `TOKEN_50`, `TOKEN_100` or `null` | Preset package identifier. Null for a custom purchase. |
+  | `payment_mode` | `MOCK` | Simulated payment. |
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). The token identifies the account. |
+  | `Content-Type` | `string` | Yes | `application/json`. |
+  | `Idempotency-Key` | `string` | Yes | Unique key per logical purchase for this account. Use 1–128 characters from printable, non-space ASCII (ASCII 33 through 126). |
+
+  ### Path parameters
+
+  This request uses a fixed path.
+
+  ### Query parameters
+
+  Send the request without query parameters.
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `package_id` | `string \| null` | For packages | One of the case-sensitive package IDs from List Wallet Offers. |
+  | `token_amount` | `integer \| null` | For custom purchases | A whole token count between `1` and `10000`, inclusive. |
+  | `expected_amount_toman` | `integer \| null` | No | Positive whole-toman amount confirmed at checkout. Omit it or send `null` to accept the server-calculated price without an amount comparison. |
+
+  Send exactly one non-null selection using `package_id` or `token_amount`. For a package, get its expected amount from `packages[].amount_toman`. For a custom quantity, multiply the base price by the token count.
+
+  ### Example request for a preset package
+
+  The saved Bruno request uses this body. Set `Idempotency-Key` to a fresh value for a new purchase and use the total shown at checkout.
+
+  ```json
+  {
+    "package_id": "TOKEN_50",
+    "expected_amount_toman": 220000
+  }
+  ```
+
+  ### Example request for a custom quantity
+
+  At a base price of 5,000 toman this order totals 100,000 toman. Use a fresh key for this order.
+
+  ```json
+  {
+    "token_amount": 20,
+    "expected_amount_toman": 100000
+  }
+  ```
+
+  ### Retry behavior
+
+  Reuse the original key and body if the response is lost. The server looks up that key for the caller before pricing a new order. The same selection returns the saved result as `200 OK`. A supplied expected amount must match the saved order total. The saved status, tracking code, and `balance_after` stay the same on replay, including after a price change. For a deliberate new attempt after a recorded failure, generate a fresh key.
+
+  ## Response
+
+  ### `201 Created` with a successful payment
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 42,
+      "type": "PURCHASE",
+      "status": "SUCCEEDED",
+      "description": "Purchase of 50 tokens",
+      "token_amount": 50,
+      "token_delta": 50,
+      "balance_after": 50,
+      "currency": "TOMAN",
+      "amount_toman": 220000,
+      "base_unit_price_toman": 5000,
+      "discount_percent": 12,
+      "package_id": "TOKEN_50",
+      "tracking_code": "DRT-20261127-000042",
+      "payment_mode": "MOCK",
+      "created_at": "2026-11-27T09:00:00Z"
+    }
+  }
+  ```
+
+  ### `201 Created` with a failed payment
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 43,
+      "type": "PURCHASE",
+      "status": "FAILED",
+      "description": "Purchase of 25 tokens",
+      "token_amount": 25,
+      "token_delta": 0,
+      "balance_after": 50,
+      "currency": "TOMAN",
+      "amount_toman": 115000,
+      "base_unit_price_toman": 5000,
+      "discount_percent": 8,
+      "package_id": "TOKEN_25",
+      "tracking_code": "DRT-20261127-000043",
+      "payment_mode": "MOCK",
+      "created_at": "2026-11-27T09:10:00Z"
+    }
+  }
+  ```
+
+  Both are recorded outcomes. Use `data.status` to display the result. The failed purchase requested 25 tokens and left the balance at 50 tokens because `token_delta` is zero.
+
+  ### `200 OK` when replaying a purchase
+
+  The body is the original recorded result, with the same `data.id` and `data.tracking_code`. Fetch Wallet Summary for the latest balance after any later transactions.
+
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `success` | `boolean` | Always `true` in a successful API response. |
+  | `data` | `object` | Recorded purchase and final outcome. |
+  | `data.id` | `integer` | Positive transaction ID for the detail request. |
+  | `data.type` | `string` | `PURCHASE`. |
+  | `data.status` | `string` | `SUCCEEDED` or `FAILED`. This field is the payment outcome for a purchase. |
+  | `data.description` | `string` | Display description of the transaction. |
+  | `data.token_amount` | `integer` | Positive token quantity for the record. Failed purchases still report the requested quantity. |
+  | `data.token_delta` | `integer` | Tokens added to the wallet. Equals the requested quantity on success and `0` on failure. |
+  | `data.balance_after` | `integer` | Stored token balance immediately after this transaction. Fetch Wallet Summary for the live balance. |
+  | `data.currency` | `string` | `TOMAN` for monetary amounts. |
+  | `data.amount_toman` | `integer` | Whole-toman order total for purchases, including failures. |
+  | `data.base_unit_price_toman` | `integer` | Base price per token at purchase time, before any package discount. |
+  | `data.discount_percent` | `integer` | Applied package discount. `0` for custom purchases or packages without a discount. |
+  | `data.package_id` | `string \| null` | Preset package ID. Null for a custom purchase. |
+  | `data.tracking_code` | `string` | Simulated reference in `DRT-YYYYMMDD-<id>` format, using the UTC date and ID padded to at least six digits. |
+  | `data.payment_mode` | `string` | `MOCK`. |
+  | `data.created_at` | `RFC 3339 timestamp` | Time this record was created, serialized in UTC. |
+
+  ## Errors
+
+  | HTTP | code | error | When it happens |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Malformed JSON, an invalid field type or expected amount, or a missing or invalid idempotency key. |
+  | 400 | `WALLET_INVALID_PURCHASE` | `provide a valid package_id or a token quantity from 1 to 10000` | Both selections were supplied, both were omitted or null, the package ID is unknown, or the quantity is outside the range. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization header is missing or its Bearer format is invalid. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid or the caller supplied a refresh token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The caller's account is inactive. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller's account is missing or soft-deleted. |
+  | 409 | `WALLET_PRICE_CHANGED` | `purchase price changed; refresh wallet offers and confirm the new amount` | The expected amount differs from the current total for a new purchase. |
+  | 409 | `WALLET_IDEMPOTENCY_CONFLICT` | `this idempotency key was already used for a different purchase` | The key already belongs to a purchase with a different package, quantity, or expected amount. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A database, transaction, random outcome generator, or token verification dependency failed, or the resulting balance is outside the supported range. |
+  | 503 | `WALLET_PRICE_UNAVAILABLE` | `token pricing is temporarily unavailable` | The base price is missing, non-positive, or too large to price the full custom quantity range within signed 64-bit integers. |
+
+  ### `409 WALLET_PRICE_CHANGED` example
+
+  Fetch the offers again and ask the user to confirm the refreshed price. The server rejects the stale quote before recording an order.
+
+  ```json
+  {
+    "success": false,
+    "code": "WALLET_PRICE_CHANGED",
+    "error": "purchase price changed; refresh wallet offers and confirm the new amount"
+  }
+  ```
+
+  ### `409 WALLET_IDEMPOTENCY_CONFLICT` example
+
+  ```json
+  {
+    "success": false,
+    "code": "WALLET_IDEMPOTENCY_CONFLICT",
+    "error": "this idempotency key was already used for a different purchase"
+  }
+  ```
+}

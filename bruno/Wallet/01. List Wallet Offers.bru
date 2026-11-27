@@ -1,0 +1,152 @@
+meta {
+  name: 01. List Wallet Offers
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/wallet/offers
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Wallet Offers
+
+  - **Method** `GET`
+  - **Endpoint** `/api/v1/wallet/offers`
+  - **Auth** Bearer access token
+
+  ## Description
+
+  Returns the current base token price, preset packages, and allowed quantities for custom purchases. Fetch this before checkout and after a `409 WALLET_PRICE_CHANGED` response from Purchase Tokens. An active account is required.
+
+  ### Pricing rules
+
+  Package totals are calculated as `ceil(base price × token quantity × (100 − discount) / 100)`. The backend rounds up to a whole toman. Custom quantities use the base price with a 0% discount. Choosing a custom quantity equal to a package's quantity still uses the custom rate.
+
+  At a base price of 5,000 toman, the 50-token package costs 220,000 toman after its 12% discount. A custom purchase of 50 tokens costs 250,000 toman. Display `packages[].amount_toman` for a package and `token_price_toman × token_amount` for a custom quantity.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `currency` | `TOMAN` | All monetary values are whole toman. |
+  | `packages[].id` | `TOKEN_10`, `TOKEN_25`, `TOKEN_50`, `TOKEN_100` | Use the selected package ID as `package_id` in Purchase Tokens. |
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). The token identifies the account. |
+
+  ### Path parameters
+
+  This request uses a fixed path.
+
+  ### Query parameters
+
+  Send the request without query parameters.
+
+  ### Body
+
+  Send an empty body.
+
+  ### Example request
+
+  `GET /api/v1/wallet/offers`
+
+  ## Response
+
+  ### `200 OK` example
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "currency": "TOMAN",
+      "token_price_toman": 5000,
+      "price_updated_at": "2026-11-27T08:00:00Z",
+      "custom_min_tokens": 1,
+      "custom_max_tokens": 10000,
+      "packages": [
+        {
+          "id": "TOKEN_10",
+          "token_amount": 10,
+          "amount_toman": 50000,
+          "discount_percent": 0,
+          "is_popular": false
+        },
+        {
+          "id": "TOKEN_25",
+          "token_amount": 25,
+          "amount_toman": 115000,
+          "discount_percent": 8,
+          "is_popular": false
+        },
+        {
+          "id": "TOKEN_50",
+          "token_amount": 50,
+          "amount_toman": 220000,
+          "discount_percent": 12,
+          "is_popular": true
+        },
+        {
+          "id": "TOKEN_100",
+          "token_amount": 100,
+          "amount_toman": 400000,
+          "discount_percent": 20,
+          "is_popular": false
+        }
+      ]
+    }
+  }
+  ```
+
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `success` | `boolean` | Always `true` in a successful API response. |
+  | `data` | `object` | Current offer catalog. |
+  | `data.currency` | `string` | `TOMAN`. |
+  | `data.token_price_toman` | `integer` | Current positive base price for one token. |
+  | `data.price_updated_at` | `RFC 3339 timestamp` | Time the admin price was last updated. |
+  | `data.custom_min_tokens` | `integer` | Minimum custom quantity, inclusive. Currently `1`. |
+  | `data.custom_max_tokens` | `integer` | Maximum custom quantity, inclusive. Currently `10000`. |
+  | `data.packages` | `array` | Preset packages ordered by increasing quantity. |
+  | `data.packages[].id` | `string` | Case-sensitive ID used at checkout. |
+  | `data.packages[].token_amount` | `integer` | Number of tokens included. |
+  | `data.packages[].amount_toman` | `integer` | Total after package discount and whole-toman rounding. |
+  | `data.packages[].discount_percent` | `integer` | Package discount. Current values are `0`, `8`, `12`, and `20`. |
+  | `data.packages[].is_popular` | `boolean` | Display flag for the featured package. Currently true for `TOKEN_50`. |
+
+  ## Errors
+
+  | HTTP | code | error | When it happens |
+  | --- | --- | --- | --- |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization header is missing or its Bearer format is invalid. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid or the caller supplied a refresh token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The caller's account is inactive. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller's account is missing or soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | An account, price, or token verification dependency failed. |
+  | 503 | `WALLET_PRICE_UNAVAILABLE` | `token pricing is temporarily unavailable` | The base price is missing, non-positive, or too large to price the full custom quantity range within signed 64-bit integers. |
+
+  ### `503 WALLET_PRICE_UNAVAILABLE` example
+
+  ```json
+  {
+    "success": false,
+    "code": "WALLET_PRICE_UNAVAILABLE",
+    "error": "token pricing is temporarily unavailable"
+  }
+  ```
+}
