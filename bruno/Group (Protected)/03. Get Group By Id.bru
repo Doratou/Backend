@@ -10,13 +10,8 @@ get {
   auth: inherit
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 vars:pre-request {
   GroupId: 9
-  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIxIiwiZXhwIjoxNzk1ODc3MzMyLCJpYXQiOjE3OTU3OTA5MzIsImp0aSI6IjU4ZDQ0YmRjLWM2NWItNDZlYi1hZjJmLTI1ZTNkNGY4YzAwNCJ9.aTBajDiXf7MybAevpsUea8KwRt09hU8K7P9OfJvtmxo
 }
 
 settings {

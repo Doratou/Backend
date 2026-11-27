@@ -20,14 +20,6 @@ params:query {
   ~sort_by: NEWEST
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
-vars:pre-request {
-  accessToken: <access-token>
-}
-
 settings {
   encodeUrl: true
   timeout: 0

@@ -10,10 +10,6 @@ post {
   auth: inherit
 }
 
-headers {
-  Authorization: Bearer {{accessToken}}
-}
-
 body:json {
   {
     "password": "password",
@@ -23,7 +19,6 @@ body:json {
 }
 
 vars:pre-request {
-  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzOTkzNzAzLCJpYXQiOjE3OTM5MDczMDMsImp0aSI6IjRjYmE4MDRiLTQyZjQtNGZhOS05OTMxLWU4YjBhMDFmN2ZhZiJ9.a27SvHzCkr6ds0yYjZ3KCvhMN4A780vgcDv2v7d4ta4
   groupId: 1
 }
 

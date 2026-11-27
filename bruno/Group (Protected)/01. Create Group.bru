@@ -10,10 +10,6 @@ post {
   auth: bearer
 }
 
-headers {
-  Authorization: Bearer  {{accessToken}}
-}
-
 auth:bearer {
   token: {{token}}
 }
@@ -24,10 +20,6 @@ body:json {
     "description": "just test",
     "cover_attachment_id": null
   }
-}
-
-vars:pre-request {
-  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzOTkzNzAzLCJpYXQiOjE3OTM5MDczMDMsImp0aSI6IjRjYmE4MDRiLTQyZjQtNGZhOS05OTMxLWU4YjBhMDFmN2ZhZiJ9.a27SvHzCkr6ds0yYjZ3KCvhMN4A780vgcDv2v7d4ta4
 }
 
 settings {
