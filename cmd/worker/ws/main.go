@@ -21,7 +21,7 @@ type WSSender interface {
 type mockWSSender struct{}
 
 func (m *mockWSSender) Send(ctx context.Context, p payload.WSPayload) error {
-	log.Printf("[MOCK WS SENDER] Successfully dispatched WS event %q | Scope: %s (IDs: %s) | Sender: %s | Data: %v",
+	log.Printf("[MOCK WS SENDER] Successfully dispatched WS event %q | Scope: %s (IDs: %v) | Sender: %v | Data: %v",
 		p.Event, p.TargetType, p.TargetIDs, p.SenderID, p.Data)
 	return nil
 }
@@ -37,7 +37,7 @@ func main() {
 				return domain_broker.ErrReject
 			}
 
-			log.Printf("[WS WORKER] processing WS event %q for targets %s:%s", p.Event, p.TargetType, p.TargetIDs)
+			log.Printf("[WS WORKER] processing WS event %q for targets %s:%v", p.Event, p.TargetType, p.TargetIDs)
 			return wsSender.Send(ctx, p)
 		}
 
