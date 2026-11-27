@@ -26,8 +26,6 @@ func RegisterUserRoutes(rg *gin.RouterGroup, userHandler *handler.UserHandler, a
 		users.PATCH("/me/phone", userHandler.ChangePhone)
 		users.DELETE("/me", userHandler.DeleteMe)
 
-		users.GET("/me/wallet", userHandler.GetWallet)
-
 		users.GET("/by-friend-code/:friendCode", userHandler.FindByFriendCode)
 		users.POST("/me/friend-code/regenerate", userHandler.RegenerateFriendCode)
 		users.GET("/:id", userHandler.GetUserByID)
