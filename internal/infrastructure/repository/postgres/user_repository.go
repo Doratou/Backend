@@ -205,10 +205,29 @@ func (r *userRepository) FindByRole(ctx context.Context, role enum.UserRole, lim
 	return users, nil
 }
 
-func (r *userRepository) Update(ctx context.Context, user *entity.User) error {
-	db := r.getDB(ctx)
-	if err := db.Save(user).Error; err != nil {
-		return exception.Wrap(exception.ErrInternal, err)
+func (r *userRepository) UpdateName(ctx context.Context, userID int64, name string) error {
+	return r.updateFields(ctx, userID, map[string]any{"name": name})
+}
+
+func (r *userRepository) UpdateEmail(ctx context.Context, userID int64, email string) error {
+	return r.updateFields(ctx, userID, map[string]any{"email": email, "is_email_verified": true})
+}
+
+func (r *userRepository) UpdatePhone(ctx context.Context, userID int64, phone string) error {
+	return r.updateFields(ctx, userID, map[string]any{"phone": phone, "is_phone_verified": true})
+}
+
+func (r *userRepository) UpdateStatus(ctx context.Context, userID int64, status enum.UserStatus) error {
+	return r.updateFields(ctx, userID, map[string]any{"status": status})
+}
+
+func (r *userRepository) updateFields(ctx context.Context, userID int64, fields map[string]any) error {
+	result := r.getDB(ctx).Model(&entity.User{}).Where("id = ?", userID).Updates(fields)
+	if result.Error != nil {
+		return exception.Wrap(exception.ErrInternal, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return exception.ErrUserNotFound
 	}
 	return nil
 }
@@ -266,17 +285,24 @@ func (r *userRepository) UpdateAvatar(ctx context.Context, userID int64, avatarI
 	return nil
 }
 
-func (r *userRepository) UpdateVerifiedStatus(ctx context.Context, userID int64, isEmailVerified, isPhoneVerified bool) error {
-	db := r.getDB(ctx)
-	res := db.Model(&entity.User{}).Where("id = ?", userID).Updates(map[string]any{
-		"is_email_verified": isEmailVerified,
-		"is_phone_verified": isPhoneVerified,
-	})
+func (r *userRepository) VerifyIdentifier(ctx context.Context, userID int64, identifier string, kind enum.OTPType) error {
+	var identifierColumn, verifiedColumn string
+	switch kind {
+	case enum.OTPTypeEmail:
+		identifierColumn, verifiedColumn = "email", "is_email_verified"
+	case enum.OTPTypePhone:
+		identifierColumn, verifiedColumn = "phone", "is_phone_verified"
+	default:
+		return exception.ErrBadRequest
+	}
+
+	res := r.getDB(ctx).Model(&entity.User{}).Where("id = ?", userID).
+		Where(map[string]any{identifierColumn: identifier}).Update(verifiedColumn, true)
 	if res.Error != nil {
 		return exception.Wrap(exception.ErrInternal, res.Error)
 	}
 	if res.RowsAffected == 0 {
-		return exception.ErrUserNotFound
+		return exception.ErrUnverifiedCredentials
 	}
 	return nil
 }
