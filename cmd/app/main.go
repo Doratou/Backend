@@ -314,8 +314,6 @@ func main() {
 		tokenRepo,
 		jwtMaker,
 		redisTrxManager,
-		readTrxManager,
-		walletService,
 	)
 
 	var wsRuntime *wsInfra.Runtime

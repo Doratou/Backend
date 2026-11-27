@@ -76,21 +76,20 @@ type TokenPairResponse struct {
 }
 
 type UserResponse struct {
-	ID                 int64                      `json:"id"`
-	Name               string                     `json:"name"`
-	FriendCode         string                     `json:"friend_code"`
-	Email              *string                    `json:"email,omitempty"`
-	Phone              *string                    `json:"phone,omitempty"`
-	IsEmailVerified    bool                       `json:"is_email_verified"`
-	IsPhoneVerified    bool                       `json:"is_phone_verified"`
-	AvatarAttachmentID *int64                     `json:"avatar_attachment_id"`
-	SystemRole         enum.UserRole              `json:"system_role"`
-	Status             enum.UserStatus            `json:"status"`
-	Wallet             int64                      `json:"wallet"`
-	TelegramChatID     *int64                     `json:"telegram_chat_id,omitempty"`
-	TelegramUserID     *int64                     `json:"telegram_user_id,omitempty"`
-	CreatedAt          time.Time                  `json:"created_at"`
-	ProfileCompletion  *ProfileCompletionResponse `json:"profile_completion,omitempty"`
+	ID                 int64           `json:"id"`
+	Name               string          `json:"name"`
+	FriendCode         string          `json:"friend_code"`
+	Email              *string         `json:"email,omitempty"`
+	Phone              *string         `json:"phone,omitempty"`
+	IsEmailVerified    bool            `json:"is_email_verified"`
+	IsPhoneVerified    bool            `json:"is_phone_verified"`
+	AvatarAttachmentID *int64          `json:"avatar_attachment_id"`
+	SystemRole         enum.UserRole   `json:"system_role"`
+	Status             enum.UserStatus `json:"status"`
+	Wallet             int64           `json:"wallet"`
+	TelegramChatID     *int64          `json:"telegram_chat_id,omitempty"`
+	TelegramUserID     *int64          `json:"telegram_user_id,omitempty"`
+	CreatedAt          time.Time       `json:"created_at"`
 }
 
 type AuthResponse struct {

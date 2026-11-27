@@ -12,6 +12,7 @@ type UserService interface {
 	ChangeEmail(ctx context.Context, userID int64, req dto.ChangeEmailRequest) (*dto.UserResponse, error)
 	ChangePhone(ctx context.Context, userID int64, req dto.ChangePhoneRequest) (*dto.UserResponse, error)
 	DeleteAccount(ctx context.Context, userID int64, tokenString string) error
+	GetWallet(ctx context.Context, userID int64) (*dto.WalletResponse, error)
 	GetUserByID(ctx context.Context, currentUserID, targetUserID int64) (*dto.UserPreviewResponse, error)
 	GetProfile(ctx context.Context, callerUserID, targetUserID int64) (*dto.UserPreviewResponse, error)
 	FindByFriendCode(ctx context.Context, userID int64, friendCode string) (*dto.UserPreviewResponse, error)

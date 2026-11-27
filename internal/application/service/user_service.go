@@ -16,7 +16,6 @@ import (
 	"github.com/Doratou/Backend/internal/domain/exception"
 	domain_db "github.com/Doratou/Backend/internal/domain/repository/DB"
 	"github.com/Doratou/Backend/internal/domain/repository/cache"
-	"github.com/Doratou/Backend/internal/infrastructure/database"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 )
@@ -30,8 +29,6 @@ type userService struct {
 	tokenRepo         cache.AuthnTokenRepository
 	jwtMaker          jwt.TokenMaker
 	redisTrx          redisInfra.TrxManager
-	readTrx           database.TrxManager
-	wallet            adapter.WalletService
 }
 
 func NewUserService(
@@ -41,8 +38,6 @@ func NewUserService(
 	tokenRepo cache.AuthnTokenRepository,
 	jwtMaker jwt.TokenMaker,
 	redisTrx redisInfra.TrxManager,
-	readTrx database.TrxManager,
-	wallet adapter.WalletService,
 ) adapter.UserService {
 	return &userService{
 		userRepo:          userRepo,
@@ -51,25 +46,15 @@ func NewUserService(
 		tokenRepo:         tokenRepo,
 		jwtMaker:          jwtMaker,
 		redisTrx:          redisTrx,
-		readTrx:           readTrx,
-		wallet:            wallet,
 	}
 }
 
 func (s *userService) GetMe(ctx context.Context, userID int64) (*dto.UserResponse, error) {
-	var response dto.UserResponse
-	err := s.readTrx.WithTransaction(ctx, func(txCtx context.Context) error {
-		user, err := s.activeUser(txCtx, userID)
-		if err != nil {
-			return err
-		}
-		response = dto.ToUserResponse(user)
-		response.ProfileCompletion, err = s.wallet.ProfileCompletion(txCtx, userID)
-		return err
-	})
+	user, err := s.activeUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
+	response := dto.ToUserResponse(user)
 	return &response, nil
 }
 
@@ -219,6 +204,14 @@ func (s *userService) DeleteAccount(ctx context.Context, userID int64, tokenStri
 	}
 
 	return nil
+}
+
+func (s *userService) GetWallet(ctx context.Context, userID int64) (*dto.WalletResponse, error) {
+	user, err := s.activeUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.WalletResponse{Wallet: user.Wallet}, nil
 }
 
 func (s *userService) GetUserByID(ctx context.Context, currentUserID, targetUserID int64) (*dto.UserPreviewResponse, error) {

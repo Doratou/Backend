@@ -21,21 +21,9 @@ type ChangePhoneRequest struct {
 	Phone string `json:"phone" binding:"required,min=10,max=20"`
 }
 
-type ProfileCompletionSteps struct {
-	FullName          bool `json:"full_name"`
-	ProfilePhoto      bool `json:"profile_photo"`
-	VerifiedEmail     bool `json:"verified_email"`
-	VerifiedPhone     bool `json:"verified_phone"`
-	TelegramConnected bool `json:"telegram_connected"`
-}
-
-type ProfileCompletionResponse struct {
-	Steps          ProfileCompletionSteps `json:"steps"`
-	CompletedSteps int                    `json:"completed_steps"`
-	TotalSteps     int                    `json:"total_steps"`
-	Progress       int                    `json:"progress_percent"`
-	RewardTokens   int64                  `json:"reward_tokens"`
-	RewardGranted  bool                   `json:"reward_granted"`
+type WalletResponse struct {
+	Wallet  int64  `json:"wallet"`
+	Message string `json:"message,omitempty"`
 }
 
 type ChangeUserRoleRequest struct {

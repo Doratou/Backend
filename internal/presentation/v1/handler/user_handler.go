@@ -141,6 +141,23 @@ func (h *UserHandler) DeleteMe(c *gin.Context) {
 	success(c, http.StatusOK, gin.H{"message": "account deleted successfully"})
 }
 
+// GetWallet handles GET /api/v1/users/me/wallet
+func (h *UserHandler) GetWallet(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	userID, ok := tokencontext.GetUserID(c)
+	if !ok {
+		fail(c, exception.ErrMissingToken)
+		return
+	}
+
+	response, err := h.userService.GetWallet(c.Request.Context(), userID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	success(c, http.StatusOK, response)
+}
+
 // GetUserByID handles GET /api/v1/users/:id
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")

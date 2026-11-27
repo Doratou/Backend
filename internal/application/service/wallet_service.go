@@ -71,7 +71,7 @@ func (s *walletService) Summary(ctx context.Context, userID int64) (*dto.WalletS
 		response.PurchasedTokens = totals.PurchasedTokens
 		response.SpentTokens = totals.SpentTokens
 		response.RewardedTokens = totals.RewardedTokens
-		response.ProfileCompletion, err = s.ProfileCompletion(txCtx, userID)
+		response.ProfileCompletion, err = s.profileCompletion(txCtx, userID)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (s *walletService) Summary(ctx context.Context, userID int64) (*dto.WalletS
 	return response, nil
 }
 
-func (s *walletService) ProfileCompletion(ctx context.Context, userID int64) (*dto.ProfileCompletionResponse, error) {
+func (s *walletService) profileCompletion(ctx context.Context, userID int64) (*dto.ProfileCompletionResponse, error) {
 	completion, err := s.repo.ProfileCompletion(ctx, userID)
 	if err != nil {
 		return nil, err

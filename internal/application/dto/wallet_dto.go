@@ -18,6 +18,23 @@ type WalletSummaryResponse struct {
 	ProfileCompletion   *ProfileCompletionResponse `json:"profile_completion"`
 }
 
+type ProfileCompletionSteps struct {
+	FullName          bool `json:"full_name"`
+	ProfilePhoto      bool `json:"profile_photo"`
+	VerifiedEmail     bool `json:"verified_email"`
+	VerifiedPhone     bool `json:"verified_phone"`
+	TelegramConnected bool `json:"telegram_connected"`
+}
+
+type ProfileCompletionResponse struct {
+	Steps          ProfileCompletionSteps `json:"steps"`
+	CompletedSteps int                    `json:"completed_steps"`
+	TotalSteps     int                    `json:"total_steps"`
+	Progress       int                    `json:"progress_percent"`
+	RewardTokens   int64                  `json:"reward_tokens"`
+	RewardGranted  bool                   `json:"reward_granted"`
+}
+
 type WalletPackageResponse struct {
 	ID              string `json:"id"`
 	TokenAmount     int64  `json:"token_amount"`
