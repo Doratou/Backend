@@ -154,6 +154,7 @@ func main() {
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
 	notificationRepo := postgresRepo.NewNotificationRepository(postgresDB)
 	tokenPriceRepo := postgresRepo.NewTokenPriceRepository(postgresDB)
+	walletRepo := postgresRepo.NewWalletRepository(postgresDB)
 	tripSuggestionRepo := postgresRepo.NewTripSuggestionRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	oauthRepo := postgresRepo.NewOAuthRepository(postgresDB)
@@ -288,6 +289,10 @@ func main() {
 	settlementService := service.NewSettlementService(settlementRepo, financialReportRepo, userRepo, dbTrxManager, attachmentService)
 	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
 	readTrxManager := database.NewReadSnapshotTrxManager(postgresDB)
+	walletCfg := cfg.Environment.Wallet
+	walletService := service.NewWalletService(walletRepo, userRepo, tokenPriceRepo, dbTrxManager, readTrxManager, randomInfra.NewCryptoGenerator(), service.WalletServiceConfig{
+		MockRandomEnabled: walletCfg.MockRandomEnabled, MockSuccessPercent: walletCfg.MockSuccessPercent,
+	})
 	financialReportService := service.NewFinancialReportService(financialReportRepo, userRepo, readTrxManager, attachmentService)
 	checklistService := service.NewChecklistService(checklistRepo, dbTrxManager, readTrxManager, attachmentService)
 	friendshipService := service.NewFriendshipService(
@@ -309,6 +314,8 @@ func main() {
 		tokenRepo,
 		jwtMaker,
 		redisTrxManager,
+		readTrxManager,
+		walletService,
 	)
 
 	var wsRuntime *wsInfra.Runtime
@@ -394,6 +401,7 @@ func main() {
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	tokenPriceHandler := handler.NewTokenPriceHandler(tokenPriceService)
+	walletHandler := handler.NewWalletHandler(walletService)
 	var wsHandler *handler.WSHandler
 	if wsRuntime != nil {
 		wsHandler = handler.NewWSHandler(wsRuntime.HTTPHandler(), wsRuntime.Monitor())
@@ -407,6 +415,7 @@ func main() {
 		AdminReportHandler:     adminReportHandler,
 		NotificationHandler:    notificationHandler,
 		TokenPriceHandler:      tokenPriceHandler,
+		WalletHandler:          walletHandler,
 		WSHandler:              wsHandler,
 		GroupHandler:           groupHandler,
 		InviteHandler:          inviteHandler,
