@@ -45,8 +45,10 @@ type UserRepository interface {
 	// FindByRole returns users filtered by system role (USER, ADMIN).
 	FindByRole(ctx context.Context, role enum.UserRole, limit, offset int) ([]*entity.User, error)
 
-	// Update updates all writable fields of an existing user.
-	Update(ctx context.Context, user *entity.User) error
+	UpdateName(ctx context.Context, userID int64, name string) error
+	UpdateEmail(ctx context.Context, userID int64, email string) error
+	UpdatePhone(ctx context.Context, userID int64, phone string) error
+	UpdateStatus(ctx context.Context, userID int64, status enum.UserStatus) error
 
 	// UpdatePassword updates only the password_hash column for the given user.
 	UpdatePassword(ctx context.Context, userID int64, passwordHash string) error
@@ -60,8 +62,7 @@ type UserRepository interface {
 	// UpdateAvatar updates only the avatar_attachment_id column for the given user.
 	UpdateAvatar(ctx context.Context, userID int64, avatarID int64) error
 
-	// UpdateVerifiedStatus updates verification flags (is_email_verified, is_phone_verified).
-	UpdateVerifiedStatus(ctx context.Context, userID int64, isEmailVerified, isPhoneVerified bool) error
+	VerifyIdentifier(ctx context.Context, userID int64, identifier string, kind enum.OTPType) error
 
 	// UpdateWallet adds delta (positive or negative) to user's wallet atomically.
 	UpdateWallet(ctx context.Context, userID int64, delta int64) error
