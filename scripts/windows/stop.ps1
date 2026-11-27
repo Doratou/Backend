@@ -18,3 +18,17 @@ if (Test-Path $pidFile) {
 } else {
     Write-Host 'Application is not running'
 }
+
+# Stop worker processes if running
+foreach ($w in @('email', 'sms', 'ws')) {
+    $wPidFile = Join-Path $RunDir "worker-$w.pid"
+    if (Test-Path $wPidFile) {
+        $wProcId = [int](Get-Content $wPidFile)
+        $wProc = Get-Process -Id $wProcId -ErrorAction SilentlyContinue
+        if ($wProc) {
+            Stop-Process -Id $wProcId -Force -ErrorAction SilentlyContinue
+            Write-Host "Stopped worker $w (pid $wProcId)"
+        }
+        Remove-Item $wPidFile -Force -ErrorAction SilentlyContinue
+    }
+}

@@ -17,3 +17,16 @@ if [ -f "$PID_FILE" ]; then
 else
   echo "Application is not running"
 fi
+
+# Stop worker processes if running
+for w in email sms ws; do
+  w_pid_file="$RUN_DIR/worker-$w.pid"
+  if [ -f "$w_pid_file" ]; then
+    w_pid="$(cat "$w_pid_file")"
+    if kill -0 "$w_pid" 2>/dev/null; then
+      kill "$w_pid" 2>/dev/null
+      echo "Stopped worker $w (pid $w_pid)"
+    fi
+    rm -f "$w_pid_file"
+  fi
+done
