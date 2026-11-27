@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
@@ -16,10 +18,11 @@ import (
 type groupService struct {
 	groups         domainrepo.GroupRepository
 	attachmentRepo domainrepo.AttachmentRepository
+	attachmentURLs adapter.AttachmentURLResolver
 }
 
-func NewGroupService(groups domainrepo.GroupRepository, attachmentRepo domainrepo.AttachmentRepository) *groupService {
-	return &groupService{groups: groups, attachmentRepo: attachmentRepo}
+func NewGroupService(groups domainrepo.GroupRepository, attachmentRepo domainrepo.AttachmentRepository, attachmentURLs adapter.AttachmentURLResolver) *groupService {
+	return &groupService{groups: groups, attachmentRepo: attachmentRepo, attachmentURLs: attachmentURLs}
 }
 
 func (s *groupService) Create(ctx context.Context, userID int64, req dto.CreateGroupRequest) (*dto.GroupResponse, error) {
@@ -341,7 +344,7 @@ func (s *groupService) Get(ctx context.Context, userID int64, role enum.UserRole
 	if err := s.authorizeGroupAccess(ctx, userID, role, groupID); err != nil {
 		return nil, err
 	}
-	return s.buildGroupDetailResponse(ctx, group, count)
+	return s.buildGroupDetailResponse(ctx, userID, group, count)
 }
 
 func (s *groupService) ListMembers(ctx context.Context, userID int64, role enum.UserRole, groupID int64) ([]dto.GroupMemberResponse, error) {
@@ -356,7 +359,11 @@ func (s *groupService) ListMembers(ctx context.Context, userID int64, role enum.
 	if err != nil {
 		return nil, err
 	}
-	return toGroupMemberResponses(members, group.CreatedByUserID), nil
+	avatarURLs, err := s.resolveAvatarURLs(ctx, userID, members)
+	if err != nil {
+		return nil, err
+	}
+	return toGroupMemberResponses(members, group.CreatedByUserID, avatarURLs), nil
 }
 
 func (s *groupService) RemoveMember(ctx context.Context, userID int64, role enum.UserRole, groupID, memberID int64) error {
@@ -420,29 +427,74 @@ func (s *groupService) authorizeGroupAccess(ctx context.Context, userID int64, r
 // =================================================================
 // RESPONSE BUILDERS & MAPPERS
 // =================================================================
-func (s *groupService) buildGroupDetailResponse(ctx context.Context, group *entity.Group, count int64) (*dto.GroupResponse, error) {
+func (s *groupService) buildGroupDetailResponse(ctx context.Context, viewerUserID int64, group *entity.Group, count int64) (*dto.GroupResponse, error) {
 	result := toGroupResponse(group, count)
 	members, err := s.groups.ListActiveMembers(ctx, group.ID)
 	if err != nil {
 		return nil, err
 	}
-	result.Members = toGroupMemberResponses(members, group.CreatedByUserID)
+	avatarURLs, err := s.resolveAvatarURLs(ctx, viewerUserID, members)
+	if err != nil {
+		return nil, err
+	}
+	result.Members = toGroupMemberResponses(members, group.CreatedByUserID, avatarURLs)
 	return &result, nil
 }
 
-func toGroupMemberResponses(members []entity.GroupMember, ownerID int64) []dto.GroupMemberResponse {
+func (s *groupService) resolveAvatarURLs(ctx context.Context, viewerUserID int64, members []entity.GroupMember) (map[int64]string, error) {
+	if s.attachmentURLs == nil {
+		return nil, nil
+	}
+	ids := make([]int64, 0, len(members))
+	seen := make(map[int64]struct{}, len(members))
+	for _, member := range members {
+		if member.User == nil || member.User.AvatarAttachmentID == nil {
+			continue
+		}
+		id := *member.User.AvatarAttachmentID
+		if _, exists := seen[id]; !exists {
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	urls, err := s.attachmentURLs.ResolveAccessURLs(ctx, viewerUserID, ids)
+	var appErr *exception.AppError
+	if errors.As(err, &appErr) && appErr.Code == exception.ErrStorageUnavailable.Code {
+		return nil, nil
+	}
+	return urls, err
+}
+
+func toGroupMemberResponses(members []entity.GroupMember, ownerID int64, avatarURLs map[int64]string) []dto.GroupMemberResponse {
 	responses := make([]dto.GroupMemberResponse, 0, len(members))
 	for _, member := range members {
 		name := ""
+		var avatarAttachmentID *int64
+		var avatarURL *string
 		if member.User != nil {
 			name = member.User.Name
+			avatarAttachmentID = member.User.AvatarAttachmentID
+			if avatarAttachmentID != nil && avatarURLs != nil {
+				if url, ok := avatarURLs[*avatarAttachmentID]; ok && url != "" {
+					avatarURL = &url
+				}
+			}
 		}
 		role := enum.GroupMemberRoleMember
 		if member.UserID == ownerID {
 			role = enum.GroupMemberRoleOwner
 		}
 		responses = append(responses, dto.GroupMemberResponse{
-			MemberID: member.ID, UserID: member.UserID, Name: name, Role: string(role), JoinedAt: member.JoinedAt,
+			MemberID:           member.ID,
+			UserID:             member.UserID,
+			Name:               name,
+			Role:               string(role),
+			JoinedAt:           member.JoinedAt,
+			AvatarAttachmentID: avatarAttachmentID,
+			AvatarURL:          avatarURL,
 		})
 	}
 	return responses

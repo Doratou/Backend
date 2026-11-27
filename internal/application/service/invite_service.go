@@ -421,7 +421,7 @@ func buildInviteJoinGroupResponse(ctx context.Context, groups domainrepo.GroupRe
 	if err != nil {
 		return nil, err
 	}
-	result.Members = toGroupMemberResponses(members, group.CreatedByUserID)
+	result.Members = toGroupMemberResponses(members, group.CreatedByUserID, nil)
 	return &result, nil
 }
 

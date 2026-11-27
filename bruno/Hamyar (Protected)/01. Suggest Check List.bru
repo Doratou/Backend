@@ -23,8 +23,8 @@ body:json {
     "city_name": "رامسر",
     "lat": 36.90,
     "lng": 50.65,
-    "start_date": "2026-11-19",
-    "end_date": "2026-11-22",
+    "start_date": "2026-12-01",
+    "end_date": "2026-12-05",
     "people_count": 4,
     "trip_type": "forest_nature",
     "transport": "private_car",
@@ -114,9 +114,9 @@ docs {
   - `422` — date format/order is invalid, a trip date is before today or more than 14 days ahead, or the trip is longer than 60 days. For a date outside the forecast window, the `error` field explains that `start_date` and `end_date` must be between today and the latest supported forecast date.
   - `502` — AI provider is unavailable or returns an invalid response.
   - `500` — unexpected server error.
-
+  
   Example `422` response when a requested date falls outside the forecast window (the displayed latest date is calculated at request time):
-
+  
   ```json
   {
     "error": "invalid trip input: start_date and end_date must be between today and <latest-date> (the 14-day forecast limit)"

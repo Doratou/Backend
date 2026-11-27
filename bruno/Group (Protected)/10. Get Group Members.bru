@@ -32,7 +32,7 @@ docs {
 
   ## Description
 
-  Returns active group members and their group roles.
+  Returns active group members, their roles, and avatar information (`avatar_attachment_id` and `avatar_url`).
 
   ## Request
 
@@ -55,8 +55,24 @@ docs {
   {
     "success": true,
     "data": [
-      {"member_id": 11, "user_id": 7, "name": "Owner", "role": "OWNER", "joined_at": "2026-11-04T10:00:00Z"},
-      {"member_id": 12, "user_id": 8, "name": "Member", "role": "MEMBER", "joined_at": "2026-11-04T10:10:00Z"}
+      {
+        "member_id": 11,
+        "user_id": 7,
+        "name": "Owner",
+        "role": "OWNER",
+        "joined_at": "2026-11-04T10:00:00Z",
+        "avatar_attachment_id": 101,
+        "avatar_url": "https://storage.example.com/attachments/profile_image/7/avatar.jpg?token=..."
+      },
+      {
+        "member_id": 12,
+        "user_id": 8,
+        "name": "Member",
+        "role": "MEMBER",
+        "joined_at": "2026-11-04T10:10:00Z",
+        "avatar_attachment_id": null,
+        "avatar_url": null
+      }
     ]
   }
   ```

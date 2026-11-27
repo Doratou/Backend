@@ -15,8 +15,8 @@ headers {
 }
 
 vars:pre-request {
-  GroupId: 3
-  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIzIiwiZXhwIjoxNzkzODE1NTUxLCJpYXQiOjE3OTM3MjkxNTEsImp0aSI6IjM2YmQ3YjRiLWEwYzItNDVkYS1iZTUyLWM0ZGFhZjI1MGJkMyJ9.KmveVQWn-yPCk2GQ8tsjjd6W4LEAUuLw5zuOCKL32yk
+  GroupId: 9
+  accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiVVNFUiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJzdWIiOiIxIiwiZXhwIjoxNzk1ODc3MzMyLCJpYXQiOjE3OTU3OTA5MzIsImp0aSI6IjU4ZDQ0YmRjLWM2NWItNDZlYi1hZjJmLTI1ZTNkNGY4YzAwNCJ9.aTBajDiXf7MybAevpsUea8KwRt09hU8K7P9OfJvtmxo
 }
 
 settings {
@@ -27,29 +27,29 @@ settings {
 
 docs {
   ## Method, Endpoint, and Auth
-
+  
   `GET /api/v1/groups/:groupID` — Active group member or site admin; Bearer access token required.
-
+  
   ## Description
-
-  Returns group details and active members with their roles. Group `status` is `ACTIVE`, `SETTLING`, or `CLOSED`. The response includes `archived_at` or `closed_at` when the corresponding timestamp is set.
-
+  
+  Returns group details and active members with their roles and avatar information (`avatar_attachment_id` and `avatar_url`). Group `status` is `ACTIVE`, `SETTLING`, or `CLOSED`. The response includes `archived_at` or `closed_at` when the corresponding timestamp is set.
+  
   ## Request
-
+  
   ### Path Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `groupID` | `integer` | Yes | Positive group ID. |
-
+  
   ### Headers
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `Authorization` | `string` | Yes | `Bearer <access-token>` |
-
+  
   ## Response
-
+  
   **`200 OK`**
   ```json
   {
@@ -66,15 +66,31 @@ docs {
       "updated_at": "2026-11-06T10:00:00Z",
       "member_count": 2,
       "members": [
-        {"member_id": 11, "user_id": 7, "name": "Owner", "role": "OWNER", "joined_at": "2026-11-04T10:00:00Z"},
-        {"member_id": 12, "user_id": 8, "name": "Member", "role": "MEMBER", "joined_at": "2026-11-04T10:10:00Z"}
+        {
+          "member_id": 11,
+          "user_id": 7,
+          "name": "Owner",
+          "role": "OWNER",
+          "joined_at": "2026-11-04T10:00:00Z",
+          "avatar_attachment_id": 101,
+          "avatar_url": "https://storage.example.com/attachments/profile_image/7/avatar.jpg?token=..."
+        },
+        {
+          "member_id": 12,
+          "user_id": 8,
+          "name": "Member",
+          "role": "MEMBER",
+          "joined_at": "2026-11-04T10:10:00Z",
+          "avatar_attachment_id": null,
+          "avatar_url": null
+        }
       ]
     }
   }
   ```
-
+  
   ## Errors
-
+  
   - `400 GROUP_INVALID_ID` — `groupID` is not a positive integer.
   - `401 MISSING_TOKEN` — Access token is missing or invalid.
   - `403 GROUP_FORBIDDEN` — Requester is neither an active member nor an admin.

@@ -255,21 +255,6 @@ func main() {
 		},
 		cfg.Constant,
 	)
-	var groupService adapter.GroupService = service.NewGroupService(groupRepo, attachmentRepo)
-	var inviteService adapter.InviteService = service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
-	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
-	luckyDrawService := service.NewLuckyDrawService(luckyDrawRepo, userRepo, dbTrxManager, randomInfra.NewCryptoGenerator())
-
-	adminReportService := service.NewAdminReportService(
-		adminReportRepo,
-		userRepo,
-	)
-	tokenPriceService := service.NewTokenPriceService(tokenPriceRepo)
-	weatherService := service.NewWeatherService(weatherInfra.NewCachedWeatherProvider(weatherInfra.NewOpenMeteoClient(), redisCache))
-	aiModel := cfg.Environment.AvalAI.Model
-	tripSuggestionService := service.NewTripSuggestionService(ai.NewAvalAIClient(ai.AvalAIConfig{
-		APIKey: cfg.Environment.AvalAI.APIKey, BaseURL: cfg.Environment.AvalAI.BaseURL, Model: aiModel,
-	}), weatherService, tripSuggestionRepo, aiModel)
 
 	attachmentService := service.NewAttachmentService(
 		attachmentRepo,
@@ -285,6 +270,21 @@ func main() {
 		},
 		cfg.Constant,
 	)
+	var groupService adapter.GroupService = service.NewGroupService(groupRepo, attachmentRepo, attachmentService)
+	var inviteService adapter.InviteService = service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
+	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
+	luckyDrawService := service.NewLuckyDrawService(luckyDrawRepo, userRepo, dbTrxManager, randomInfra.NewCryptoGenerator())
+
+	adminReportService := service.NewAdminReportService(
+		adminReportRepo,
+		userRepo,
+	)
+	tokenPriceService := service.NewTokenPriceService(tokenPriceRepo)
+	weatherService := service.NewWeatherService(weatherInfra.NewCachedWeatherProvider(weatherInfra.NewOpenMeteoClient(), redisCache))
+	aiModel := cfg.Environment.AvalAI.Model
+	tripSuggestionService := service.NewTripSuggestionService(ai.NewAvalAIClient(ai.AvalAIConfig{
+		APIKey: cfg.Environment.AvalAI.APIKey, BaseURL: cfg.Environment.AvalAI.BaseURL, Model: aiModel,
+	}), weatherService, tripSuggestionRepo, aiModel)
 	settlementService := service.NewSettlementService(settlementRepo, financialReportRepo, userRepo, dbTrxManager, attachmentService)
 	expenseService := service.NewExpenseService(expenseRepo, userRepo, dbTrxManager, attachmentService)
 	readTrxManager := database.NewReadSnapshotTrxManager(postgresDB)

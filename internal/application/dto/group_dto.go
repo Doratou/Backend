@@ -55,11 +55,13 @@ type GroupResponse struct {
 }
 
 type GroupMemberResponse struct {
-	MemberID int64     `json:"member_id"`
-	UserID   int64     `json:"user_id"`
-	Name     string    `json:"name"`
-	Role     string    `json:"role"`
-	JoinedAt time.Time `json:"joined_at"`
+	MemberID           int64     `json:"member_id"`
+	UserID             int64     `json:"user_id"`
+	Name               string    `json:"name"`
+	Role               string    `json:"role"`
+	JoinedAt           time.Time `json:"joined_at"`
+	AvatarAttachmentID *int64    `json:"avatar_attachment_id"`
+	AvatarURL          *string   `json:"avatar_url"`
 }
 
 type TransferGroupOwnershipRequest struct {
