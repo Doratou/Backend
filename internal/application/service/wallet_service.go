@@ -341,7 +341,7 @@ func walletTransactionResponse(transaction entity.WalletTransaction) dto.WalletT
 		DiscountPercent: transaction.DiscountPercent, PackageID: transaction.PackageID, CreatedAt: transaction.CreatedAt.UTC(),
 	}
 	if transaction.Type == enum.WalletTransactionPurchase {
-		trackingCode := fmt.Sprintf("MOCK-%d", transaction.ID)
+		trackingCode := fmt.Sprintf("DRT-%s-%06d", response.CreatedAt.Format("20060102"), transaction.ID)
 		paymentMode := "MOCK"
 		response.TrackingCode = &trackingCode
 		response.PaymentMode = &paymentMode
