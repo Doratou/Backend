@@ -16,6 +16,7 @@ import (
 	"github.com/Doratou/Backend/internal/domain/exception"
 	domain_db "github.com/Doratou/Backend/internal/domain/repository/DB"
 	"github.com/Doratou/Backend/internal/domain/repository/cache"
+	"github.com/Doratou/Backend/internal/infrastructure/database"
 	"github.com/Doratou/Backend/internal/infrastructure/jwt"
 	redisInfra "github.com/Doratou/Backend/internal/infrastructure/redis"
 )
@@ -29,6 +30,8 @@ type userService struct {
 	tokenRepo         cache.AuthnTokenRepository
 	jwtMaker          jwt.TokenMaker
 	redisTrx          redisInfra.TrxManager
+	readTrx           database.TrxManager
+	wallet            adapter.WalletService
 }
 
 func NewUserService(
@@ -38,6 +41,8 @@ func NewUserService(
 	tokenRepo cache.AuthnTokenRepository,
 	jwtMaker jwt.TokenMaker,
 	redisTrx redisInfra.TrxManager,
+	readTrx database.TrxManager,
+	wallet adapter.WalletService,
 ) adapter.UserService {
 	return &userService{
 		userRepo:          userRepo,
@@ -46,21 +51,30 @@ func NewUserService(
 		tokenRepo:         tokenRepo,
 		jwtMaker:          jwtMaker,
 		redisTrx:          redisTrx,
+		readTrx:           readTrx,
+		wallet:            wallet,
 	}
 }
 
 func (s *userService) GetMe(ctx context.Context, userID int64) (*dto.UserResponse, error) {
-	user, err := s.activeUser(ctx, userID)
+	var response dto.UserResponse
+	err := s.readTrx.WithTransaction(ctx, func(txCtx context.Context) error {
+		user, err := s.activeUser(txCtx, userID)
+		if err != nil {
+			return err
+		}
+		response = dto.ToUserResponse(user)
+		response.ProfileCompletion, err = s.wallet.ProfileCompletion(txCtx, userID)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	response := dto.ToUserResponse(user)
 	return &response, nil
 }
 
 func (s *userService) UpdateProfile(ctx context.Context, userID int64, req dto.UpdateProfileRequest) (*dto.UserResponse, error) {
-	user, err := s.activeUser(ctx, userID)
-	if err != nil {
+	if _, err := s.activeUser(ctx, userID); err != nil {
 		return nil, err
 	}
 
@@ -69,23 +83,19 @@ func (s *userService) UpdateProfile(ctx context.Context, userID int64, req dto.U
 		return nil, exception.ErrBadRequest
 	}
 
-	user.Name = name
-	if err := s.userRepo.Update(ctx, user); err != nil {
+	if err := s.userRepo.UpdateName(ctx, userID, name); err != nil {
 		return nil, err
 	}
 
-	response := dto.ToUserResponse(user)
-	return &response, nil
+	return s.GetMe(ctx, userID)
 }
 
 func (s *userService) ActivateUserStatus(ctx context.Context, userID int64) (*dto.UserResponse, error) {
-	user, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
+	if err := s.userRepo.UpdateStatus(ctx, userID, enum.UserStatusActive); err != nil {
 		return nil, err
 	}
 
-	user.Status = enum.UserStatusActive
-	err = s.userRepo.Update(ctx, user)
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +117,7 @@ func (s *userService) ChangeEmail(ctx context.Context, userID int64, req dto.Cha
 	}
 
 	if user.Email != nil && *user.Email == email && user.IsEmailVerified {
-		response := dto.ToUserResponse(user)
-		return &response, nil
+		return s.GetMe(ctx, userID)
 	}
 
 	verified, err := s.otpService.IsVerified(ctx, email, enum.OTPTypeEmail)
@@ -129,9 +138,7 @@ func (s *userService) ChangeEmail(ctx context.Context, userID int64, req dto.Cha
 	}
 
 	// 2. Update email and mark verified
-	user.Email = &email
-	user.IsEmailVerified = true
-	if err := s.userRepo.Update(ctx, user); err != nil {
+	if err := s.userRepo.UpdateEmail(ctx, userID, email); err != nil {
 		return nil, err
 	}
 
@@ -140,8 +147,7 @@ func (s *userService) ChangeEmail(ctx context.Context, userID int64, req dto.Cha
 		return s.otpService.ClearVerified(trxCtx, email, enum.OTPTypeEmail)
 	})
 
-	response := dto.ToUserResponse(user)
-	return &response, nil
+	return s.GetMe(ctx, userID)
 }
 
 func (s *userService) ChangePhone(ctx context.Context, userID int64, req dto.ChangePhoneRequest) (*dto.UserResponse, error) {
@@ -156,8 +162,7 @@ func (s *userService) ChangePhone(ctx context.Context, userID int64, req dto.Cha
 	}
 
 	if user.Phone != nil && *user.Phone == phone && user.IsPhoneVerified {
-		response := dto.ToUserResponse(user)
-		return &response, nil
+		return s.GetMe(ctx, userID)
 	}
 
 	// 1. Verify OTP was confirmed in Redis
@@ -179,9 +184,7 @@ func (s *userService) ChangePhone(ctx context.Context, userID int64, req dto.Cha
 	}
 
 	// 3. Update phone and mark verified
-	user.Phone = &phone
-	user.IsPhoneVerified = true
-	if err := s.userRepo.Update(ctx, user); err != nil {
+	if err := s.userRepo.UpdatePhone(ctx, userID, phone); err != nil {
 		return nil, err
 	}
 
@@ -190,18 +193,15 @@ func (s *userService) ChangePhone(ctx context.Context, userID int64, req dto.Cha
 		return s.otpService.ClearVerified(trxCtx, phone, enum.OTPTypePhone)
 	})
 
-	response := dto.ToUserResponse(user)
-	return &response, nil
+	return s.GetMe(ctx, userID)
 }
 
 func (s *userService) DeleteAccount(ctx context.Context, userID int64, tokenString string) error {
-	user, err := s.activeUser(ctx, userID)
-	if err != nil {
+	if _, err := s.activeUser(ctx, userID); err != nil {
 		return err
 	}
 
-	user.Status = enum.UserStatusInactive
-	_ = s.userRepo.Update(ctx, user)
+	_ = s.userRepo.UpdateStatus(ctx, userID, enum.UserStatusInactive)
 
 	if err := s.userRepo.DeleteByID(ctx, userID); err != nil {
 		return err
@@ -219,16 +219,6 @@ func (s *userService) DeleteAccount(ctx context.Context, userID int64, tokenStri
 	}
 
 	return nil
-}
-
-func (s *userService) GetWallet(ctx context.Context, userID int64) (*dto.WalletResponse, error) {
-	user, err := s.activeUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	return &dto.WalletResponse{
-		Wallet: user.Wallet,
-	}, nil
 }
 
 func (s *userService) GetUserByID(ctx context.Context, currentUserID, targetUserID int64) (*dto.UserPreviewResponse, error) {

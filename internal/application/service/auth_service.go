@@ -387,12 +387,11 @@ func (s *authService) LoginWithOTP(ctx context.Context, req dto.LoginWithOTPRequ
 		return nil, exception.ErrUserInactive
 	}
 
-	if isEmail && !user.IsEmailVerified {
-		user.IsEmailVerified = true
-		_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, true, user.IsPhoneVerified)
-	} else if !isEmail && !user.IsPhoneVerified {
-		user.IsPhoneVerified = true
-		_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, user.IsEmailVerified, true)
+	if (isEmail && !user.IsEmailVerified) || (!isEmail && !user.IsPhoneVerified) {
+		user, err = s.verifyIdentifier(ctx, user.ID, req.Identifier, otpType)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Clear verified flag atomically from Redis
@@ -533,6 +532,13 @@ func (s *authService) UpdateAvatar(ctx context.Context, userID int64, avatarAtta
 	return &res, nil
 }
 
+func (s *authService) verifyIdentifier(ctx context.Context, userID int64, identifier string, kind enum.OTPType) (*entity.User, error) {
+	if err := s.userRepo.VerifyIdentifier(ctx, userID, identifier, kind); err != nil {
+		return nil, err
+	}
+	return s.userRepo.FindByID(ctx, userID)
+}
+
 func (s *authService) GoogleLoginURL(ctx context.Context) (*dto.OAuthLoginURLResponse, error) {
 	if s.googleProvider == nil {
 		return nil, exception.Wrap(exception.ErrInternal, errors.New("google oauth provider is not configured"))
@@ -627,8 +633,10 @@ func (s *authService) GoogleCallback(ctx context.Context, req dto.GoogleCallback
 		// Ensure is_email_verified is true since Google verified it
 		if !user.IsEmailVerified {
 			log.Printf("Info: updating email verification status for user_id: %d", user.ID)
-			user.IsEmailVerified = true
-			_ = s.userRepo.UpdateVerifiedStatus(ctx, user.ID, true, user.IsPhoneVerified)
+			user, err = s.verifyIdentifier(ctx, user.ID, email, enum.OTPTypeEmail)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		// Check if OAuth account link already exists for this provider
