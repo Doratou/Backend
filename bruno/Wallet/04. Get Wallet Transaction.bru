@@ -1,0 +1,168 @@
+meta {
+  name: 04. Get Wallet Transaction
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/wallet/transactions/1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Wallet Transaction
+
+  - **Method** `GET`
+  - **Endpoint** `/api/v1/wallet/transactions/:transactionID`
+  - **Auth** Bearer access token
+
+  ## Description
+
+  Returns one wallet transaction belonging to the active caller. Use `data.id` from Purchase Tokens or `items[].id` from List Wallet Transactions. The stored amount, timestamp and tracking code can be displayed as the receipt for a successful mock purchase. A failed purchase exposes its original order details and failure status. A profile completion reward exposes its token credit.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `type` | `PURCHASE`, `SPEND`, `REWARD` | Purchase, spending, and reward records. Values are uppercase and case-sensitive. |
+  | `status` | `SUCCEEDED`, `FAILED` | Final recorded outcome. |
+  | `currency` | `TOMAN` | All monetary values are whole toman. |
+  | `package_id` | `TOKEN_10`, `TOKEN_25`, `TOKEN_50`, `TOKEN_100` or `null` | Case-sensitive preset package ID. Null for custom purchases, spending, and rewards. |
+  | `payment_mode` | `MOCK` or `null` | MOCK for purchases. Null for spending and rewards. |
+  | `reward_code` | `PROFILE_COMPLETION` when present | Identifies the one-time profile completion reward. |
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). The token identifies the account. |
+
+  ### Path parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `transactionID` | `integer` | Yes | Positive signed 64-bit transaction ID. Replace `1` in the saved Bruno request with the ID from the purchase or history response. |
+
+  ### Query parameters
+
+  Send the request without query parameters.
+
+  ### Body
+
+  Send an empty body.
+
+  ### Example request
+
+  `GET /api/v1/wallet/transactions/42`
+
+  ## Response
+
+  ### `200 OK` for a purchase
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 42,
+      "type": "PURCHASE",
+      "status": "SUCCEEDED",
+      "description": "Purchase of 50 tokens",
+      "token_amount": 50,
+      "token_delta": 50,
+      "balance_after": 50,
+      "currency": "TOMAN",
+      "amount_toman": 220000,
+      "base_unit_price_toman": 5000,
+      "discount_percent": 12,
+      "package_id": "TOKEN_50",
+      "tracking_code": "DRT-20261127-000042",
+      "payment_mode": "MOCK",
+      "created_at": "2026-11-27T09:00:00Z"
+    }
+  }
+  ```
+
+  ### `200 OK` for a profile completion reward
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 44,
+      "type": "REWARD",
+      "status": "SUCCEEDED",
+      "description": "Profile completion reward",
+      "token_amount": 3,
+      "token_delta": 3,
+      "balance_after": 53,
+      "currency": "TOMAN",
+      "amount_toman": null,
+      "base_unit_price_toman": null,
+      "discount_percent": 0,
+      "package_id": null,
+      "tracking_code": null,
+      "payment_mode": null,
+      "reward_code": "PROFILE_COMPLETION",
+      "created_at": "2026-11-27T09:15:00Z"
+    }
+  }
+  ```
+
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `success` | `boolean` | Always `true` in a successful API response. |
+  | `data` | `object` | Details of the requested transaction. |
+  | `data.id` | `integer` | Positive transaction ID for the detail request. |
+  | `data.type` | `string` | `PURCHASE`, `SPEND`, or `REWARD`. |
+  | `data.status` | `string` | `SUCCEEDED` or `FAILED`. This field is the payment outcome for a purchase. |
+  | `data.description` | `string` | Display description of the transaction. |
+  | `data.token_amount` | `integer` | Positive token quantity for the record. Failed purchases still report the requested quantity. |
+  | `data.token_delta` | `integer` | Signed balance change. Positive for successful purchases and rewards, negative for spending, and zero for failed purchases. |
+  | `data.balance_after` | `integer` | Stored token balance immediately after this transaction. Fetch Wallet Summary for the live balance. |
+  | `data.currency` | `string` | `TOMAN` for monetary amounts. |
+  | `data.amount_toman` | `integer \| null` | Whole-toman order total for purchases, including failures. Null for spending and rewards. |
+  | `data.base_unit_price_toman` | `integer \| null` | Base price per token at purchase time, before any package discount. Null for spending and rewards. |
+  | `data.discount_percent` | `integer` | Applied package discount. `0` for custom purchases, spending, and rewards. |
+  | `data.package_id` | `string \| null` | Preset package ID. Null for a custom purchase, spending, or rewards. |
+  | `data.tracking_code` | `string \| null` | Simulated reference in `DRT-YYYYMMDD-<id>` format, using the UTC date and ID padded to at least six digits. Null for spending and rewards. |
+  | `data.payment_mode` | `string \| null` | `MOCK` for purchases. Null for spending and rewards. |
+  | `data.reward_code` | `string, optional` | `PROFILE_COMPLETION` for the profile reward. Other records omit this field. |
+  | `data.created_at` | `RFC 3339 timestamp` | Time this record was created, serialized in UTC. |
+
+  ### Rendering the receipt
+
+  Show `created_at`, `amount_toman`, `token_amount`, `status`, and `tracking_code` for a successful purchase. The code is identical in the purchase, history, and detail responses for the same transaction. The price and discount describe that purchase at the time it was recorded.
+
+  ## Errors
+
+  | HTTP | code | error | When it happens |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | The transaction ID cannot be parsed as a signed 64-bit integer or is zero or negative. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization header is missing or its Bearer format is invalid. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid or the caller supplied a refresh token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The caller's account is inactive. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller's account is missing or soft-deleted. |
+  | 404 | `WALLET_TRANSACTION_NOT_FOUND` | `wallet transaction not found` | The transaction is missing or belongs to someone else. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | The transaction lookup or token verification dependency failed. |
+
+  ### `404 WALLET_TRANSACTION_NOT_FOUND` example
+
+  ```json
+  {
+    "success": false,
+    "code": "WALLET_TRANSACTION_NOT_FOUND",
+    "error": "wallet transaction not found"
+  }
+  ```
+}

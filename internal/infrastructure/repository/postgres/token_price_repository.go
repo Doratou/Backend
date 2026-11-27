@@ -26,6 +26,18 @@ func (r *tokenPriceRepository) getDB(ctx context.Context) *gorm.DB {
 	return database.ExtractTrxOrDB(ctx, r.db).GetGormDB().WithContext(ctx)
 }
 
+func (r *tokenPriceRepository) CurrentPrice(ctx context.Context) (*entity.TokenPrice, error) {
+	var price entity.TokenPrice
+	err := r.getDB(ctx).First(&price, 1).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, exception.ErrWalletPriceUnavailable
+	}
+	if err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+	return &price, nil
+}
+
 func (r *tokenPriceRepository) UpdatePrice(ctx context.Context, newPriceToman int64) (int64, *entity.TokenPrice, error) {
 	var oldPrice int64
 	var updated entity.TokenPrice

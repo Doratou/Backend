@@ -1,0 +1,223 @@
+meta {
+  name: 03. List Wallet Transactions
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/wallet/transactions?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+  ~type: PURCHASE
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # List Wallet Transactions
+
+  - **Method** `GET`
+  - **Endpoint** `/api/v1/wallet/transactions`
+  - **Auth** Bearer access token
+
+  ## Description
+
+  Lists the active caller's wallet history, ordered by `created_at` descending and then by `id` descending for matching timestamps. Successful and failed purchases both appear. The `REWARD` filter includes profile completion rewards. The `SPEND` filter is available for spending records when token spending is introduced.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `type` | `PURCHASE`, `SPEND`, `REWARD` | Purchase, spending, and reward records. Values are uppercase and case-sensitive. |
+  | `status` | `SUCCEEDED`, `FAILED` | Final recorded outcome. |
+  | `currency` | `TOMAN` | All monetary values are whole toman. |
+  | `package_id` | `TOKEN_10`, `TOKEN_25`, `TOKEN_50`, `TOKEN_100` or `null` | Case-sensitive preset package ID. Null for custom purchases, spending, and rewards. |
+  | `payment_mode` | `MOCK` or `null` | MOCK for purchases. Null for spending and rewards. |
+  | `reward_code` | `PROFILE_COMPLETION` when present | Identifies the one-time profile completion reward. |
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). The token identifies the account. |
+
+  ### Path parameters
+
+  This request uses a fixed path.
+
+  ### Query parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `page` | `integer` | No | Page number beginning at `1`. Defaults to `1` when omitted. |
+  | `limit` | `integer` | No | From `1` to `100`, inclusive. Defaults to `20` when omitted. |
+  | `type` | `string` | No | `PURCHASE`, `SPEND`, or `REWARD`. Omit or send an empty value for all types. |
+
+  Use the same filter and limit when requesting the next page. The server rejects an explicitly empty `page` or `limit`, invalid values, and an offset outside the supported range.
+
+  ### Body
+
+  Send an empty body.
+
+  ### Example requests
+
+  | View | Request |
+  | --- | --- |
+  | All transactions | `GET /api/v1/wallet/transactions?page=1&limit=20` |
+  | Purchases | `GET /api/v1/wallet/transactions?type=PURCHASE&page=1&limit=20` |
+  | Rewards | `GET /api/v1/wallet/transactions?type=REWARD&page=1&limit=20` |
+  | Spending | `GET /api/v1/wallet/transactions?type=SPEND&page=1&limit=20` |
+
+  ## Response
+
+  ### `200 OK` for unfiltered history
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 44,
+          "type": "REWARD",
+          "status": "SUCCEEDED",
+          "description": "Profile completion reward",
+          "token_amount": 3,
+          "token_delta": 3,
+          "balance_after": 53,
+          "currency": "TOMAN",
+          "amount_toman": null,
+          "base_unit_price_toman": null,
+          "discount_percent": 0,
+          "package_id": null,
+          "tracking_code": null,
+          "payment_mode": null,
+          "reward_code": "PROFILE_COMPLETION",
+          "created_at": "2026-11-27T09:15:00Z"
+        },
+        {
+          "id": 43,
+          "type": "PURCHASE",
+          "status": "FAILED",
+          "description": "Purchase of 25 tokens",
+          "token_amount": 25,
+          "token_delta": 0,
+          "balance_after": 50,
+          "currency": "TOMAN",
+          "amount_toman": 115000,
+          "base_unit_price_toman": 5000,
+          "discount_percent": 8,
+          "package_id": "TOKEN_25",
+          "tracking_code": "DRT-20261127-000043",
+          "payment_mode": "MOCK",
+          "created_at": "2026-11-27T09:10:00Z"
+        },
+        {
+          "id": 42,
+          "type": "PURCHASE",
+          "status": "SUCCEEDED",
+          "description": "Purchase of 50 tokens",
+          "token_amount": 50,
+          "token_delta": 50,
+          "balance_after": 50,
+          "currency": "TOMAN",
+          "amount_toman": 220000,
+          "base_unit_price_toman": 5000,
+          "discount_percent": 12,
+          "package_id": "TOKEN_50",
+          "tracking_code": "DRT-20261127-000042",
+          "payment_mode": "MOCK",
+          "created_at": "2026-11-27T09:00:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 3
+      }
+    }
+  }
+  ```
+
+  ### `200 OK` for an empty result
+
+  An empty filtered history has a matching total of zero. A page beyond the results also returns `items: []` and keeps the total for the matching filter.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 0
+      }
+    }
+  }
+  ```
+
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `success` | `boolean` | Always `true` in a successful API response. |
+  | `data` | `object` | List of matching transactions and pagination metadata. |
+  | `data.items` | `array` | Transactions on the current page. Empty when there are no items. |
+  | `data.items[].id` | `integer` | Positive transaction ID for the detail request. |
+  | `data.items[].type` | `string` | `PURCHASE`, `SPEND`, or `REWARD`. |
+  | `data.items[].status` | `string` | `SUCCEEDED` or `FAILED`. This field is the payment outcome for a purchase. |
+  | `data.items[].description` | `string` | Display description of the transaction. |
+  | `data.items[].token_amount` | `integer` | Positive token quantity for the record. Failed purchases still report the requested quantity. |
+  | `data.items[].token_delta` | `integer` | Signed balance change. Positive for successful purchases and rewards, negative for spending, and zero for failed purchases. |
+  | `data.items[].balance_after` | `integer` | Stored token balance immediately after this transaction. Fetch Wallet Summary for the live balance. |
+  | `data.items[].currency` | `string` | `TOMAN` for monetary amounts. |
+  | `data.items[].amount_toman` | `integer \| null` | Whole-toman order total for purchases, including failures. Null for spending and rewards. |
+  | `data.items[].base_unit_price_toman` | `integer \| null` | Base price per token at purchase time, before any package discount. Null for spending and rewards. |
+  | `data.items[].discount_percent` | `integer` | Applied package discount. `0` for custom purchases, spending, and rewards. |
+  | `data.items[].package_id` | `string \| null` | Preset package ID. Null for a custom purchase, spending, or rewards. |
+  | `data.items[].tracking_code` | `string \| null` | Simulated reference in `DRT-YYYYMMDD-<id>` format, using the UTC date and ID padded to at least six digits. Null for spending and rewards. |
+  | `data.items[].payment_mode` | `string \| null` | `MOCK` for purchases. Null for spending and rewards. |
+  | `data.items[].reward_code` | `string, optional` | `PROFILE_COMPLETION` for the profile reward. Other records omit this field. |
+  | `data.items[].created_at` | `RFC 3339 timestamp` | Time this record was created, serialized in UTC. |
+  | `data.pagination` | `object` | Pagination metadata for the selected filter. |
+  | `data.pagination.page` | `integer` | Requested page. Starts at `1`. |
+  | `data.pagination.limit` | `integer` | Maximum number of items per page. |
+  | `data.pagination.total` | `integer` | Number of matching transactions across all pages. |
+
+  ### Displaying history
+
+  Use `type` for the row label and `status` for the purchase outcome. On a failed purchase, show `amount_toman` as the requested order total. A profile completion reward appears as a three-token credit with null payment fields. Use `items[].id` to open a transaction.
+
+  ## Errors
+
+  | HTTP | code | error | When it happens |
+  | --- | --- | --- | --- |
+  | 400 | `BAD_REQUEST` | `bad request payload or parameters` | Invalid transaction type, invalid page or limit, or an overflowing page offset. |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization header is missing or its Bearer format is invalid. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid or the caller supplied a refresh token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The caller's account is inactive. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller's account is missing or soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A history lookup, database transaction, or token verification dependency failed. |
+
+  ### `400 BAD_REQUEST` example
+
+  ```json
+  {
+    "success": false,
+    "code": "BAD_REQUEST",
+    "error": "bad request payload or parameters"
+  }
+  ```
+}

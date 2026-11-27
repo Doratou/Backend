@@ -31,6 +31,7 @@ type Dependencies struct {
 	InviteHandler          *handler.InviteHandler
 	NotificationHandler    *handler.NotificationHandler
 	TokenPriceHandler      *handler.TokenPriceHandler
+	WalletHandler          *handler.WalletHandler
 	WSHandler              *handler.WSHandler
 	CaptchaService         adapter.CaptchaService
 	CaptchaEnabled         bool
@@ -113,6 +114,9 @@ func New(deps Dependencies) *gin.Engine {
 	}
 	if deps.TokenPriceHandler != nil {
 		RegisterTokenPriceRoutes(v1, deps.TokenPriceHandler, authMiddleware)
+	}
+	if deps.WalletHandler != nil {
+		RegisterWalletRoutes(v1, deps.WalletHandler, authMiddleware)
 	}
 	if deps.WSHandler != nil {
 		RegisterWSRoutes(v1, deps.WSHandler, authMiddleware)

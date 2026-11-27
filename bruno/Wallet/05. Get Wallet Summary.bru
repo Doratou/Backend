@@ -1,0 +1,183 @@
+meta {
+  name: 05. Get Wallet Summary
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/wallet/summary
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Wallet Summary
+
+  - **Method** `GET`
+  - **Endpoint** `/api/v1/wallet/summary`
+  - **Auth** Bearer access token
+
+  ## Description
+
+  Returns the active caller's current token balance, successful transaction totals, base price, estimated wallet value in toman, and progress toward the profile completion reward. Use this endpoint when opening the wallet and refresh it after a purchase or a profile update.
+
+  Use `wallet` for the live balance. The totals count successful history records. For accounts with balances that predate transaction history, the totals can differ from the balance. Failed purchases appear in history and are excluded from the totals.
+
+  ## Enum values
+
+  | Field | Values | Meaning |
+  | --- | --- | --- |
+  | `currency` | `TOMAN` | All monetary values are whole toman. |
+
+  ## Request
+
+  ### Headers
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `Authorization` | `string` | Yes | Bearer access token (`Bearer <token>`). The token identifies the account. |
+
+  ### Path parameters
+
+  This request uses a fixed path.
+
+  ### Query parameters
+
+  Send the request without query parameters.
+
+  ### Body
+
+  Send an empty body.
+
+  ### Example request
+
+  `GET /api/v1/wallet/summary`
+
+  ## Response
+
+  ### `200 OK` after a successful purchase and profile completion
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "wallet": 53,
+      "currency": "TOMAN",
+      "purchased_tokens": 50,
+      "spent_tokens": 0,
+      "rewarded_tokens": 3,
+      "token_price_toman": 5000,
+      "price_updated_at": "2026-11-27T08:00:00Z",
+      "estimated_value_toman": 265000,
+      "profile_completion": {
+        "steps": {
+          "full_name": true,
+          "profile_photo": true,
+          "verified_email": true,
+          "verified_phone": true,
+          "telegram_connected": true
+        },
+        "completed_steps": 5,
+        "total_steps": 5,
+        "progress_percent": 100,
+        "reward_tokens": 3,
+        "reward_granted": true
+      }
+    }
+  }
+  ```
+
+  ### `200 OK` with no positive token price configured
+
+  Balance and profile progress remain available. The price fields and estimated value come back as `null`.
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "wallet": 0,
+      "currency": "TOMAN",
+      "purchased_tokens": 0,
+      "spent_tokens": 0,
+      "rewarded_tokens": 0,
+      "token_price_toman": null,
+      "price_updated_at": null,
+      "estimated_value_toman": null,
+      "profile_completion": {
+        "steps": {
+          "full_name": true,
+          "profile_photo": false,
+          "verified_email": true,
+          "verified_phone": false,
+          "telegram_connected": false
+        },
+        "completed_steps": 2,
+        "total_steps": 5,
+        "progress_percent": 40,
+        "reward_tokens": 3,
+        "reward_granted": false
+      }
+    }
+  }
+  ```
+
+  ### Response fields
+
+  | Field | Type | Meaning |
+  | --- | --- | --- |
+  | `success` | `boolean` | Always `true` in a successful API response. |
+  | `data` | `object` | Current wallet and profile completion snapshot. |
+  | `data.wallet` | `integer` | Current token balance. |
+  | `data.currency` | `string` | `TOMAN`. |
+  | `data.purchased_tokens` | `integer` | Total tokens from successful purchases. |
+  | `data.spent_tokens` | `integer` | Total tokens spent through successful spending records, expressed as a non-negative count. |
+  | `data.rewarded_tokens` | `integer` | Total tokens credited by successful rewards. |
+  | `data.token_price_toman` | `integer \| null` | Current base price per token. Null when a positive price is unavailable. |
+  | `data.price_updated_at` | `RFC 3339 timestamp \| null` | Time the base price was last updated. Null when a positive price is unavailable. |
+  | `data.estimated_value_toman` | `integer \| null` | Current balance multiplied by the base price. Null when the price is unavailable or the result is outside the supported range. |
+  | `data.profile_completion` | `object` | Profile progress and reward status. |
+  | `data.profile_completion.steps` | `object` | Five boolean flags for the checklist. See the table below. |
+  | `data.profile_completion.completed_steps` | `integer` | Completed steps from `0` to `5`. |
+  | `data.profile_completion.total_steps` | `integer` | Required number of steps. Currently `5`. |
+  | `data.profile_completion.progress_percent` | `integer` | Progress from `0` to `100` in increments of `20`. |
+  | `data.profile_completion.reward_tokens` | `integer` | Reward amount in tokens. Currently `3`. |
+  | `data.profile_completion.reward_granted` | `boolean` | True once the account has received the reward. Stays true if a step later becomes incomplete. |
+
+  ### Profile completion steps
+
+  | Field in `data.profile_completion.steps` | Type | Complete when |
+  | --- | --- | --- |
+  | `full_name` | `boolean` | The user's name contains at least two parts separated by whitespace. |
+  | `profile_photo` | `boolean` | The user owns the selected, non-deleted `PROFILE_IMAGE` attachment. |
+  | `verified_email` | `boolean` | The account has a non-empty, verified email address. |
+  | `verified_phone` | `boolean` | The account has a non-empty, verified phone number. |
+  | `telegram_connected` | `boolean` | The Telegram integration has stored a positive `telegram_user_id`. |
+
+  Once all five steps are complete, the backend credits 3 tokens once and records a `REWARD` transaction with `reward_code: PROFILE_COMPLETION`. Refresh the summary after a profile update has been saved or after the Telegram connection completes. Refresh transaction history to show the new reward entry.
+
+  ## Errors
+
+  | HTTP | code | error | When it happens |
+  | --- | --- | --- | --- |
+  | 401 | `MISSING_TOKEN` | `authorization token is missing` | Authorization header is missing or its Bearer format is invalid. |
+  | 401 | `TOKEN_INVALID` | `authorization token is invalid` | The token is invalid or the caller supplied a refresh token. |
+  | 401 | `TOKEN_EXPIRED` | `authorization token has expired` | The access token expired. |
+  | 401 | `TOKEN_REVOKED` | `authorization token has been revoked` | The access token is blacklisted. |
+  | 403 | `USER_INACTIVE` | `user account is deactivated` | The caller's account is inactive. |
+  | 404 | `USER_NOT_FOUND` | `user not found` | The caller's account is missing or soft-deleted. |
+  | 500 | `INTERNAL_SERVER_ERROR` | `an internal server error occurred` | A wallet, profile, price, or token verification dependency failed. |
+
+  ### `401 MISSING_TOKEN` example
+
+  ```json
+  {
+    "success": false,
+    "code": "MISSING_TOKEN",
+    "error": "authorization token is missing"
+  }
+  ```
+}

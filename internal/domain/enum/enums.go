@@ -433,3 +433,31 @@ func (c ChecklistFilter) IsValid() bool {
 		return false
 	}
 }
+
+type WalletTransactionType string
+
+const (
+	WalletTransactionPurchase WalletTransactionType = "PURCHASE"
+	WalletTransactionSpend    WalletTransactionType = "SPEND"
+	WalletTransactionReward   WalletTransactionType = "REWARD"
+)
+
+func (t WalletTransactionType) IsValid() bool {
+	switch t {
+	case WalletTransactionPurchase, WalletTransactionSpend, WalletTransactionReward:
+		return true
+	default:
+		return false
+	}
+}
+
+type WalletTransactionStatus string
+
+const (
+	WalletTransactionSucceeded WalletTransactionStatus = "SUCCEEDED"
+	WalletTransactionFailed    WalletTransactionStatus = "FAILED"
+)
+
+type WalletRewardCode string
+
+const WalletRewardProfileCompletion WalletRewardCode = "PROFILE_COMPLETION"

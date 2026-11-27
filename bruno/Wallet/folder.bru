@@ -1,0 +1,43 @@
+meta {
+  name: Wallet
+  seq: 20
+}
+
+auth {
+  mode: none
+}
+
+docs {
+  # Wallet
+
+  All routes require a Bearer access token for an active account. The wallet is personal to the signed-in user. Monetary amounts are integer `TOMAN` and token counts are integers.
+
+  | Method | Path | Action |
+  | --- | --- | --- |
+  | `GET` | `/api/v1/wallet/summary` | Balance, successful transaction totals, estimated wallet value and profile completion. |
+  | `GET` | `/api/v1/wallet/offers` | Read the base price, available packages and allowed custom quantities. |
+  | `POST` | `/api/v1/wallet/purchases` | Create a mock purchase and receive its final result. |
+  | `GET` | `/api/v1/wallet/transactions` | List and filter wallet history. |
+  | `GET` | `/api/v1/wallet/transactions/:transactionID` | Read transaction details for the receipt view. |
+
+  ## Try it manually
+
+  1. If the test database has no positive price, use an admin token with **Token Price / 01. Update Token Price**. Set `price_toman` to `5000` to match these examples.
+  2. Log in as the user and fetch **01. List Wallet Offers**. Copy the selected package ID and total into **02. Purchase Tokens**, or replace the package ID with a custom quantity.
+  3. Set a fresh `Idempotency-Key` for each new purchase. Send the same key to retry the same purchase. The response's `data.status` is `SUCCEEDED` or `FAILED`.
+  4. Copy `data.id` into the path of **04. Get Wallet Transaction**. Fetch the wallet summary and transaction list to see the resulting totals and history.
+
+  ## Mock payment settings
+
+  | `WALLET_MOCK_RANDOM_ENABLED` | `WALLET_MOCK_SUCCESS_PERCENT` | Behavior |
+  | --- | --- | --- |
+  | `true` | `75` (default) | Each new purchase has a 75% chance of success. |
+  | `true` | `0` or `100` | Deterministic failure or success, useful for manual testing. |
+  | `false` | Any value from `0` to `100` | Every new mock purchase succeeds. |
+
+  Status and type values are uppercase. `token_delta` is the actual balance change. It is zero for a failed purchase even though `token_amount` still shows the quantity requested. The mock records a simulated payment result without charging the user. Purchase results and the internal tracking code are available immediately.
+
+  ## Profile completion reward
+
+  Read `profile_completion` from **05. Get Wallet Summary**. All five completed steps earn 3 tokens once per account, with a `REWARD` transaction and `reward_code: PROFILE_COMPLETION`. Refresh the summary and history after the final step. Registration starts with a zero balance.
+}
