@@ -29,6 +29,12 @@ type Environment struct {
 	QueueTTL     QueueTTLConfig     `mapstructure:",squash"`
 	Notification NotificationConfig `mapstructure:",squash"`
 	WS           WSConfig           `mapstructure:",squash"`
+	Wallet       WalletConfig       `mapstructure:",squash"`
+}
+
+type WalletConfig struct {
+	MockRandomEnabled  bool  `mapstructure:"WALLET_MOCK_RANDOM_ENABLED"`
+	MockSuccessPercent int64 `mapstructure:"WALLET_MOCK_SUCCESS_PERCENT"`
 }
 
 type WSConfig struct {
@@ -201,6 +207,8 @@ func NewEnvironment() (*Environment, error) {
 	v := viper.New()
 	v.SetConfigFile(".env")
 	v.SetConfigType("env")
+	v.SetDefault("WALLET_MOCK_RANDOM_ENABLED", true)
+	v.SetDefault("WALLET_MOCK_SUCCESS_PERCENT", 75)
 
 	for _, key := range EnvKeys {
 		if err := v.BindEnv(key); err != nil {
@@ -213,6 +221,9 @@ func NewEnvironment() (*Environment, error) {
 	var environment Environment
 	if err := v.Unmarshal(&environment); err != nil {
 		return nil, fmt.Errorf("read environment settings: %w", err)
+	}
+	if environment.Wallet.MockSuccessPercent < 0 || environment.Wallet.MockSuccessPercent > 100 {
+		return nil, fmt.Errorf("WALLET_MOCK_SUCCESS_PERCENT must be between 0 and 100")
 	}
 
 	return &environment, nil
