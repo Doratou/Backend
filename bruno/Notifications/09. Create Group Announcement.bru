@@ -1,0 +1,69 @@
+meta {
+  name: 09. Create Group Announcement
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/groups/1/announcements
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "title": "Emergency Group Notice",
+    "message": "Please review the updated checklist and expense split by tonight."
+  }
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Create Group Announcement
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/groups/:groupID/announcements`
+  **Auth:** Required (Group Owner)
+
+  ## Description
+
+  Allows the group owner to broadcast a custom announcement with arbitrary title and message to all active group members. The owner themselves is excluded from receiving duplicate self-notifications. Persists notification records in the database for all members and immediately publishes a `group.announcement` event to RabbitMQ for real-time WebSocket delivery.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `groupID` | `integer` | Yes | Target group ID |
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `title` | `string` | Yes | Custom announcement title (1 to 200 characters) |
+  | `message` | `string` | Yes | Custom announcement text body (1 to 2000 characters) |
+
+  ## Response
+
+  **`201 Created`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dispatched_count": 4,
+      "group_id": 1
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid payload or empty message
+  * `401 Unauthorized` — Missing or invalid access token
+  * `403 Forbidden` — Caller is not the owner of the group
+  * `404 Not Found` — Group not found
+}

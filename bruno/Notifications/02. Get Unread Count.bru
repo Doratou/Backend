@@ -1,0 +1,56 @@
+meta {
+  name: 02. Get Unread Count
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/notifications/unread-count
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~group_id: 1
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Unread Count
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/notifications/unread-count`
+  **Auth:** Required
+
+  ## Description
+
+  Returns the total count of unread notifications (`id > last_read_id`) for the caller. Ideal for light periodic badge/bell polling or tab focus sync.
+
+  ## Request
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `group_id` | `integer` | No | Filter unread counter by a specific group |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "unread_count": 3,
+      "last_read_id": 102
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `401 Unauthorized` — Missing or invalid access token
+}

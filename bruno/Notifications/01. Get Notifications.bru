@@ -1,0 +1,79 @@
+meta {
+  name: 01. Get Notifications
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/notifications?limit=20&status=all
+  body: none
+  auth: bearer
+}
+
+params:query {
+  limit: 20
+  status: all
+  ~cursor_id: 100
+  ~group_id: 1
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Get Notifications
+
+  **Method:** `GET`
+  **Endpoint:** `/api/v1/notifications`
+  **Auth:** Required
+
+  ## Description
+
+  Retrieves a cursor-paginated timeline of notifications for the authenticated user, ordered from newest to oldest (`id DESC`), with dynamic `is_read` status computed via High-Water Mark.
+
+  ## Request
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `cursor_id` | `integer` | No | ID of the last seen notification to load earlier items (`id < cursor_id`) |
+  | `limit` | `integer` | No | Maximum number of items to return (default: 20, max: 100) |
+  | `status` | `string` | No | Filter by read status: `all` (default), `unread`, or `read` |
+  | `group_id` | `integer` | No | Filter notifications related to a specific group |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": 105,
+          "recipient_id": 12,
+          "actor_id": 45,
+          "group_id": 3,
+          "event": "poll.created",
+          "data": {
+            "poll_id": 9,
+            "title": "Where should we go?"
+          },
+          "is_read": false,
+          "created_at": "2026-11-24T14:30:00Z"
+        }
+      ],
+      "unread_count": 4,
+      "next_cursor": 105,
+      "has_more": false
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid cursor_id, limit, or filter parameters
+  * `401 Unauthorized` — Missing or invalid access token
+}

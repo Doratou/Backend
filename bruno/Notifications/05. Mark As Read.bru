@@ -1,0 +1,59 @@
+meta {
+  name: 05. Mark As Read
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/notifications/read
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "up_to_id": 105
+  }
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Mark As Read
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/notifications/read`
+  **Auth:** Required
+
+  ## Description
+
+  Advances the user's High-Water Mark bookmark (`last_read_id`) in $O(1)$ time without updating individual rows in the notifications table. If `up_to_id` is omitted or 0, the server automatically marks all current notifications up to the newest one as read.
+
+  ## Request
+
+  ### Body
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `up_to_id` | `integer` | No | ID up to which all notifications should be marked as read. If 0 or omitted, marks all as read |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "last_read_id": 105,
+      "unread_count": 0
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid request format
+  * `401 Unauthorized` — Missing or invalid access token
+}

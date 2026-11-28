@@ -1,0 +1,54 @@
+meta {
+  name: 06. Mark Single As Read
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/notifications/105/read
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Mark Single As Read
+
+  **Method:** `POST`
+  **Endpoint:** `/api/v1/notifications/:id/read`
+  **Auth:** Required
+
+  ## Description
+
+  Marks a specific notification as read by advancing the caller's High-Water Mark to at least the given notification ID.
+
+  ## Request
+
+  ### Path Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `id` | `integer` | Yes | Target notification ID to mark as read |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "last_read_id": 105,
+      "unread_count": 0
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `400 Bad Request` — Invalid notification ID
+  * `401 Unauthorized` — Missing or invalid access token
+  * `404 Not Found` — Notification not found or not owned by user
+}

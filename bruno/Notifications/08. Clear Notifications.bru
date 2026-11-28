@@ -1,0 +1,55 @@
+meta {
+  name: 08. Clear Notifications
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/notifications?only_read=false
+  body: none
+  auth: bearer
+}
+
+params:query {
+  only_read: false
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Clear Notifications
+
+  **Method:** `DELETE`
+  **Endpoint:** `/api/v1/notifications`
+  **Auth:** Required
+
+  ## Description
+
+  Clears notification inbox for the authenticated user. If `only_read=true`, only read notifications (`id <= last_read_id`) are soft-deleted. If `only_read=false` (default), all active notifications are cleared.
+
+  ## Request
+
+  ### Query Parameters
+
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `only_read` | `boolean` | No | If true, only deletes read notifications; if false (default), clears all |
+
+  ## Response
+
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "cleared": true
+    }
+  }
+  ```
+
+  ## Errors
+
+  * `401 Unauthorized` — Missing or invalid access token
+}
