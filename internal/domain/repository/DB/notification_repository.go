@@ -10,8 +10,10 @@ import (
 // NotificationFilter defines query criteria and pagination for user notifications.
 type NotificationFilter struct {
 	RecipientID int64
-	CursorID    int64 // For keyset pagination (id < CursorID when CursorID > 0)
-	Limit       int   // Max items to return (default 20, max 100)
+	CursorID    int64  // For keyset pagination (id < CursorID when CursorID > 0)
+	Limit       int    // Max items to return (default 20, max 100)
+	Status      string // "all", "unread", "read"
+	GroupID     *int64 // Optional group filter
 }
 
 // NotificationRepository defines full CRUD operations, High-Water Mark bookmarking,
@@ -29,8 +31,14 @@ type NotificationRepository interface {
 	// ListByRecipient returns active notifications for a user ordered by id DESC with computed IsRead status.
 	ListByRecipient(ctx context.Context, filter NotificationFilter) ([]*entity.Notification, error)
 
+	// ListMissedSince returns active notifications for a user ordered by id ASC where id > sinceID (catch-up sync).
+	ListMissedSince(ctx context.Context, recipientID int64, sinceID int64, limit int) ([]*entity.Notification, error)
+
 	// GetUnreadCount returns the count of active notifications with id > user's last_read_id.
 	GetUnreadCount(ctx context.Context, userID int64) (int64, error)
+
+	// GetUnreadCountByGroup returns the count of active notifications with id > user's last_read_id, optionally filtered by group.
+	GetUnreadCountByGroup(ctx context.Context, userID int64, groupID *int64) (int64, error)
 
 	// GetLastReadID retrieves the user's current High-Water Mark last_read_id.
 	GetLastReadID(ctx context.Context, userID int64) (int64, error)
@@ -49,6 +57,9 @@ type NotificationRepository interface {
 
 	// SoftDeleteAllByRecipient soft-deletes all active notifications for a specific user.
 	SoftDeleteAllByRecipient(ctx context.Context, recipientID int64) error
+
+	// SoftDeleteReadByRecipient soft-deletes all read notifications (id <= last_read_id) for a specific user.
+	SoftDeleteReadByRecipient(ctx context.Context, recipientID int64) error
 
 	// HardDelete permanently removes a notification record by ID.
 	HardDelete(ctx context.Context, id int64) error

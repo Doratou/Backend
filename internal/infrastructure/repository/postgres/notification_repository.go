@@ -96,6 +96,17 @@ func (r *notificationRepository) ListByRecipient(ctx context.Context, filter dom
 		Joins("LEFT JOIN notification_reads r ON r.user_id = n.recipient_id").
 		Where("n.recipient_id = ? AND n.deleted_at IS NULL", filter.RecipientID)
 
+	if filter.GroupID != nil {
+		query = query.Where("n.group_id = ?", *filter.GroupID)
+	}
+
+	switch filter.Status {
+	case "unread":
+		query = query.Where("n.id > COALESCE(r.last_read_id, 0)")
+	case "read":
+		query = query.Where("n.id <= COALESCE(r.last_read_id, 0)")
+	}
+
 	if filter.CursorID > 0 {
 		query = query.Where("n.id < ?", filter.CursorID)
 	}
@@ -124,14 +135,72 @@ func (r *notificationRepository) ListByRecipient(ctx context.Context, filter dom
 	return results, nil
 }
 
+func (r *notificationRepository) ListMissedSince(ctx context.Context, recipientID int64, sinceID int64, limit int) ([]*entity.Notification, error) {
+	if limit <= 0 {
+		limit = 50
+	} else if limit > 100 {
+		limit = 100
+	}
+
+	query := r.getDB(ctx).
+		Table("notifications n").
+		Select(`
+			n.id,
+			n.recipient_id,
+			n.actor_id,
+			n.group_id,
+			n.event,
+			n.data,
+			n.last_error,
+			n.created_at,
+			n.updated_at,
+			(n.id <= COALESCE(r.last_read_id, 0)) AS is_read
+		`).
+		Joins("LEFT JOIN notification_reads r ON r.user_id = n.recipient_id").
+		Where("n.recipient_id = ? AND n.deleted_at IS NULL AND n.id > ?", recipientID, sinceID).
+		Order("n.id ASC").
+		Limit(limit)
+
+	var rows []notificationQueryResult
+	if err := query.Find(&rows).Error; err != nil {
+		return nil, exception.Wrap(exception.ErrInternal, err)
+	}
+
+	results := make([]*entity.Notification, len(rows))
+	for i, row := range rows {
+		notif := &entity.Notification{
+			RecipientID: row.RecipientID,
+			ActorID:     row.ActorID,
+			GroupID:     row.GroupID,
+			Event:       payload.WSEvent(row.Event),
+			Data:        row.Data,
+			LastError:   row.LastError,
+			IsRead:      row.IsRead,
+		}
+		notif.ID = row.ID
+		notif.CreatedAt = row.CreatedAt
+		notif.UpdatedAt = row.UpdatedAt
+		results[i] = notif
+	}
+	return results, nil
+}
+
 func (r *notificationRepository) GetUnreadCount(ctx context.Context, userID int64) (int64, error) {
+	return r.GetUnreadCountByGroup(ctx, userID, nil)
+}
+
+func (r *notificationRepository) GetUnreadCountByGroup(ctx context.Context, userID int64, groupID *int64) (int64, error) {
 	var count int64
-	err := r.getDB(ctx).
+	query := r.getDB(ctx).
 		Table("notifications n").
 		Joins("LEFT JOIN notification_reads r ON r.user_id = n.recipient_id").
-		Where("n.recipient_id = ? AND n.deleted_at IS NULL AND n.id > COALESCE(r.last_read_id, 0)", userID).
-		Count(&count).Error
-	if err != nil {
+		Where("n.recipient_id = ? AND n.deleted_at IS NULL AND n.id > COALESCE(r.last_read_id, 0)", userID)
+
+	if groupID != nil {
+		query = query.Where("n.group_id = ?", *groupID)
+	}
+
+	if err := query.Count(&count).Error; err != nil {
 		return 0, exception.Wrap(exception.ErrInternal, err)
 	}
 	return count, nil
@@ -216,6 +285,20 @@ func (r *notificationRepository) SoftDeleteAllByRecipient(ctx context.Context, r
 		Where("recipient_id = ? AND deleted_at IS NULL", recipientID).
 		Delete(&entity.Notification{}).Error
 	if err != nil {
+		return exception.Wrap(exception.ErrInternal, err)
+	}
+	return nil
+}
+
+func (r *notificationRepository) SoftDeleteReadByRecipient(ctx context.Context, recipientID int64) error {
+	query := `
+		UPDATE notifications
+		SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE recipient_id = ?
+		  AND deleted_at IS NULL
+		  AND id <= COALESCE((SELECT last_read_id FROM notification_reads WHERE user_id = ?), 0);
+	`
+	if err := r.getDB(ctx).Exec(query, recipientID, recipientID).Error; err != nil {
 		return exception.Wrap(exception.ErrInternal, err)
 	}
 	return nil
