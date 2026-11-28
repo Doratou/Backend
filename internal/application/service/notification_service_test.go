@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
 	"github.com/Doratou/Backend/internal/application/service"
 	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
@@ -221,8 +222,14 @@ func (m *mockGroupRepo) CloneWithMembers(ctx context.Context, sourceGroupID int6
 	return nil
 }
 
+type publishedRecord struct {
+	payload payload.WSPayload
+	opts    domain_broker.PublishOptions
+}
+
 type mockPublisher struct {
 	published []payload.WSPayload
+	records   []publishedRecord
 }
 
 func (m *mockPublisher) Publish(ctx context.Context, exchange, routingKey string, msg domain_broker.Message, opts ...domain_broker.PublishOption) error {
@@ -230,10 +237,23 @@ func (m *mockPublisher) Publish(ctx context.Context, exchange, routingKey string
 }
 
 func (m *mockPublisher) PublishJSON(ctx context.Context, exchange, routingKey string, p any, opts ...domain_broker.PublishOption) error {
+	var pubOpts domain_broker.PublishOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&pubOpts)
+		}
+	}
 	if wsPayload, ok := p.(payload.WSPayload); ok {
 		m.published = append(m.published, wsPayload)
+		m.records = append(m.records, publishedRecord{payload: wsPayload, opts: pubOpts})
 	}
 	return nil
+}
+
+var testServiceConfig = service.NotificationServiceConfig{
+	RealtimeTTL: time.Minute,
+	StandardTTL: 5 * time.Minute,
+	NormalTTL:   15 * time.Minute,
 }
 
 func TestNotificationService_GetAndMarkAsRead(t *testing.T) {
@@ -244,7 +264,7 @@ func TestNotificationService_GetAndMarkAsRead(t *testing.T) {
 		members: make(map[int64][]entity.GroupMember),
 	}
 	pub := &mockPublisher{}
-	srv := service.NewNotificationService(repo, groupRepo, nil, pub)
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
 
 	// Dispatch 3 notifications
 	_ = srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventFriendRequestReceived, map[string]string{"msg": "hi 1"})
@@ -294,7 +314,7 @@ func TestNotificationService_SyncNotifications(t *testing.T) {
 		members: make(map[int64][]entity.GroupMember),
 	}
 	pub := &mockPublisher{}
-	srv := service.NewNotificationService(repo, groupRepo, nil, pub)
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
 
 	_ = srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventTokenPriceUpdated, map[string]int{"price": 100})
 	_ = srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventTokenPriceUpdated, map[string]int{"price": 110})
@@ -335,7 +355,7 @@ func TestNotificationService_CreateGroupAnnouncement_ExcludesOwner_AndPublishesT
 		},
 	}
 	pub := &mockPublisher{}
-	srv := service.NewNotificationService(repo, groupRepo, nil, pub)
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
 
 	res, err := srv.CreateGroupAnnouncement(ctx, 100, 1, dto.GroupAnnouncementRequest{
 		Title:   "Important Announcement",
@@ -362,7 +382,7 @@ func TestNotificationService_CreateGroupAnnouncement_ExcludesOwner_AndPublishesT
 		t.Fatalf("expected member 200 to have 1 notification, got %d", len(memberList.Items))
 	}
 
-	// Verify RabbitMQ publish was triggered with TargetGroups
+	// Verify RabbitMQ publish was triggered with TargetGroups and Realtime delivery
 	if len(pub.published) != 1 {
 		t.Fatalf("expected 1 event published to RMQ, got %d", len(pub.published))
 	}
@@ -379,6 +399,14 @@ func TestNotificationService_CreateGroupAnnouncement_ExcludesOwner_AndPublishesT
 	if event.SenderID != 100 {
 		t.Fatalf("expected sender ID 100, got %d", event.SenderID)
 	}
+
+	rec := pub.records[0]
+	if rec.opts.Urgency != domain_broker.UrgencyRealtime {
+		t.Fatalf("expected announcement urgency Realtime (%d), got %d", domain_broker.UrgencyRealtime, rec.opts.Urgency)
+	}
+	if rec.opts.TTL != time.Minute {
+		t.Fatalf("expected announcement TTL 1m, got %v", rec.opts.TTL)
+	}
 }
 
 func TestNotificationService_DispatchToUser_PublishesToRMQ(t *testing.T) {
@@ -389,7 +417,7 @@ func TestNotificationService_DispatchToUser_PublishesToRMQ(t *testing.T) {
 		members: make(map[int64][]entity.GroupMember),
 	}
 	pub := &mockPublisher{}
-	srv := service.NewNotificationService(repo, groupRepo, nil, pub)
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
 
 	var actorID int64 = 42
 	err := srv.DispatchToUser(ctx, 10, &actorID, nil, payload.WSEventFriendRequestReceived, map[string]string{"from": "Ali"})
@@ -409,5 +437,95 @@ func TestNotificationService_DispatchToUser_PublishesToRMQ(t *testing.T) {
 	}
 	if ev.SenderID != 42 {
 		t.Fatalf("expected sender ID 42, got %d", ev.SenderID)
+	}
+
+	rec := pub.records[0]
+	if rec.opts.Urgency != domain_broker.UrgencyRealtime {
+		t.Fatalf("expected friend_request urgency Realtime, got %d", rec.opts.Urgency)
+	}
+	if rec.opts.TTL != time.Minute {
+		t.Fatalf("expected friend_request TTL 1m, got %v", rec.opts.TTL)
+	}
+}
+
+func TestNotificationService_EventUrgencyAndTTL_Defaults(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockNotificationRepo()
+	groupRepo := &mockGroupRepo{
+		groups:  make(map[int64]*entity.Group),
+		members: make(map[int64][]entity.GroupMember),
+	}
+	pub := &mockPublisher{}
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
+
+	// 1. UrgencyRealtime event (e.g. SettlementPaid)
+	if err := srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventSettlementPaid, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// 2. UrgencyStandard event (e.g. PollCreated)
+	if err := srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventPollCreated, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// 3. UrgencyNormal event (e.g. TokenPriceUpdated)
+	if err := srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventTokenPriceUpdated, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(pub.records) != 3 {
+		t.Fatalf("expected 3 published records, got %d", len(pub.records))
+	}
+
+	// Verify SettlementPaid -> Realtime & 1m
+	if pub.records[0].opts.Urgency != domain_broker.UrgencyRealtime {
+		t.Errorf("SettlementPaid: expected UrgencyRealtime (%d), got %d", domain_broker.UrgencyRealtime, pub.records[0].opts.Urgency)
+	}
+	if pub.records[0].opts.TTL != time.Minute {
+		t.Errorf("SettlementPaid: expected TTL 1m, got %v", pub.records[0].opts.TTL)
+	}
+
+	// Verify PollCreated -> Standard & 5m
+	if pub.records[1].opts.Urgency != domain_broker.UrgencyStandard {
+		t.Errorf("PollCreated: expected UrgencyStandard (%d), got %d", domain_broker.UrgencyStandard, pub.records[1].opts.Urgency)
+	}
+	if pub.records[1].opts.TTL != 5*time.Minute {
+		t.Errorf("PollCreated: expected TTL 5m, got %v", pub.records[1].opts.TTL)
+	}
+
+	// Verify TokenPriceUpdated -> Normal & 15m
+	if pub.records[2].opts.Urgency != domain_broker.UrgencyNormal {
+		t.Errorf("TokenPriceUpdated: expected UrgencyNormal (%d), got %d", domain_broker.UrgencyNormal, pub.records[2].opts.Urgency)
+	}
+	if pub.records[2].opts.TTL != 15*time.Minute {
+		t.Errorf("TokenPriceUpdated: expected TTL 15m, got %v", pub.records[2].opts.TTL)
+	}
+}
+
+func TestNotificationService_CallerOverride(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockNotificationRepo()
+	groupRepo := &mockGroupRepo{
+		groups:  make(map[int64]*entity.Group),
+		members: make(map[int64][]entity.GroupMember),
+	}
+	pub := &mockPublisher{}
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
+
+	// Override TokenPriceUpdated (default Normal/15m) to Realtime with custom 30s TTL
+	err := srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventTokenPriceUpdated, nil,
+		adapter.WithDispatchUrgency(domain_broker.UrgencyRealtime),
+		adapter.WithDispatchTTL(30*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(pub.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(pub.records))
+	}
+	if pub.records[0].opts.Urgency != domain_broker.UrgencyRealtime {
+		t.Errorf("override: expected UrgencyRealtime, got %d", pub.records[0].opts.Urgency)
+	}
+	if pub.records[0].opts.TTL != 30*time.Second {
+		t.Errorf("override: expected TTL 30s, got %v", pub.records[0].opts.TTL)
 	}
 }

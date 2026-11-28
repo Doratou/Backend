@@ -17,11 +17,19 @@ import (
 	"github.com/Doratou/Backend/internal/infrastructure/database"
 )
 
+// NotificationServiceConfig holds tier-based TTL durations for WebSocket notification delivery.
+type NotificationServiceConfig struct {
+	RealtimeTTL time.Duration
+	StandardTTL time.Duration
+	NormalTTL   time.Duration
+}
+
 type notificationService struct {
 	repo      domain_repo.NotificationRepository
 	groupRepo domain_repo.GroupRepository
 	dbTrx     database.TrxManager
 	brokerPub domain_broker.Publisher
+	cfg       NotificationServiceConfig
 }
 
 // NewNotificationService creates a new instance of NotificationService.
@@ -30,24 +38,104 @@ func NewNotificationService(
 	groupRepo domain_repo.GroupRepository,
 	dbTrx database.TrxManager,
 	brokerPub domain_broker.Publisher,
+	cfg NotificationServiceConfig,
 ) adapter.NotificationService {
+	if cfg.RealtimeTTL <= 0 {
+		cfg.RealtimeTTL = 1 * time.Minute
+	}
+	if cfg.StandardTTL <= 0 {
+		cfg.StandardTTL = 5 * time.Minute
+	}
+	if cfg.NormalTTL <= 0 {
+		cfg.NormalTTL = 15 * time.Minute
+	}
 	return &notificationService{
 		repo:      repo,
 		groupRepo: groupRepo,
 		dbTrx:     dbTrx,
 		brokerPub: brokerPub,
+		cfg:       cfg,
 	}
 }
 
-// publishWS encapsulates real-time event dispatching to RabbitMQ with standard TTL and urgency.
-func (s *notificationService) publishWS(ctx context.Context, p payload.WSPayload) {
+// defaultUrgencyForEvent encapsulates the application business logic for determining
+// the intrinsic delivery urgency level for each specific event type.
+func defaultUrgencyForEvent(e payload.WSEvent) domain_broker.Urgency {
+	switch e {
+	case payload.WSEventFriendRequestReceived,
+		payload.WSEventFriendRequestResponded,
+		payload.WSEventSettlementPaid,
+		payload.WSEventDrawResult,
+		payload.WSEventAdminReportAnswered,
+		payload.WSEventGroupAnnouncement:
+		return domain_broker.UrgencyRealtime
+	case payload.WSEventPollCreated,
+		payload.WSEventPollClosed,
+		payload.WSEventDrawCreated,
+		payload.WSEventChecklistUpdated,
+		payload.WSEventGroupMemberJoined,
+		payload.WSEventGroupMemberLeft:
+		return domain_broker.UrgencyStandard
+	case payload.WSEventTokenPriceUpdated:
+		return domain_broker.UrgencyNormal
+	default:
+		return domain_broker.UrgencyStandard
+	}
+}
+
+// resolveDeliveryParameters determines the final urgency and TTL by evaluating
+// caller-supplied options first, then falling back to event-type defaults and configured tier TTLs.
+func (s *notificationService) resolveDeliveryParameters(event payload.WSEvent, opts ...adapter.DispatchOption) (domain_broker.Urgency, time.Duration) {
+	var custom adapter.DispatchOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&custom)
+		}
+	}
+
+	// 1. Resolve Urgency: Caller override > Event-type inherent default
+	urgency := custom.Urgency
+	if urgency == 0 {
+		urgency = defaultUrgencyForEvent(event)
+	}
+
+	// 2. Resolve TTL: Caller override > Configured tier TTL from .env
+	ttl := custom.TTL
+	if ttl <= 0 {
+		switch urgency {
+		case domain_broker.UrgencyRealtime:
+			ttl = s.cfg.RealtimeTTL
+			if ttl <= 0 {
+				ttl = time.Minute
+			}
+		case domain_broker.UrgencyNormal:
+			ttl = s.cfg.NormalTTL
+			if ttl <= 0 {
+				ttl = 15 * time.Minute
+			}
+		default:
+			ttl = s.cfg.StandardTTL
+			if ttl <= 0 {
+				ttl = 5 * time.Minute
+			}
+		}
+	}
+
+	return urgency, ttl
+}
+
+// publishWS encapsulates event dispatching to RabbitMQ with event-driven dynamic urgency and TTL.
+func (s *notificationService) publishWS(ctx context.Context, p payload.WSPayload, opts ...adapter.DispatchOption) {
 	if s.brokerPub == nil {
 		return
 	}
+
+	urgency, ttl := s.resolveDeliveryParameters(p.Event, opts...)
+
 	p.Timestamp = time.Now()
 	if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.WSRoutingKey, p,
-		domain_broker.WithTTL(60*time.Second),
-		domain_broker.WithUrgency(domain_broker.UrgencyRealtime),
+		domain_broker.WithTTL(ttl),
+		domain_broker.WithUrgency(urgency),
 	); err != nil {
 		log.Printf("[NOTIFICATION PUBLISHER WARNING] failed to publish WS event %q to rabbitmq: %v", p.Event, err)
 	}
@@ -345,7 +433,7 @@ func (s *notificationService) CreateGroupAnnouncement(ctx context.Context, owner
 		}
 	}
 
-	// Dispatch real-time WebSocket event via RabbitMQ
+	// Dispatch real-time WebSocket event via RabbitMQ (uses intrinsic UrgencyRealtime and RealtimeTTL)
 	s.publishWS(ctx, payload.WSPayload{
 		Event:      payload.WSEventGroupAnnouncement,
 		TargetType: payload.TargetGroups,
@@ -360,7 +448,7 @@ func (s *notificationService) CreateGroupAnnouncement(ctx context.Context, owner
 	}, nil
 }
 
-func (s *notificationService) DispatchToUser(ctx context.Context, recipientID int64, actorID *int64, groupID *int64, event payload.WSEvent, data any) error {
+func (s *notificationService) DispatchToUser(ctx context.Context, recipientID int64, actorID *int64, groupID *int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
 	if recipientID <= 0 {
 		return exception.ErrBadRequest
 	}
@@ -389,12 +477,12 @@ func (s *notificationService) DispatchToUser(ctx context.Context, recipientID in
 		TargetIDs:  []int64{recipientID},
 		Data:       data,
 		SenderID:   senderID,
-	})
+	}, opts...)
 
 	return nil
 }
 
-func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any) error {
+func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
 	if len(recipientIDs) == 0 {
 		return nil
 	}
@@ -429,16 +517,16 @@ func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs 
 		TargetIDs:  recipientIDs,
 		Data:       data,
 		SenderID:   senderID,
-	})
+	}, opts...)
 
 	return nil
 }
 
-func (s *notificationService) DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientMemberIDs []int64, event payload.WSEvent, data any) error {
+func (s *notificationService) DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientMemberIDs []int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
 	if len(recipientMemberIDs) == 0 {
 		return nil
 	}
-	if err := s.DispatchToUsers(ctx, recipientMemberIDs, actorID, &groupID, event, data); err != nil {
+	if err := s.DispatchToUsers(ctx, recipientMemberIDs, actorID, &groupID, event, data, opts...); err != nil {
 		return err
 	}
 
@@ -452,12 +540,12 @@ func (s *notificationService) DispatchToGroup(ctx context.Context, groupID int64
 		TargetIDs:  []int64{groupID},
 		Data:       data,
 		SenderID:   senderID,
-	})
+	}, opts...)
 
 	return nil
 }
 
-func (s *notificationService) Broadcast(ctx context.Context, actorID *int64, event payload.WSEvent, data any) error {
+func (s *notificationService) Broadcast(ctx context.Context, actorID *int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
 	var senderID int64
 	if actorID != nil {
 		senderID = *actorID
@@ -467,6 +555,6 @@ func (s *notificationService) Broadcast(ctx context.Context, actorID *int64, eve
 		TargetType: payload.TargetBroadcast,
 		Data:       data,
 		SenderID:   senderID,
-	})
+	}, opts...)
 	return nil
 }

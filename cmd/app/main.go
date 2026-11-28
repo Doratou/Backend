@@ -322,7 +322,17 @@ func main() {
 	settlementHandler := handler.NewSettlementHandler(settlementService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
-	notificationService := service.NewNotificationService(notificationRepo, groupRepo, dbTrxManager, rmqPublisher)
+	notificationService := service.NewNotificationService(
+		notificationRepo,
+		groupRepo,
+		dbTrxManager,
+		rmqPublisher,
+		service.NotificationServiceConfig{
+			RealtimeTTL: cfg.Environment.Notification.RealtimeTTL,
+			StandardTTL: cfg.Environment.Notification.StandardTTL,
+			NormalTTL:   cfg.Environment.Notification.NormalTTL,
+		},
+	)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	engine := router.New(router.Dependencies{
 		AuthHandler:         authHandler,

@@ -25,8 +25,15 @@ type Environment struct {
 	PoW        PoWConfig         `mapstructure:",squash"`
 	Google     GoogleOAuthConfig `mapstructure:",squash"`
 	AvalAI     AvalAIConfig      `mapstructure:",squash"`
-	Workers    WorkerConfig      `mapstructure:",squash"`
-	QueueTTL   QueueTTLConfig    `mapstructure:",squash"`
+	Workers      WorkerConfig       `mapstructure:",squash"`
+	QueueTTL     QueueTTLConfig     `mapstructure:",squash"`
+	Notification NotificationConfig `mapstructure:",squash"`
+}
+
+type NotificationConfig struct {
+	RealtimeTTL time.Duration `mapstructure:"NOTIFICATION_WS_REALTIME_TTL"`
+	StandardTTL time.Duration `mapstructure:"NOTIFICATION_WS_STANDARD_TTL"`
+	NormalTTL   time.Duration `mapstructure:"NOTIFICATION_WS_NORMAL_TTL"`
 }
 
 type QueueTTLConfig struct {

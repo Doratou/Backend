@@ -2,10 +2,35 @@ package adapter
 
 import (
 	"context"
+	"time"
 
 	"github.com/Doratou/Backend/internal/application/dto"
+	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
 	"github.com/Doratou/Backend/internal/domain/broker/payload"
 )
+
+// DispatchOptions holds caller overrides for WS notification delivery.
+type DispatchOptions struct {
+	TTL     time.Duration
+	Urgency domain_broker.Urgency
+}
+
+// DispatchOption configures an optional override on dispatch operations.
+type DispatchOption func(*DispatchOptions)
+
+// WithDispatchTTL overrides the default event TTL for this dispatch.
+func WithDispatchTTL(ttl time.Duration) DispatchOption {
+	return func(o *DispatchOptions) {
+		o.TTL = ttl
+	}
+}
+
+// WithDispatchUrgency overrides the intrinsic event urgency for this dispatch.
+func WithDispatchUrgency(urgency domain_broker.Urgency) DispatchOption {
+	return func(o *DispatchOptions) {
+		o.Urgency = urgency
+	}
+}
 
 // NotificationService defines comprehensive business operations for reading, managing,
 // and dispatching notifications across the application.
@@ -38,14 +63,14 @@ type NotificationService interface {
 	CreateGroupAnnouncement(ctx context.Context, ownerUserID, groupID int64, req dto.GroupAnnouncementRequest) (*dto.GroupAnnouncementResponse, error)
 
 	// DispatchToUser saves and publishes a notification targeted to a single recipient.
-	DispatchToUser(ctx context.Context, recipientID int64, actorID *int64, groupID *int64, event payload.WSEvent, data any) error
+	DispatchToUser(ctx context.Context, recipientID int64, actorID *int64, groupID *int64, event payload.WSEvent, data any, opts ...DispatchOption) error
 
 	// DispatchToUsers saves and publishes notifications targeted to multiple recipients.
-	DispatchToUsers(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any) error
+	DispatchToUsers(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any, opts ...DispatchOption) error
 
 	// DispatchToGroup saves and publishes notifications targeted to active members of a group.
-	DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientMemberIDs []int64, event payload.WSEvent, data any) error
+	DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientMemberIDs []int64, event payload.WSEvent, data any, opts ...DispatchOption) error
 
 	// Broadcast publishes a system-wide broadcast event.
-	Broadcast(ctx context.Context, actorID *int64, event payload.WSEvent, data any) error
+	Broadcast(ctx context.Context, actorID *int64, event payload.WSEvent, data any, opts ...DispatchOption) error
 }
