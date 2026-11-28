@@ -5,9 +5,13 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/api/v1/groups/1/announcements
+  url: {{baseUrl}}/api/v1/groups/4/announcements
   body: json
   auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
 }
 
 body:json {
@@ -17,38 +21,34 @@ body:json {
   }
 }
 
-auth:bearer {
-  token: {{token}}
-}
-
 docs {
   # Create Group Announcement
-
+  
   **Method:** `POST`
   **Endpoint:** `/api/v1/groups/:groupID/announcements`
   **Auth:** Required (Group Owner)
-
+  
   ## Description
-
+  
   Allows the group owner to broadcast a custom announcement with arbitrary title and message to all active group members. The owner themselves is excluded from receiving duplicate self-notifications. Persists notification records in the database for all members and immediately publishes a `group.announcement` event to RabbitMQ for real-time WebSocket delivery.
-
+  
   ## Request
-
+  
   ### Path Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `groupID` | `integer` | Yes | Target group ID |
-
+  
   ### Body
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `title` | `string` | Yes | Custom announcement title (1 to 200 characters) |
   | `message` | `string` | Yes | Custom announcement text body (1 to 2000 characters) |
-
+  
   ## Response
-
+  
   **`201 Created`**
   ```json
   {
@@ -59,9 +59,9 @@ docs {
     }
   }
   ```
-
+  
   ## Errors
-
+  
   * `400 Bad Request` — Invalid payload or empty message
   * `401 Unauthorized` — Missing or invalid access token
   * `403 Forbidden` — Caller is not the owner of the group

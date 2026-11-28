@@ -47,8 +47,8 @@ services:
       RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
       RUSTFS_CONSOLE_ENABLE: "true"
     ports:
-      - "127.0.0.1:${RUSTFS_API_PORT:-9000}:9000"
-      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${RUSTFS_API_PORT:?RUSTFS_API_PORT is required}:9000"
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:?RUSTFS_CONSOLE_PORT is required}:9001"
     volumes:
       - rustfsdata:/data
     healthcheck:
@@ -67,11 +67,11 @@ services:
     container_name: doratou-rabbitmq
     restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: ${RMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RMQ_PASSWORD:-guest}
-      RABBITMQ_DEFAULT_VHOST: ${RMQ_VHOST:-/}
+      RABBITMQ_DEFAULT_USER: ${RMQ_USER:?RMQ_USER is required}
+      RABBITMQ_DEFAULT_PASS: ${RMQ_PASSWORD:?RUSTFSRMQ_PASSWORD_API_PORT is required}
+      RABBITMQ_DEFAULT_VHOST: ${RMQ_VHOST:?RMQ_VHOST is required}
     ports:
-      - "127.0.0.1:${RMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RMQ_PORT:?RMQ_PORT is required}:5672"
       - "127.0.0.1:15672:15672"
     volumes:
       - rmqdata:/var/lib/rabbitmq

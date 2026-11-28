@@ -5,7 +5,7 @@ meta {
 }
 
 delete {
-  url: {{baseUrl}}/api/v1/notifications/105
+  url: {{baseUrl}}/api/v1/notifications/16
   body: none
   auth: bearer
 }
@@ -16,25 +16,25 @@ auth:bearer {
 
 docs {
   # Delete Notification
-
+  
   **Method:** `DELETE`
   **Endpoint:** `/api/v1/notifications/:id`
   **Auth:** Required
-
+  
   ## Description
-
+  
   Soft-deletes a single notification belonging to the caller by setting `deleted_at = NOW()`.
-
+  
   ## Request
-
+  
   ### Path Parameters
-
+  
   | Field | Type | Required | Description |
   | --- | --- | --- | --- |
   | `id` | `integer` | Yes | Target notification ID to delete |
-
+  
   ## Response
-
+  
   **`200 OK`**
   ```json
   {
@@ -44,9 +44,9 @@ docs {
     }
   }
   ```
-
+  
   ## Errors
-
+  
   * `400 Bad Request` — Invalid notification ID
   * `401 Unauthorized` — Missing or invalid access token
   * `404 Not Found` — Notification not found or not owned by user
