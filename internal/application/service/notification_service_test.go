@@ -7,6 +7,7 @@ import (
 
 	"github.com/Doratou/Backend/internal/application/dto"
 	"github.com/Doratou/Backend/internal/application/service"
+	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
 	"github.com/Doratou/Backend/internal/domain/broker/payload"
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"
@@ -220,6 +221,21 @@ func (m *mockGroupRepo) CloneWithMembers(ctx context.Context, sourceGroupID int6
 	return nil
 }
 
+type mockPublisher struct {
+	published []payload.WSPayload
+}
+
+func (m *mockPublisher) Publish(ctx context.Context, exchange, routingKey string, msg domain_broker.Message, opts ...domain_broker.PublishOption) error {
+	return nil
+}
+
+func (m *mockPublisher) PublishJSON(ctx context.Context, exchange, routingKey string, p any, opts ...domain_broker.PublishOption) error {
+	if wsPayload, ok := p.(payload.WSPayload); ok {
+		m.published = append(m.published, wsPayload)
+	}
+	return nil
+}
+
 func TestNotificationService_GetAndMarkAsRead(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockNotificationRepo()
@@ -227,7 +243,8 @@ func TestNotificationService_GetAndMarkAsRead(t *testing.T) {
 		groups:  make(map[int64]*entity.Group),
 		members: make(map[int64][]entity.GroupMember),
 	}
-	srv := service.NewNotificationService(repo, groupRepo, nil)
+	pub := &mockPublisher{}
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub)
 
 	// Dispatch 3 notifications
 	_ = srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventFriendRequestReceived, map[string]string{"msg": "hi 1"})
@@ -276,7 +293,8 @@ func TestNotificationService_SyncNotifications(t *testing.T) {
 		groups:  make(map[int64]*entity.Group),
 		members: make(map[int64][]entity.GroupMember),
 	}
-	srv := service.NewNotificationService(repo, groupRepo, nil)
+	pub := &mockPublisher{}
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub)
 
 	_ = srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventTokenPriceUpdated, map[string]int{"price": 100})
 	_ = srv.DispatchToUser(ctx, 10, nil, nil, payload.WSEventTokenPriceUpdated, map[string]int{"price": 110})
@@ -298,7 +316,7 @@ func TestNotificationService_SyncNotifications(t *testing.T) {
 	}
 }
 
-func TestNotificationService_CreateGroupAnnouncement_ExcludesOwner(t *testing.T) {
+func TestNotificationService_CreateGroupAnnouncement_ExcludesOwner_AndPublishesToRMQ(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockNotificationRepo()
 	groupRepo := &mockGroupRepo{
@@ -316,7 +334,8 @@ func TestNotificationService_CreateGroupAnnouncement_ExcludesOwner(t *testing.T)
 			},
 		},
 	}
-	srv := service.NewNotificationService(repo, groupRepo, nil)
+	pub := &mockPublisher{}
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub)
 
 	res, err := srv.CreateGroupAnnouncement(ctx, 100, 1, dto.GroupAnnouncementRequest{
 		Title:   "Important Announcement",
@@ -341,5 +360,54 @@ func TestNotificationService_CreateGroupAnnouncement_ExcludesOwner(t *testing.T)
 	memberList, _ := srv.GetNotifications(ctx, 200, dto.GetNotificationsQuery{})
 	if len(memberList.Items) != 1 {
 		t.Fatalf("expected member 200 to have 1 notification, got %d", len(memberList.Items))
+	}
+
+	// Verify RabbitMQ publish was triggered with TargetGroups
+	if len(pub.published) != 1 {
+		t.Fatalf("expected 1 event published to RMQ, got %d", len(pub.published))
+	}
+	event := pub.published[0]
+	if event.Event != payload.WSEventGroupAnnouncement {
+		t.Fatalf("expected event %s, got %s", payload.WSEventGroupAnnouncement, event.Event)
+	}
+	if event.TargetType != payload.TargetGroups {
+		t.Fatalf("expected target type %s, got %s", payload.TargetGroups, event.TargetType)
+	}
+	if len(event.TargetIDs) != 1 || event.TargetIDs[0] != 1 {
+		t.Fatalf("expected target IDs [1], got %v", event.TargetIDs)
+	}
+	if event.SenderID != 100 {
+		t.Fatalf("expected sender ID 100, got %d", event.SenderID)
+	}
+}
+
+func TestNotificationService_DispatchToUser_PublishesToRMQ(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockNotificationRepo()
+	groupRepo := &mockGroupRepo{
+		groups:  make(map[int64]*entity.Group),
+		members: make(map[int64][]entity.GroupMember),
+	}
+	pub := &mockPublisher{}
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub)
+
+	var actorID int64 = 42
+	err := srv.DispatchToUser(ctx, 10, &actorID, nil, payload.WSEventFriendRequestReceived, map[string]string{"from": "Ali"})
+	if err != nil {
+		t.Fatalf("unexpected error dispatching to user: %v", err)
+	}
+
+	if len(pub.published) != 1 {
+		t.Fatalf("expected 1 event published, got %d", len(pub.published))
+	}
+	ev := pub.published[0]
+	if ev.TargetType != payload.TargetUsers {
+		t.Fatalf("expected target type users, got %s", ev.TargetType)
+	}
+	if len(ev.TargetIDs) != 1 || ev.TargetIDs[0] != 10 {
+		t.Fatalf("expected target IDs [10], got %v", ev.TargetIDs)
+	}
+	if ev.SenderID != 42 {
+		t.Fatalf("expected sender ID 42, got %d", ev.SenderID)
 	}
 }

@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/dto"
+	domain_broker "github.com/Doratou/Backend/internal/domain/broker"
 	"github.com/Doratou/Backend/internal/domain/broker/payload"
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/exception"
@@ -19,6 +21,7 @@ type notificationService struct {
 	repo      domain_repo.NotificationRepository
 	groupRepo domain_repo.GroupRepository
 	dbTrx     database.TrxManager
+	brokerPub domain_broker.Publisher
 }
 
 // NewNotificationService creates a new instance of NotificationService.
@@ -26,11 +29,27 @@ func NewNotificationService(
 	repo domain_repo.NotificationRepository,
 	groupRepo domain_repo.GroupRepository,
 	dbTrx database.TrxManager,
+	brokerPub domain_broker.Publisher,
 ) adapter.NotificationService {
 	return &notificationService{
 		repo:      repo,
 		groupRepo: groupRepo,
 		dbTrx:     dbTrx,
+		brokerPub: brokerPub,
+	}
+}
+
+// publishWS encapsulates real-time event dispatching to RabbitMQ with standard TTL and urgency.
+func (s *notificationService) publishWS(ctx context.Context, p payload.WSPayload) {
+	if s.brokerPub == nil {
+		return
+	}
+	p.Timestamp = time.Now()
+	if err := s.brokerPub.PublishJSON(ctx, domain_broker.NotificationExchange, domain_broker.WSRoutingKey, p,
+		domain_broker.WithTTL(60*time.Second),
+		domain_broker.WithUrgency(domain_broker.UrgencyRealtime),
+	); err != nil {
+		log.Printf("[NOTIFICATION PUBLISHER WARNING] failed to publish WS event %q to rabbitmq: %v", p.Event, err)
 	}
 }
 
@@ -326,6 +345,15 @@ func (s *notificationService) CreateGroupAnnouncement(ctx context.Context, owner
 		}
 	}
 
+	// Dispatch real-time WebSocket event via RabbitMQ
+	s.publishWS(ctx, payload.WSPayload{
+		Event:      payload.WSEventGroupAnnouncement,
+		TargetType: payload.TargetGroups,
+		TargetIDs:  []int64{groupID},
+		Data:       announcementData,
+		SenderID:   ownerUserID,
+	})
+
 	return &dto.GroupAnnouncementResponse{
 		DispatchedCount: len(notifs),
 		GroupID:         groupID,
@@ -347,7 +375,23 @@ func (s *notificationService) DispatchToUser(ctx context.Context, recipientID in
 		return exception.Wrap(exception.ErrInternal, err)
 	}
 
-	return s.repo.Create(ctx, notif)
+	if err := s.repo.Create(ctx, notif); err != nil {
+		return err
+	}
+
+	var senderID int64
+	if actorID != nil {
+		senderID = *actorID
+	}
+	s.publishWS(ctx, payload.WSPayload{
+		Event:      event,
+		TargetType: payload.TargetUsers,
+		TargetIDs:  []int64{recipientID},
+		Data:       data,
+		SenderID:   senderID,
+	})
+
+	return nil
 }
 
 func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any) error {
@@ -371,17 +415,58 @@ func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs 
 		}
 	}
 
-	return s.repo.CreateBatch(ctx, notifs)
+	if err := s.repo.CreateBatch(ctx, notifs); err != nil {
+		return err
+	}
+
+	var senderID int64
+	if actorID != nil {
+		senderID = *actorID
+	}
+	s.publishWS(ctx, payload.WSPayload{
+		Event:      event,
+		TargetType: payload.TargetUsers,
+		TargetIDs:  recipientIDs,
+		Data:       data,
+		SenderID:   senderID,
+	})
+
+	return nil
 }
 
 func (s *notificationService) DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientMemberIDs []int64, event payload.WSEvent, data any) error {
 	if len(recipientMemberIDs) == 0 {
 		return nil
 	}
-	return s.DispatchToUsers(ctx, recipientMemberIDs, actorID, &groupID, event, data)
+	if err := s.DispatchToUsers(ctx, recipientMemberIDs, actorID, &groupID, event, data); err != nil {
+		return err
+	}
+
+	var senderID int64
+	if actorID != nil {
+		senderID = *actorID
+	}
+	s.publishWS(ctx, payload.WSPayload{
+		Event:      event,
+		TargetType: payload.TargetGroups,
+		TargetIDs:  []int64{groupID},
+		Data:       data,
+		SenderID:   senderID,
+	})
+
+	return nil
 }
 
 func (s *notificationService) Broadcast(ctx context.Context, actorID *int64, event payload.WSEvent, data any) error {
-	// Broadcast is primarily handled via RMQ WebSocket worker; DB persistence for broadcast is optional or handled per user.
+	var senderID int64
+	if actorID != nil {
+		senderID = *actorID
+	}
+	s.publishWS(ctx, payload.WSPayload{
+		Event:      event,
+		TargetType: payload.TargetBroadcast,
+		Data:       data,
+		SenderID:   senderID,
+	})
 	return nil
 }
