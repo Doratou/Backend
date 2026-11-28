@@ -148,6 +148,7 @@ func main() {
 	expenseRepo := postgresRepo.NewExpenseRepository(postgresDB)
 	settlementRepo := postgresRepo.NewSettlementRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
+	notificationRepo := postgresRepo.NewNotificationRepository(postgresDB)
 	tripSuggestionRepo := postgresRepo.NewTripSuggestionRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	oauthRepo := postgresRepo.NewOAuthRepository(postgresDB)
@@ -321,12 +322,15 @@ func main() {
 	settlementHandler := handler.NewSettlementHandler(settlementService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
+	notificationService := service.NewNotificationService(notificationRepo, groupRepo, dbTrxManager, rmqPublisher)
+	notificationHandler := handler.NewNotificationHandler(notificationService)
 	engine := router.New(router.Dependencies{
-		AuthHandler:        authHandler,
-		UserHandler:        userHandler,
-		CaptchaHandler:     captchaHandler,
-		AttachmentHandler:  attachmentHandler,
-		AdminReportHandler: adminReportHandler,
+		AuthHandler:         authHandler,
+		UserHandler:         userHandler,
+		CaptchaHandler:      captchaHandler,
+		AttachmentHandler:   attachmentHandler,
+		AdminReportHandler:  adminReportHandler,
+		NotificationHandler: notificationHandler,
 		GroupHandler:       groupHandler,
 		InviteHandler:      inviteHandler,
 		FriendshipHandler:  friendshipHandler,

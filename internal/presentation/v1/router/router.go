@@ -28,6 +28,7 @@ type Dependencies struct {
 	LuckyDrawHandler   *handler.LuckyDrawHandler
 	HamyarHandler      *handler.HamyarHandler
 	InviteHandler      *handler.InviteHandler
+	NotificationHandler *handler.NotificationHandler
 	CaptchaService     adapter.CaptchaService
 	CaptchaEnabled     bool
 	TokenMaker         jwt.TokenMaker
@@ -100,6 +101,9 @@ func New(deps Dependencies) *gin.Engine {
 	}
 	if deps.HamyarHandler != nil {
 		RegisterHamyarRoutes(v1, deps.HamyarHandler, authMiddleware)
+	}
+	if deps.NotificationHandler != nil {
+		RegisterNotificationRoutes(v1, deps.NotificationHandler, authMiddleware)
 	}
 
 	return engine
