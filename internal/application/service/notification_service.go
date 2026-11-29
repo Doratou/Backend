@@ -482,7 +482,7 @@ func (s *notificationService) DispatchToUser(ctx context.Context, recipientID in
 	return nil
 }
 
-func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
+func (s *notificationService) createBatchNotifications(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any) error {
 	if len(recipientIDs) == 0 {
 		return nil
 	}
@@ -503,7 +503,15 @@ func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs 
 		}
 	}
 
-	if err := s.repo.CreateBatch(ctx, notifs); err != nil {
+	return s.repo.CreateBatch(ctx, notifs)
+}
+
+func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
+	if len(recipientIDs) == 0 {
+		return nil
+	}
+
+	if err := s.createBatchNotifications(ctx, recipientIDs, actorID, groupID, event, data); err != nil {
 		return err
 	}
 
@@ -522,11 +530,27 @@ func (s *notificationService) DispatchToUsers(ctx context.Context, recipientIDs 
 	return nil
 }
 
-func (s *notificationService) DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientMemberIDs []int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
-	if len(recipientMemberIDs) == 0 {
+func (s *notificationService) DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientUserIDs []int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
+	if groupID <= 0 {
+		return exception.ErrBadRequest
+	}
+
+	if len(recipientUserIDs) == 0 {
+		members, err := s.groupRepo.ListActiveMembers(ctx, groupID)
+		if err != nil {
+			return exception.Wrap(exception.ErrInternal, err)
+		}
+		recipientUserIDs = make([]int64, 0, len(members))
+		for _, m := range members {
+			recipientUserIDs = append(recipientUserIDs, m.UserID)
+		}
+	}
+
+	if len(recipientUserIDs) == 0 {
 		return nil
 	}
-	if err := s.DispatchToUsers(ctx, recipientMemberIDs, actorID, &groupID, event, data, opts...); err != nil {
+
+	if err := s.createBatchNotifications(ctx, recipientUserIDs, actorID, &groupID, event, data); err != nil {
 		return err
 	}
 

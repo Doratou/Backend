@@ -529,3 +529,58 @@ func TestNotificationService_CallerOverride(t *testing.T) {
 		t.Errorf("override: expected TTL 30s, got %v", pub.records[0].opts.TTL)
 	}
 }
+
+func TestNotificationService_DispatchToGroup_AutoResolvesMembersAndPublishesOnce(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockNotificationRepo()
+	groupRepo := &mockGroupRepo{
+		groups: map[int64]*entity.Group{
+			5: {Title: "Trip Group"},
+		},
+		members: map[int64][]entity.GroupMember{
+			5: {
+				{UserID: 100},
+				{UserID: 200},
+				{UserID: 300},
+			},
+		},
+	}
+	pub := &mockPublisher{}
+	srv := service.NewNotificationService(repo, groupRepo, nil, pub, testServiceConfig)
+
+	actorID := int64(100)
+	err := srv.DispatchToGroup(ctx, 5, &actorID, nil, payload.WSEventPollCreated, payload.PollCreatedData{
+		PollID:   1,
+		GroupID:  5,
+		Question: "Where to go?",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify DB rows saved for ALL 3 members including actorID
+	for _, uid := range []int64{100, 200, 300} {
+		list, lErr := srv.GetNotifications(ctx, uid, dto.GetNotificationsQuery{Limit: 10})
+		if lErr != nil {
+			t.Fatalf("unexpected error fetching notifications for user %d: %v", uid, lErr)
+		}
+		if len(list.Items) != 1 {
+			t.Fatalf("expected 1 notification for user %d, got %d", uid, len(list.Items))
+		}
+	}
+
+	// Verify RabbitMQ received ONLY ONE message (TargetGroups), not duplicate TargetUsers + TargetGroups
+	if len(pub.records) != 1 {
+		t.Fatalf("expected exactly 1 RabbitMQ publish, got %d", len(pub.records))
+	}
+	ev := pub.records[0].payload
+	if ev.TargetType != payload.TargetGroups {
+		t.Fatalf("expected target type %s, got %s", payload.TargetGroups, ev.TargetType)
+	}
+	if len(ev.TargetIDs) != 1 || ev.TargetIDs[0] != 5 {
+		t.Fatalf("expected target group ID [5], got %v", ev.TargetIDs)
+	}
+	if ev.SenderID != 100 {
+		t.Fatalf("expected sender ID 100, got %d", ev.SenderID)
+	}
+}

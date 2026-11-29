@@ -69,7 +69,8 @@ type NotificationService interface {
 	DispatchToUsers(ctx context.Context, recipientIDs []int64, actorID *int64, groupID *int64, event payload.WSEvent, data any, opts ...DispatchOption) error
 
 	// DispatchToGroup saves and publishes notifications targeted to active members of a group.
-	DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientMemberIDs []int64, event payload.WSEvent, data any, opts ...DispatchOption) error
+	// If recipientUserIDs is empty, all active members of the group are resolved automatically.
+	DispatchToGroup(ctx context.Context, groupID int64, actorID *int64, recipientUserIDs []int64, event payload.WSEvent, data any, opts ...DispatchOption) error
 
 	// Broadcast publishes a system-wide broadcast event.
 	Broadcast(ctx context.Context, actorID *int64, event payload.WSEvent, data any, opts ...DispatchOption) error
