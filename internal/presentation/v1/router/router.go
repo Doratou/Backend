@@ -27,9 +27,10 @@ type Dependencies struct {
 	SettlementHandler  *handler.SettlementHandler
 	LuckyDrawHandler   *handler.LuckyDrawHandler
 	HamyarHandler      *handler.HamyarHandler
-	InviteHandler      *handler.InviteHandler
+	InviteHandler       *handler.InviteHandler
 	NotificationHandler *handler.NotificationHandler
-	CaptchaService     adapter.CaptchaService
+	TokenPriceHandler   *handler.TokenPriceHandler
+	CaptchaService      adapter.CaptchaService
 	CaptchaEnabled     bool
 	TokenMaker         jwt.TokenMaker
 	TokenRepo          cache.AuthnTokenRepository
@@ -104,6 +105,9 @@ func New(deps Dependencies) *gin.Engine {
 	}
 	if deps.NotificationHandler != nil {
 		RegisterNotificationRoutes(v1, deps.NotificationHandler, authMiddleware)
+	}
+	if deps.TokenPriceHandler != nil {
+		RegisterTokenPriceRoutes(v1, deps.TokenPriceHandler, authMiddleware)
 	}
 
 	return engine
