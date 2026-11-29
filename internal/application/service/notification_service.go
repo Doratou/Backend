@@ -67,6 +67,7 @@ func defaultUrgencyForEvent(e payload.WSEvent) domain_broker.Urgency {
 		payload.WSEventSettlementPaid,
 		payload.WSEventDrawResult,
 		payload.WSEventAdminReportAnswered,
+		payload.WSEventGroupInviteReceived,
 		payload.WSEventGroupAnnouncement:
 		return domain_broker.UrgencyRealtime
 	case payload.WSEventPollCreated,

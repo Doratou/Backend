@@ -50,9 +50,10 @@ const (
 	// 6. Admin Report Events
 	WSEventAdminReportAnswered WSEvent = "admin_report.answered"
 
-	// 7. Group Membership Events
-	WSEventGroupMemberJoined WSEvent = "group.member_joined"
-	WSEventGroupMemberLeft   WSEvent = "group.member_left"
+	// 7. Group Membership & Invite Events
+	WSEventGroupMemberJoined   WSEvent = "group.member_joined"
+	WSEventGroupMemberLeft     WSEvent = "group.member_left"
+	WSEventGroupInviteReceived WSEvent = "group.invite_received"
 
 	// 8. Token Price Events
 	WSEventTokenPriceUpdated WSEvent = "token.price_updated"
@@ -74,6 +75,7 @@ func (e WSEvent) IsValid() bool {
 		WSEventAdminReportAnswered,
 		WSEventGroupMemberJoined,
 		WSEventGroupMemberLeft,
+		WSEventGroupInviteReceived,
 		WSEventTokenPriceUpdated,
 		WSEventGroupAnnouncement:
 		return true

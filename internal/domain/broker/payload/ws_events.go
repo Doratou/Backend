@@ -166,6 +166,18 @@ type GroupMemberLeftData struct {
 	LeftAt    time.Time `json:"left_at"`
 }
 
+// GroupInviteReceivedData is the data contract for WSEventGroupInviteReceived.
+// Dispatched to an invited user when they receive a direct group invitation.
+type GroupInviteReceivedData struct {
+	InviteID       int64     `json:"invite_id"`
+	GroupID        int64     `json:"group_id"`
+	GroupName      string    `json:"group_name"`
+	SenderID       string    `json:"sender_id"`
+	SenderName     string    `json:"sender_name"`
+	SenderAvatarID int64     `json:"sender_avatar_id,omitempty"`
+	InvitedAt      time.Time `json:"invited_at"`
+}
+
 // ============================================================================
 // 8. Token Price Payloads
 // ============================================================================
