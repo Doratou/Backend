@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Doratou/Backend/bootstrap"
+	"github.com/Doratou/Backend/internal/application/decorator"
 	"github.com/Doratou/Backend/internal/application/service"
 	"github.com/Doratou/Backend/internal/infrastructure/ai"
 	brokerInfra "github.com/Doratou/Backend/internal/infrastructure/broker/rabbitmq"
@@ -304,6 +305,25 @@ func main() {
 		redisTrxManager,
 	)
 
+	notificationService := service.NewNotificationService(
+		notificationRepo,
+		groupRepo,
+		dbTrxManager,
+		rmqPublisher,
+		service.NotificationServiceConfig{
+			RealtimeTTL: cfg.Environment.Notification.RealtimeTTL,
+			StandardTTL: cfg.Environment.Notification.StandardTTL,
+			NormalTTL:   cfg.Environment.Notification.NormalTTL,
+		},
+	)
+
+	// Decorate domain services with real-time & persistent event notification dispatching.
+	friendshipService = decorator.NewFriendshipNotificationDecorator(friendshipService, notificationService, friendshipRepo, userRepo)
+	settlementService = decorator.NewSettlementNotificationDecorator(settlementService, notificationService, groupRepo)
+	pollService = decorator.NewPollNotificationDecorator(pollService, notificationService, groupRepo, userRepo)
+	luckyDrawService = decorator.NewLuckyDrawNotificationDecorator(luckyDrawService, notificationService, groupRepo, userRepo)
+	checklistService = decorator.NewChecklistNotificationDecorator(checklistService, notificationService, groupRepo, userRepo, checklistRepo)
+
 	// 8. Presentation Handlers & Routers
 	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(&cfg.Environment.OAuth, authService)
@@ -322,17 +342,6 @@ func main() {
 	settlementHandler := handler.NewSettlementHandler(settlementService)
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
-	notificationService := service.NewNotificationService(
-		notificationRepo,
-		groupRepo,
-		dbTrxManager,
-		rmqPublisher,
-		service.NotificationServiceConfig{
-			RealtimeTTL: cfg.Environment.Notification.RealtimeTTL,
-			StandardTTL: cfg.Environment.Notification.StandardTTL,
-			NormalTTL:   cfg.Environment.Notification.NormalTTL,
-		},
-	)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	engine := router.New(router.Dependencies{
 		AuthHandler:         authHandler,
