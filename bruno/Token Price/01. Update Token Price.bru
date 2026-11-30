@@ -1,0 +1,59 @@
+meta {
+  name: 01. Update Token Price
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/api/v1/admin/token-price
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "price_toman": 12500
+  }
+}
+
+docs {
+  # Update Token Price
+  
+  **Method:** `PUT`
+  **Endpoint:** `/api/v1/admin/token-price`
+  **Auth:** Required (Admin)
+  
+  ## Description
+  
+  Updates the singleton platform token price in Toman. When the price actually changes, broadcasts a `token.price_updated` event via RabbitMQ to notify all active WebSocket sessions.
+  
+  ## Request
+  
+  | Field | Type | Required | Description |
+  | --- | --- | --- | --- |
+  | `price_toman` | `integer` | Yes | New token price in Toman (must be greater than 0) |
+  
+  ## Response
+  
+  **`200 OK`**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "old_price_toman": 10000,
+      "new_price_toman": 12500,
+      "updated_at": "2026-11-25T16:50:00Z"
+    }
+  }
+  ```
+  
+  ## Errors
+  
+  * `400 Bad Request` — Invalid payload or non-positive price
+  * `401 Unauthorized` — Missing or invalid access token
+  * `403 Forbidden` — Caller does not have `ADMIN` role
+}
