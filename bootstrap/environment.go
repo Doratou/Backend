@@ -19,12 +19,12 @@ type Environment struct {
 	Email      EmailConfig   `mapstructure:",squash"`
 	OAuth      OAuthConfig   `mapstructure:",squash"`
 
-	Invite     InvitationConfig  `mapstructure:",squash"`
-	Friendship FriendshipConfig  `mapstructure:",squash"`
-	RustFS     RustFSConfig      `mapstructure:",squash"`
-	PoW        PoWConfig         `mapstructure:",squash"`
-	Google     GoogleOAuthConfig `mapstructure:",squash"`
-	AvalAI     AvalAIConfig      `mapstructure:",squash"`
+	Invite       InvitationConfig   `mapstructure:",squash"`
+	Friendship   FriendshipConfig   `mapstructure:",squash"`
+	RustFS       RustFSConfig       `mapstructure:",squash"`
+	PoW          PoWConfig          `mapstructure:",squash"`
+	Google       GoogleOAuthConfig  `mapstructure:",squash"`
+	AvalAI       AvalAIConfig       `mapstructure:",squash"`
 	Workers      WorkerConfig       `mapstructure:",squash"`
 	QueueTTL     QueueTTLConfig     `mapstructure:",squash"`
 	Notification NotificationConfig `mapstructure:",squash"`

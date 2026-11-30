@@ -14,27 +14,27 @@ import (
 
 // Dependencies bundles all handlers and presentation dependencies needed to wire routes.
 type Dependencies struct {
-	AttachmentHandler  *handler.AttachmentHandler
-	AuthHandler        *handler.AuthHandler
-	UserHandler        *handler.UserHandler
-	CaptchaHandler     *handler.CaptchaHandler
-	AdminReportHandler *handler.AdminReportHandler
-	FriendshipHandler  *handler.FriendshipHandler
-	GroupHandler       *handler.GroupHandler
-	PollHandler        *handler.PollHandler
-	ChecklistHandler   *handler.ChecklistHandler
-	ExpenseHandler     *handler.ExpenseHandler
-	SettlementHandler  *handler.SettlementHandler
-	LuckyDrawHandler   *handler.LuckyDrawHandler
-	HamyarHandler      *handler.HamyarHandler
+	AttachmentHandler   *handler.AttachmentHandler
+	AuthHandler         *handler.AuthHandler
+	UserHandler         *handler.UserHandler
+	CaptchaHandler      *handler.CaptchaHandler
+	AdminReportHandler  *handler.AdminReportHandler
+	FriendshipHandler   *handler.FriendshipHandler
+	GroupHandler        *handler.GroupHandler
+	PollHandler         *handler.PollHandler
+	ChecklistHandler    *handler.ChecklistHandler
+	ExpenseHandler      *handler.ExpenseHandler
+	SettlementHandler   *handler.SettlementHandler
+	LuckyDrawHandler    *handler.LuckyDrawHandler
+	HamyarHandler       *handler.HamyarHandler
 	InviteHandler       *handler.InviteHandler
 	NotificationHandler *handler.NotificationHandler
 	TokenPriceHandler   *handler.TokenPriceHandler
 	CaptchaService      adapter.CaptchaService
-	CaptchaEnabled     bool
-	TokenMaker         jwt.TokenMaker
-	TokenRepo          cache.AuthnTokenRepository
-	EmailFontFiles     fs.FS
+	CaptchaEnabled      bool
+	TokenMaker          jwt.TokenMaker
+	TokenRepo           cache.AuthnTokenRepository
+	EmailFontFiles      fs.FS
 }
 
 // New builds the fully configured Gin engine with global middlewares and versioned routes.

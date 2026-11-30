@@ -212,8 +212,8 @@ func (m *mockGroupRepo) FindAll(ctx context.Context, status *enum.GroupStatus, l
 func (m *mockGroupRepo) IsActiveMember(ctx context.Context, groupID, userID int64) (bool, error) {
 	return true, nil
 }
-func (m *mockGroupRepo) Update(ctx context.Context, group *entity.Group) error       { return nil }
-func (m *mockGroupRepo) UpdateCover(ctx context.Context, group *entity.Group) error  { return nil }
+func (m *mockGroupRepo) Update(ctx context.Context, group *entity.Group) error      { return nil }
+func (m *mockGroupRepo) UpdateCover(ctx context.Context, group *entity.Group) error { return nil }
 func (m *mockGroupRepo) SetStatus(ctx context.Context, groupID int64, status enum.GroupStatus) error {
 	return nil
 }
