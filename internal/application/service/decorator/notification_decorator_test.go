@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/Doratou/Backend/internal/application/adapter"
-	"github.com/Doratou/Backend/internal/application/decorator"
 	"github.com/Doratou/Backend/internal/application/dto"
+	"github.com/Doratou/Backend/internal/application/service/decorator"
 	"github.com/Doratou/Backend/internal/domain/broker/payload"
 	"github.com/Doratou/Backend/internal/domain/entity"
 	"github.com/Doratou/Backend/internal/domain/enum"

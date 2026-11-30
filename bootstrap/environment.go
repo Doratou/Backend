@@ -31,9 +31,10 @@ type Environment struct {
 }
 
 type NotificationConfig struct {
-	RealtimeTTL time.Duration `mapstructure:"NOTIFICATION_WS_REALTIME_TTL"`
-	StandardTTL time.Duration `mapstructure:"NOTIFICATION_WS_STANDARD_TTL"`
-	NormalTTL   time.Duration `mapstructure:"NOTIFICATION_WS_NORMAL_TTL"`
+	RealtimeTTL    time.Duration `mapstructure:"NOTIFICATION_WS_REALTIME_TTL"`
+	StandardTTL    time.Duration `mapstructure:"NOTIFICATION_WS_STANDARD_TTL"`
+	NormalTTL      time.Duration `mapstructure:"NOTIFICATION_WS_NORMAL_TTL"`
+	SeedDemoEvents bool          `mapstructure:"NOTIFICATION_SEED_DEMO_EVENTS"`
 }
 
 type QueueTTLConfig struct {

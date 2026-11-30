@@ -14,8 +14,8 @@ import (
 
 	"github.com/Doratou/Backend/bootstrap"
 	"github.com/Doratou/Backend/internal/application/adapter"
-	"github.com/Doratou/Backend/internal/application/decorator"
 	"github.com/Doratou/Backend/internal/application/service"
+	"github.com/Doratou/Backend/internal/application/service/decorator"
 	"github.com/Doratou/Backend/internal/infrastructure/ai"
 	brokerInfra "github.com/Doratou/Backend/internal/infrastructure/broker/rabbitmq"
 	"github.com/Doratou/Backend/internal/infrastructure/database"
@@ -331,6 +331,27 @@ func main() {
 	inviteService = decorator.NewInviteNotificationDecorator(inviteService, notificationService, groupRepo, userRepo)
 	tokenPriceService = decorator.NewTokenPriceNotificationDecorator(tokenPriceService, notificationService)
 
+	// 7.1 Optional End-to-End Notification Demo Seeder (runs all 14 real event flows on startup)
+	if cfg.Environment.Notification.SeedDemoEvents {
+		seedNotifCtx, cancelSeedNotif := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := seed.SeedNotificationEvents(seedNotifCtx, seed.NotificationSeedDeps{
+			DB:                  postgresDB,
+			FriendshipService:   friendshipService,
+			SettlementService:   settlementService,
+			PollService:         pollService,
+			LuckyDrawService:    luckyDrawService,
+			ChecklistService:    checklistService,
+			AdminReportService:  adminReportService,
+			GroupService:        groupService,
+			InviteService:       inviteService,
+			TokenPriceService:   tokenPriceService,
+			NotificationService: notificationService,
+		}); err != nil {
+			log.Printf("[SEED NOTIFICATIONS WARNING] failed to emit demo notification events: %v", err)
+		}
+		cancelSeedNotif()
+	}
+
 	// 8. Presentation Handlers & Routers
 	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(&cfg.Environment.OAuth, authService)
@@ -359,20 +380,20 @@ func main() {
 		AdminReportHandler:  adminReportHandler,
 		NotificationHandler: notificationHandler,
 		TokenPriceHandler:   tokenPriceHandler,
-		GroupHandler:       groupHandler,
-		InviteHandler:      inviteHandler,
-		FriendshipHandler:  friendshipHandler,
-		PollHandler:        pollHandler,
-		ChecklistHandler:   checklistHandler,
-		ExpenseHandler:     expenseHandler,
-		SettlementHandler:  settlementHandler,
-		LuckyDrawHandler:   luckyDrawHandler,
-		HamyarHandler:      hamyarHandler,
-		CaptchaService:     captchaService,
-		CaptchaEnabled:     cfg.Environment.Captcha.Enabled,
-		TokenMaker:         jwtMaker,
-		TokenRepo:          tokenRepo,
-		EmailFontFiles:     emailFontFiles,
+		GroupHandler:        groupHandler,
+		InviteHandler:       inviteHandler,
+		FriendshipHandler:   friendshipHandler,
+		PollHandler:         pollHandler,
+		ChecklistHandler:    checklistHandler,
+		ExpenseHandler:      expenseHandler,
+		SettlementHandler:   settlementHandler,
+		LuckyDrawHandler:    luckyDrawHandler,
+		HamyarHandler:       hamyarHandler,
+		CaptchaService:      captchaService,
+		CaptchaEnabled:      cfg.Environment.Captcha.Enabled,
+		TokenMaker:          jwtMaker,
+		TokenRepo:           tokenRepo,
+		EmailFontFiles:      emailFontFiles,
 	})
 
 	// 9. HTTP Server Lifecycle & Graceful Shutdown
