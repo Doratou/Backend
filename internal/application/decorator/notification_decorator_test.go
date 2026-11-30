@@ -58,6 +58,16 @@ func (m *mockNotifService) DispatchToGroup(ctx context.Context, groupID int64, a
 	return nil
 }
 
+func (m *mockNotifService) Broadcast(ctx context.Context, actorID *int64, event payload.WSEvent, data any, opts ...adapter.DispatchOption) error {
+	m.calls = append(m.calls, dispatchCall{
+		kind:    "broadcast",
+		actorID: actorID,
+		event:   event,
+		data:    data,
+	})
+	return nil
+}
+
 type mockUserRepo struct {
 	domain_db.UserRepository
 	users map[int64]*entity.User
@@ -72,7 +82,8 @@ func (m *mockUserRepo) FindByID(ctx context.Context, id int64) (*entity.User, er
 
 type mockGroupRepo struct {
 	domain_db.GroupRepository
-	groups map[int64]*entity.Group
+	groups        map[int64]*entity.Group
+	activeMembers map[int64]*entity.GroupMember
 }
 
 func (m *mockGroupRepo) FindByID(ctx context.Context, id int64) (*entity.Group, int64, error) {
@@ -80,6 +91,15 @@ func (m *mockGroupRepo) FindByID(ctx context.Context, id int64) (*entity.Group, 
 		return g, 3, nil
 	}
 	return nil, 0, errors.New("group not found")
+}
+
+func (m *mockGroupRepo) FindActiveMemberByID(ctx context.Context, groupID, memberID int64) (*entity.GroupMember, error) {
+	if m.activeMembers != nil {
+		if member, ok := m.activeMembers[memberID]; ok && member.GroupID == groupID {
+			return member, nil
+		}
+	}
+	return nil, errors.New("member not found")
 }
 
 type mockFriendshipRepo struct {

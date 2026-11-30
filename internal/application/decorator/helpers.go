@@ -52,3 +52,12 @@ func dispatchGroupNotification(ctx context.Context, notifSvc adapter.Notificatio
 		log.Printf("[NOTIFICATION WARNING] failed to dispatch %q to group %d: %v", event, groupID, err)
 	}
 }
+
+func dispatchBroadcastNotification(ctx context.Context, notifSvc adapter.NotificationService, actorID *int64, event payload.WSEvent, data any) {
+	if notifSvc == nil {
+		return
+	}
+	if err := notifSvc.Broadcast(ctx, actorID, event, data); err != nil {
+		log.Printf("[NOTIFICATION WARNING] failed to broadcast %q: %v", event, err)
+	}
+}
