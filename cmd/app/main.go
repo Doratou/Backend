@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Doratou/Backend/bootstrap"
+	"github.com/Doratou/Backend/internal/application/adapter"
 	"github.com/Doratou/Backend/internal/application/decorator"
 	"github.com/Doratou/Backend/internal/application/service"
 	"github.com/Doratou/Backend/internal/infrastructure/ai"
@@ -150,6 +151,7 @@ func main() {
 	settlementRepo := postgresRepo.NewSettlementRepository(postgresDB)
 	luckyDrawRepo := postgresRepo.NewLuckyDrawRepository(postgresDB)
 	notificationRepo := postgresRepo.NewNotificationRepository(postgresDB)
+	tokenPriceRepo := postgresRepo.NewTokenPriceRepository(postgresDB)
 	tripSuggestionRepo := postgresRepo.NewTripSuggestionRepository(postgresDB)
 	inviteRepo := postgresRepo.NewInviteRepository(postgresDB)
 	oauthRepo := postgresRepo.NewOAuthRepository(postgresDB)
@@ -251,8 +253,8 @@ func main() {
 		},
 		cfg.Constant,
 	)
-	groupService := service.NewGroupService(groupRepo, attachmentRepo)
-	inviteService := service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
+	var groupService adapter.GroupService = service.NewGroupService(groupRepo, attachmentRepo)
+	var inviteService adapter.InviteService = service.NewInviteService(groupRepo, inviteRepo, friendshipRepo, userRepo, passwordHasher, cfg.Environment.Invite.SecretKey, cfg.Environment.Invite.DirectInviteRejectCooldown)
 	pollService := service.NewPollService(pollRepo, userRepo, dbTrxManager)
 	luckyDrawService := service.NewLuckyDrawService(luckyDrawRepo, userRepo, dbTrxManager, randomInfra.NewCryptoGenerator())
 
@@ -260,6 +262,7 @@ func main() {
 		adminReportRepo,
 		userRepo,
 	)
+	tokenPriceService := service.NewTokenPriceService(tokenPriceRepo)
 	weatherService := service.NewWeatherService(weatherInfra.NewCachedWeatherProvider(weatherInfra.NewOpenMeteoClient(), redisCache))
 	aiModel := cfg.Environment.AvalAI.Model
 	tripSuggestionService := service.NewTripSuggestionService(ai.NewAvalAIClient(ai.AvalAIConfig{
@@ -323,6 +326,10 @@ func main() {
 	pollService = decorator.NewPollNotificationDecorator(pollService, notificationService, groupRepo, userRepo)
 	luckyDrawService = decorator.NewLuckyDrawNotificationDecorator(luckyDrawService, notificationService, groupRepo, userRepo)
 	checklistService = decorator.NewChecklistNotificationDecorator(checklistService, notificationService, groupRepo, userRepo, checklistRepo)
+	adminReportService = decorator.NewAdminReportNotificationDecorator(adminReportService, notificationService, userRepo)
+	groupService = decorator.NewGroupNotificationDecorator(groupService, notificationService, groupRepo, userRepo)
+	inviteService = decorator.NewInviteNotificationDecorator(inviteService, notificationService, groupRepo, userRepo)
+	tokenPriceService = decorator.NewTokenPriceNotificationDecorator(tokenPriceService, notificationService)
 
 	// 8. Presentation Handlers & Routers
 	userHandler := handler.NewUserHandler(userService)
@@ -343,6 +350,7 @@ func main() {
 	luckyDrawHandler := handler.NewLuckyDrawHandler(luckyDrawService)
 	inviteHandler := handler.NewInviteHandler(inviteService)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
+	tokenPriceHandler := handler.NewTokenPriceHandler(tokenPriceService)
 	engine := router.New(router.Dependencies{
 		AuthHandler:         authHandler,
 		UserHandler:         userHandler,
@@ -350,6 +358,7 @@ func main() {
 		AttachmentHandler:   attachmentHandler,
 		AdminReportHandler:  adminReportHandler,
 		NotificationHandler: notificationHandler,
+		TokenPriceHandler:   tokenPriceHandler,
 		GroupHandler:       groupHandler,
 		InviteHandler:      inviteHandler,
 		FriendshipHandler:  friendshipHandler,
